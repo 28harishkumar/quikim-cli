@@ -1,6 +1,6 @@
 # Quikim CLI
 
-Command-line interface for managing Quikim projects and running the MCP server for Cursor IDE integration.
+Command-line interface for managing Quikim projects and running the MCP server for IDE integration (Cursor, Kiro, Windsurf, Zed, VS Code, Claude Code).
 
 ## Installation
 
@@ -26,10 +26,12 @@ quikim login
 # 2. Connect to a project
 quikim connect
 
-# 3. Configure Cursor IDE (one-time setup)
+# 3. Configure your IDE (one-time setup)
+# For Cursor:
 quikim mcp install-cursor
+# For other editors: install-kiro, install-windsurf, install-zed, install-vscode, install-claude-code
 
-# 4. Restart Cursor - Quikim tools are now available!
+# 4. Restart your IDE - Quikim tools are now available!
 ```
 
 ## Commands
@@ -54,14 +56,19 @@ quikim mcp install-cursor
 | `quikim project disconnect` | Disconnect from current project        |
 
 
-### MCP Server (Cursor Integration)
+### MCP Server (IDE Integration)
 
-| Command                       | Description                       |
-| ----------------------------- | --------------------------------- |
-| `quikim mcp install-cursor`   | Configure MCP server in Cursor    |
-| `quikim mcp uninstall-cursor` | Remove MCP server from Cursor     |
-| `quikim mcp status`           | Show MCP server status            |
-| `quikim mcp serve`            | Start MCP server (used by Cursor) |
+| Command                          | Description                              |
+| -------------------------------- | ---------------------------------------- |
+| `quikim mcp install-cursor`      | Configure MCP server in Cursor           |
+| `quikim mcp install-kiro`        | Configure MCP server in Kiro             |
+| `quikim mcp install-windsurf`    | Configure MCP server in Windsurf         |
+| `quikim mcp install-zed`         | Configure MCP server in Zed              |
+| `quikim mcp install-vscode`      | Configure MCP server in VS Code          |
+| `quikim mcp install-claude-code` | Configure MCP server in Claude Code      |
+| `quikim mcp uninstall-<editor>`  | Remove MCP server from specified editor |
+| `quikim mcp status`              | Show MCP server status for all editors  |
+| `quikim mcp serve`               | Start MCP server (used by all editors)  |
 
 
 ### Configuration
@@ -83,14 +90,14 @@ quikim mcp install-cursor
 
 ## How It Works
 
-The CLI integrates with Cursor IDE through the Model Context Protocol (MCP):
+The CLI integrates with supported IDEs through the Model Context Protocol (MCP):
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Developer's Machine                      │
 │                                                             │
 │  ┌─────────────────┐      ┌────────────────────────────┐    │
-│  │   Cursor IDE    │◄────►│   Quikim MCP Server        │    │
+│  │   Your IDE      │◄────►│   Quikim MCP Server        │    │
 │  │  (MCP Host)     │      │   (quikim mcp serve)       │    │
 │  └─────────────────┘      │                            │    │
 │                           │  Uses CLI's stored auth    │    │
@@ -105,9 +112,9 @@ The CLI integrates with Cursor IDE through the Model Context Protocol (MCP):
                           └────────────────────────────────┘
 ```
 
-### MCP Tools Available in Cursor
+### MCP Tools Available in Supported IDEs
 
-Once configured, these tools are available in Cursor's AI assistant:
+Once configured, these tools are available in your IDE's AI assistant:
 
 - `push_requirements` / `pull_requirements` - Sync requirements
 - `push_hld` / `pull_hld` - Sync high-level designs

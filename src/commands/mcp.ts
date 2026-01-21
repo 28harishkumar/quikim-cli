@@ -13,34 +13,330 @@ import * as output from "../utils/output.js";
 import { homedir, platform } from "os";
 import { join } from "path";
 import { readFile, writeFile, mkdir } from "fs/promises";
+import { cwd } from "process";
+import chalk from "chalk";
 
-/** Cursor MCP config file path based on OS */
-function getCursorMcpConfigPath(): string {
-  const home = homedir();
-  const os = platform();
-  
-  if (os === "win32") {
-    return join(home, "AppData", "Roaming", "Cursor", "User", "globalStorage", "mcp.json");
-  } else if (os === "darwin") {
-    return join(home, ".cursor", "mcp.json");
-  } else {
-    // Linux
-    return join(home, ".config", "cursor", "mcp.json");
-  }
-}
+/** Supported editor types */
+type EditorType = "cursor" | "kiro" | "windsurf" | "zed" | "vscode" | "claude-code";
 
-/** MCP server configuration for Cursor */
+/** MCP server configuration */
 interface MCPServerConfig {
   command: string;
   args: string[];
   env?: Record<string, string>;
 }
 
+/** Editor configuration interface */
+interface EditorConfig {
+  name: string;
+  getConfigPath: () => string;
+  getConfigDir: () => string;
+  readConfig: (path: string) => Promise<unknown>;
+  writeConfig: (path: string, config: unknown) => Promise<void>;
+  isProjectLevel?: boolean;
+}
+
+/** Cursor MCP config structure */
 interface CursorMCPConfig {
   mcpServers: Record<string, MCPServerConfig>;
 }
 
-/** Start MCP server handler (called by Cursor) */
+/** VS Code MCP config structure */
+interface VSCodeMCPConfig {
+  mcpServers: Record<string, MCPServerConfig>;
+}
+
+/** Zed settings structure */
+interface ZedSettings {
+  mcp?: {
+    servers?: Record<string, MCPServerConfig>;
+  };
+  [key: string]: unknown;
+}
+
+/** Windsurf MCP config structure */
+interface WindsurfMCPConfig {
+  servers?: Record<string, MCPServerConfig>;
+  [key: string]: unknown;
+}
+
+/** Kiro MCP config structure */
+interface KiroMCPConfig {
+  servers?: Record<string, MCPServerConfig>;
+  [key: string]: unknown;
+}
+
+/** Claude Code config structure */
+interface ClaudeCodeConfig {
+  mcp?: {
+    servers?: Record<string, MCPServerConfig>;
+  };
+  [key: string]: unknown;
+}
+
+/** Get editor configuration based on editor type */
+function getEditorConfig(editor: EditorType): EditorConfig {
+  const home = homedir();
+  const os = platform();
+  const projectRoot = cwd();
+
+  const configs: Record<EditorType, EditorConfig> = {
+    cursor: {
+      name: "Cursor",
+      getConfigPath: () => {
+        if (os === "win32") {
+          return join(home, "AppData", "Roaming", "Cursor", "User", "globalStorage", "mcp.json");
+        } else if (os === "darwin") {
+          return join(home, ".cursor", "mcp.json");
+        } else {
+          return join(home, ".config", "cursor", "mcp.json");
+        }
+      },
+      getConfigDir: () => {
+        const path = configs.cursor.getConfigPath();
+        return join(path, "..");
+      },
+      readConfig: async (path: string) => {
+        try {
+          const content = await readFile(path, "utf-8");
+          return JSON.parse(content) as CursorMCPConfig;
+        } catch {
+          return { mcpServers: {} } as CursorMCPConfig;
+        }
+      },
+      writeConfig: async (path: string, config: unknown) => {
+        await writeFile(path, JSON.stringify(config, null, 2), "utf-8");
+      },
+      isProjectLevel: false,
+    },
+    kiro: {
+      name: "Kiro",
+      getConfigPath: () => join(projectRoot, ".kiro", "settings", "mcp.json"),
+      getConfigDir: () => join(projectRoot, ".kiro", "settings"),
+      readConfig: async (path: string) => {
+        try {
+          const content = await readFile(path, "utf-8");
+          return JSON.parse(content) as KiroMCPConfig;
+        } catch {
+          return { servers: {} } as KiroMCPConfig;
+        }
+      },
+      writeConfig: async (path: string, config: unknown) => {
+        await writeFile(path, JSON.stringify(config, null, 2), "utf-8");
+      },
+      isProjectLevel: true,
+    },
+    windsurf: {
+      name: "Windsurf",
+      getConfigPath: () => {
+        if (os === "win32") {
+          return join(home, ".codeium", "windsurf", "mcp_config.json");
+        } else {
+          return join(home, ".codeium", "windsurf", "mcp_config.json");
+        }
+      },
+      getConfigDir: () => {
+        const path = configs.windsurf.getConfigPath();
+        return join(path, "..");
+      },
+      readConfig: async (path: string) => {
+        try {
+          const content = await readFile(path, "utf-8");
+          return JSON.parse(content) as WindsurfMCPConfig;
+        } catch {
+          return { servers: {} } as WindsurfMCPConfig;
+        }
+      },
+      writeConfig: async (path: string, config: unknown) => {
+        await writeFile(path, JSON.stringify(config, null, 2), "utf-8");
+      },
+      isProjectLevel: false,
+    },
+    zed: {
+      name: "Zed",
+      getConfigPath: () => {
+        if (os === "win32") {
+          return join(home, "AppData", "Roaming", "Zed", "settings.json");
+        } else {
+          return join(home, ".config", "zed", "settings.json");
+        }
+      },
+      getConfigDir: () => {
+        const path = configs.zed.getConfigPath();
+        return join(path, "..");
+      },
+      readConfig: async (path: string) => {
+        try {
+          const content = await readFile(path, "utf-8");
+          return JSON.parse(content) as ZedSettings;
+        } catch {
+          return {} as ZedSettings;
+        }
+      },
+      writeConfig: async (path: string, config: unknown) => {
+        await writeFile(path, JSON.stringify(config, null, 2), "utf-8");
+      },
+      isProjectLevel: false,
+    },
+    vscode: {
+      name: "VS Code",
+      getConfigPath: () => {
+        if (os === "win32") {
+          return join(home, "AppData", "Roaming", "Code", "User", "mcp.json");
+        } else if (os === "darwin") {
+          return join(home, "Library", "Application Support", "Code", "User", "mcp.json");
+        } else {
+          return join(home, ".config", "Code", "User", "mcp.json");
+        }
+      },
+      getConfigDir: () => {
+        const path = configs.vscode.getConfigPath();
+        return join(path, "..");
+      },
+      readConfig: async (path: string) => {
+        try {
+          const content = await readFile(path, "utf-8");
+          return JSON.parse(content) as VSCodeMCPConfig;
+        } catch {
+          return { mcpServers: {} } as VSCodeMCPConfig;
+        }
+      },
+      writeConfig: async (path: string, config: unknown) => {
+        await writeFile(path, JSON.stringify(config, null, 2), "utf-8");
+      },
+      isProjectLevel: false,
+    },
+    "claude-code": {
+      name: "Claude Code",
+      getConfigPath: () => join(home, ".claude.json"),
+      getConfigDir: () => home,
+      readConfig: async (path: string) => {
+        try {
+          const content = await readFile(path, "utf-8");
+          return JSON.parse(content) as ClaudeCodeConfig;
+        } catch {
+          return {} as ClaudeCodeConfig;
+        }
+      },
+      writeConfig: async (path: string, config: unknown) => {
+        await writeFile(path, JSON.stringify(config, null, 2), "utf-8");
+      },
+      isProjectLevel: false,
+    },
+  };
+
+  return configs[editor];
+}
+
+/** Get MCP server configuration */
+function getMCPServerConfig(): MCPServerConfig {
+  const env: Record<string, string> = {};
+
+  // Pass API URLs based on current CLI config
+  if (configManager.isLocalMode()) {
+    env.QUIKIM_API_BASE_URL = configManager.getProjectServiceUrl();
+  } else {
+    env.QUIKIM_API_BASE_URL = configManager.getApiUrl();
+  }
+
+  return {
+    command: "quikim",
+    args: ["mcp", "serve"],
+    env: Object.keys(env).length > 0 ? env : undefined,
+  };
+}
+
+/** Check if Quikim is configured in editor config */
+function isQuikimConfigured(config: unknown, editor: EditorType): boolean {
+  if (editor === "cursor" || editor === "vscode") {
+    const c = config as CursorMCPConfig | VSCodeMCPConfig;
+    return !!(c.mcpServers && c.mcpServers.quikim);
+  } else if (editor === "kiro" || editor === "windsurf") {
+    const c = config as KiroMCPConfig | WindsurfMCPConfig;
+    return !!(c.servers && c.servers.quikim);
+  } else if (editor === "zed") {
+    const c = config as ZedSettings;
+    return !!(c.mcp && c.mcp.servers && c.mcp.servers.quikim);
+  } else if (editor === "claude-code") {
+    const c = config as ClaudeCodeConfig;
+    return !!(c.mcp && c.mcp.servers && c.mcp.servers.quikim);
+  }
+  return false;
+}
+
+/** Add Quikim to editor config */
+function addQuikimToConfig(config: unknown, editor: EditorType): unknown {
+  const serverConfig = getMCPServerConfig();
+
+  if (editor === "cursor" || editor === "vscode") {
+    const c = config as CursorMCPConfig | VSCodeMCPConfig;
+    if (!c.mcpServers) {
+      c.mcpServers = {};
+    }
+    c.mcpServers.quikim = serverConfig;
+    return c;
+  } else if (editor === "kiro" || editor === "windsurf") {
+    const c = config as KiroMCPConfig | WindsurfMCPConfig;
+    if (!c.servers) {
+      c.servers = {};
+    }
+    c.servers.quikim = serverConfig;
+    return c;
+  } else if (editor === "zed") {
+    const c = config as ZedSettings;
+    if (!c.mcp) {
+      c.mcp = {};
+    }
+    if (!c.mcp.servers) {
+      c.mcp.servers = {};
+    }
+    c.mcp.servers.quikim = serverConfig;
+    return c;
+  } else if (editor === "claude-code") {
+    const c = config as ClaudeCodeConfig;
+    if (!c.mcp) {
+      c.mcp = {};
+    }
+    if (!c.mcp.servers) {
+      c.mcp.servers = {};
+    }
+    c.mcp.servers.quikim = serverConfig;
+    return c;
+  }
+  return config;
+}
+
+/** Remove Quikim from editor config */
+function removeQuikimFromConfig(config: unknown, editor: EditorType): unknown {
+  if (editor === "cursor" || editor === "vscode") {
+    const c = config as CursorMCPConfig | VSCodeMCPConfig;
+    if (c.mcpServers && c.mcpServers.quikim) {
+      delete c.mcpServers.quikim;
+    }
+    return c;
+  } else if (editor === "kiro" || editor === "windsurf") {
+    const c = config as KiroMCPConfig | WindsurfMCPConfig;
+    if (c.servers && c.servers.quikim) {
+      delete c.servers.quikim;
+    }
+    return c;
+  } else if (editor === "zed") {
+    const c = config as ZedSettings;
+    if (c.mcp && c.mcp.servers && c.mcp.servers.quikim) {
+      delete c.mcp.servers.quikim;
+    }
+    return c;
+  } else if (editor === "claude-code") {
+    const c = config as ClaudeCodeConfig;
+    if (c.mcp && c.mcp.servers && c.mcp.servers.quikim) {
+      delete c.mcp.servers.quikim;
+    }
+    return c;
+  }
+  return config;
+}
+
+/** Start MCP server handler (called by any editor) */
 async function serveHandler(): Promise<void> {
   // Import and start the MCP server
   const { MCPCursorProtocolServer } = await import("../mcp/server.js");
@@ -49,12 +345,13 @@ async function serveHandler(): Promise<void> {
   await server.start();
 }
 
-/** Install MCP server configuration for Cursor */
-async function installCursorHandler(options: { force?: boolean }): Promise<void> {
-  const configPath = getCursorMcpConfigPath();
-  const configDir = join(configPath, "..");
+/** Install MCP server configuration for an editor */
+async function installEditorHandler(editor: EditorType, options: { force?: boolean }): Promise<void> {
+  const editorConfig = getEditorConfig(editor);
+  const configPath = editorConfig.getConfigPath();
+  const configDir = editorConfig.getConfigDir();
   
-  output.header("Installing Quikim MCP Server for Cursor");
+  output.header(`Installing Quikim MCP Server for ${editorConfig.name}`);
   output.separator();
   
   // Check authentication status
@@ -72,110 +369,160 @@ async function installCursorHandler(options: { force?: boolean }): Promise<void>
   }
   
   // Read existing config or create new one
-  let config: CursorMCPConfig = { mcpServers: {} };
-  try {
-    const existingContent = await readFile(configPath, "utf-8");
-    config = JSON.parse(existingContent) as CursorMCPConfig;
-  } catch {
-    // File doesn't exist or is invalid, use default
-  }
+  let config = await editorConfig.readConfig(configPath);
   
   // Check if quikim already configured
-  if (config.mcpServers.quikim && !options.force) {
-    output.info("Quikim MCP server is already configured in Cursor.");
+  if (isQuikimConfigured(config, editor) && !options.force) {
+    output.info(`Quikim MCP server is already configured in ${editorConfig.name}.`);
     output.info('Use --force to overwrite the existing configuration.');
     return;
   }
   
-  // Build environment variables for MCP server
-  const env: Record<string, string> = {};
-  
-  // Pass API URLs based on current CLI config
-  if (configManager.isLocalMode()) {
-    env.QUIKIM_API_BASE_URL = configManager.getProjectServiceUrl();
-  } else {
-    env.QUIKIM_API_BASE_URL = configManager.getApiUrl();
-  }
-  
   // Add quikim MCP server configuration
-  config.mcpServers.quikim = {
-    command: "quikim",
-    args: ["mcp", "serve"],
-    env: Object.keys(env).length > 0 ? env : undefined,
-  };
+  config = addQuikimToConfig(config, editor);
   
   // Write config
   try {
-    await writeFile(configPath, JSON.stringify(config, null, 2), "utf-8");
-    output.success("Quikim MCP server configured for Cursor!");
+    await editorConfig.writeConfig(configPath, config);
+    output.success(`Quikim MCP server configured for ${editorConfig.name}!`);
     output.separator();
     output.tableRow("Config file", configPath);
     output.tableRow("Command", "quikim mcp serve");
     output.separator();
-    output.info("Restart Cursor to activate the MCP server.");
-    output.info('After restart, Quikim tools will be available in Cursor\'s AI assistant.');
+    output.info(`Restart ${editorConfig.name} to activate the MCP server.`);
+    output.info(`After restart, Quikim tools will be available in ${editorConfig.name}'s AI assistant.`);
+    if (editorConfig.isProjectLevel) {
+      output.warning(`Note: This is a project-level configuration. The config file is in your project directory.`);
+    }
   } catch (err) {
     output.error(`Failed to write config: ${err instanceof Error ? err.message : "Unknown error"}`);
     process.exit(1);
   }
 }
 
-/** Uninstall MCP server configuration from Cursor */
-async function uninstallCursorHandler(): Promise<void> {
-  const configPath = getCursorMcpConfigPath();
+/** Uninstall MCP server configuration from an editor */
+async function uninstallEditorHandler(editor: EditorType): Promise<void> {
+  const editorConfig = getEditorConfig(editor);
+  const configPath = editorConfig.getConfigPath();
   
-  output.header("Uninstalling Quikim MCP Server from Cursor");
+  output.header(`Uninstalling Quikim MCP Server from ${editorConfig.name}`);
   output.separator();
   
   // Read existing config
-  let config: CursorMCPConfig;
+  let config;
   try {
-    const existingContent = await readFile(configPath, "utf-8");
-    config = JSON.parse(existingContent) as CursorMCPConfig;
+    config = await editorConfig.readConfig(configPath);
   } catch {
-    output.info("No Cursor MCP configuration found.");
+    output.info(`No ${editorConfig.name} MCP configuration found.`);
     return;
   }
   
   // Check if quikim is configured
-  if (!config.mcpServers.quikim) {
-    output.info("Quikim MCP server is not configured in Cursor.");
+  if (!isQuikimConfigured(config, editor)) {
+    output.info(`Quikim MCP server is not configured in ${editorConfig.name}.`);
     return;
   }
   
   // Remove quikim configuration
-  delete config.mcpServers.quikim;
+  config = removeQuikimFromConfig(config, editor);
   
   // Write config
   try {
-    await writeFile(configPath, JSON.stringify(config, null, 2), "utf-8");
-    output.success("Quikim MCP server removed from Cursor configuration.");
-    output.info("Restart Cursor to apply changes.");
+    await editorConfig.writeConfig(configPath, config);
+    output.success(`Quikim MCP server removed from ${editorConfig.name} configuration.`);
+    output.info(`Restart ${editorConfig.name} to apply changes.`);
   } catch (err) {
     output.error(`Failed to write config: ${err instanceof Error ? err.message : "Unknown error"}`);
     process.exit(1);
   }
 }
 
+/** Install handler for specific editor */
+async function installCursorHandler(options: { force?: boolean }): Promise<void> {
+  return installEditorHandler("cursor", options);
+}
+
+async function installKiroHandler(options: { force?: boolean }): Promise<void> {
+  return installEditorHandler("kiro", options);
+}
+
+async function installWindsurfHandler(options: { force?: boolean }): Promise<void> {
+  return installEditorHandler("windsurf", options);
+}
+
+async function installZedHandler(options: { force?: boolean }): Promise<void> {
+  return installEditorHandler("zed", options);
+}
+
+async function installVSCodeHandler(options: { force?: boolean }): Promise<void> {
+  return installEditorHandler("vscode", options);
+}
+
+async function installClaudeCodeHandler(options: { force?: boolean }): Promise<void> {
+  return installEditorHandler("claude-code", options);
+}
+
+/** Uninstall handler for specific editor */
+async function uninstallCursorHandler(): Promise<void> {
+  return uninstallEditorHandler("cursor");
+}
+
+async function uninstallKiroHandler(): Promise<void> {
+  return uninstallEditorHandler("kiro");
+}
+
+async function uninstallWindsurfHandler(): Promise<void> {
+  return uninstallEditorHandler("windsurf");
+}
+
+async function uninstallZedHandler(): Promise<void> {
+  return uninstallEditorHandler("zed");
+}
+
+async function uninstallVSCodeHandler(): Promise<void> {
+  return uninstallEditorHandler("vscode");
+}
+
+async function uninstallClaudeCodeHandler(): Promise<void> {
+  return uninstallEditorHandler("claude-code");
+}
+
 /** Show MCP server status */
 async function statusHandler(): Promise<void> {
-  const configPath = getCursorMcpConfigPath();
-  
   output.header("Quikim MCP Server Status");
   output.separator();
   
-  // Check Cursor configuration
-  let cursorConfigured = false;
-  try {
-    const content = await readFile(configPath, "utf-8");
-    const config = JSON.parse(content) as CursorMCPConfig;
-    cursorConfigured = !!config.mcpServers?.quikim;
-  } catch {
-    // Config doesn't exist
+  // Check all editor configurations
+  const editors: EditorType[] = ["cursor", "kiro", "windsurf", "zed", "vscode", "claude-code"];
+  const editorStatus: Array<{ name: string; configured: boolean; path: string }> = [];
+  
+  for (const editor of editors) {
+    const editorConfig = getEditorConfig(editor);
+    const configPath = editorConfig.getConfigPath();
+    let configured = false;
+    
+    try {
+      const config = await editorConfig.readConfig(configPath);
+      configured = isQuikimConfigured(config, editor);
+    } catch {
+      // Config doesn't exist
+    }
+    
+    editorStatus.push({
+      name: editorConfig.name,
+      configured,
+      path: configPath,
+    });
   }
   
-  output.tableRow("Cursor configured", cursorConfigured ? "Yes" : "No");
-  output.tableRow("Config path", configPath);
+  output.info("Editor Configurations:");
+  for (const status of editorStatus) {
+    const statusText = status.configured ? chalk.green("Yes") : chalk.gray("No");
+    output.tableRow(`${status.name}`, statusText);
+    if (status.configured) {
+      output.tableRow(`  Config path`, status.path);
+    }
+  }
   output.separator();
   
   // Check authentication
@@ -201,10 +548,18 @@ async function statusHandler(): Promise<void> {
   // API configuration
   output.tableRow("API URL", configManager.getApiUrl());
   output.tableRow("Local mode", configManager.isLocalMode() ? "Yes" : "No");
+  output.separator();
   
-  if (!cursorConfigured) {
-    output.separator();
-    output.info('Run "quikim mcp install-cursor" to configure Cursor.');
+  // Show installation suggestions
+  const configuredEditors = editorStatus.filter(e => e.configured);
+  if (configuredEditors.length === 0) {
+    output.info("No editors configured. Install for your editor:");
+    output.info('  quikim mcp install-cursor     - Install for Cursor');
+    output.info('  quikim mcp install-kiro       - Install for Kiro');
+    output.info('  quikim mcp install-windsurf   - Install for Windsurf');
+    output.info('  quikim mcp install-zed        - Install for Zed');
+    output.info('  quikim mcp install-vscode      - Install for VS Code');
+    output.info('  quikim mcp install-claude-code - Install for Claude Code');
   }
   
   if (!isAuthenticated) {
@@ -224,9 +579,10 @@ export function createMCPCommands(): Command {
 
   mcp
     .command("serve")
-    .description("Start the MCP server (used by Cursor)")
+    .description("Start the MCP server (used by supported editors)")
     .action(serveHandler);
 
+  // Install commands for each editor
   mcp
     .command("install-cursor")
     .description("Configure Quikim MCP server in Cursor IDE")
@@ -234,13 +590,69 @@ export function createMCPCommands(): Command {
     .action(installCursorHandler);
 
   mcp
+    .command("install-kiro")
+    .description("Configure Quikim MCP server in Kiro IDE")
+    .option("-f, --force", "Overwrite existing configuration")
+    .action(installKiroHandler);
+
+  mcp
+    .command("install-windsurf")
+    .description("Configure Quikim MCP server in Windsurf IDE")
+    .option("-f, --force", "Overwrite existing configuration")
+    .action(installWindsurfHandler);
+
+  mcp
+    .command("install-zed")
+    .description("Configure Quikim MCP server in Zed Editor")
+    .option("-f, --force", "Overwrite existing configuration")
+    .action(installZedHandler);
+
+  mcp
+    .command("install-vscode")
+    .description("Configure Quikim MCP server in VS Code")
+    .option("-f, --force", "Overwrite existing configuration")
+    .action(installVSCodeHandler);
+
+  mcp
+    .command("install-claude-code")
+    .description("Configure Quikim MCP server in Claude Code")
+    .option("-f, --force", "Overwrite existing configuration")
+    .action(installClaudeCodeHandler);
+
+  // Uninstall commands for each editor
+  mcp
     .command("uninstall-cursor")
     .description("Remove Quikim MCP server from Cursor IDE")
     .action(uninstallCursorHandler);
 
   mcp
+    .command("uninstall-kiro")
+    .description("Remove Quikim MCP server from Kiro IDE")
+    .action(uninstallKiroHandler);
+
+  mcp
+    .command("uninstall-windsurf")
+    .description("Remove Quikim MCP server from Windsurf IDE")
+    .action(uninstallWindsurfHandler);
+
+  mcp
+    .command("uninstall-zed")
+    .description("Remove Quikim MCP server from Zed Editor")
+    .action(uninstallZedHandler);
+
+  mcp
+    .command("uninstall-vscode")
+    .description("Remove Quikim MCP server from VS Code")
+    .action(uninstallVSCodeHandler);
+
+  mcp
+    .command("uninstall-claude-code")
+    .description("Remove Quikim MCP server from Claude Code")
+    .action(uninstallClaudeCodeHandler);
+
+  mcp
     .command("status")
-    .description("Show MCP server status and configuration")
+    .description("Show MCP server status and configuration for all editors")
     .action(statusHandler);
 
   return mcp;
