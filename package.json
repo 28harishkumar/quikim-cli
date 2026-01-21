@@ -33,12 +33,15 @@
     "fast-xml-parser": "^4.3.0",
     "inquirer": "^9.3.7",
     "ora": "^8.1.0",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "diff-match-patch": "^1.0.5",
+    "chokidar": "^3.6.0"
   },
   "devDependencies": {
     "@types/inquirer": "^9.0.7",
     "@types/node": "^22.10.0",
     "@types/uuid": "^9.0.0",
+    "@types/diff-match-patch": "^1.0.36",
     "typescript": "^5.6.3"
   },
   "engines": {

@@ -1,5 +1,5 @@
 /**
- * Quikim - Bidirectional Sync Service
+ * Quikim - Enhanced Bidirectional Sync Service
  * 
  * Copyright (c) 2026 Quikim Inc.
  * 
@@ -7,6 +7,11 @@
  * See LICENSE file in the project root for full license information.
  */
 
+import { createHash } from "crypto";
+import { diff_match_patch } from "diff-match-patch";
+import { watch, FSWatcher } from "chokidar";
+import { join } from "path";
+import { readFile, writeFile, mkdir, access, readdir } from "fs/promises";
 import { logger } from '../utils/logger.js';
 import { errorHandler, ErrorContext } from '../utils/error-handler.js';
 import { WorkflowIntegrationService, ArtifactType, ChangeCategory } from './workflow-integration.js';
@@ -14,9 +19,11 @@ import { WorkflowIntegrationService, ArtifactType, ChangeCategory } from './work
 export interface SyncConfiguration {
   enableAutoSync: boolean;
   syncInterval: number; // milliseconds
-  conflictResolution: "manual" | "auto_merge" | "last_writer_wins";
+  conflictResolution: "manual" | "auto_merge" | "last_writer_wins" | "three_way_merge";
   enableVersioning: boolean;
   maxSyncRetries: number;
+  enableFileWatchers: boolean;
+  projectPath?: string; // Path to project root for file watching
 }
 
 export interface SyncStatus {
@@ -27,13 +34,28 @@ export interface SyncStatus {
   status: "synced" | "pending" | "conflict" | "error";
   conflictReason?: string;
   errorMessage?: string;
+  version?: number;
+  vectorClock?: VectorClock;
+}
+
+export interface VectorClock {
+  [userId: string]: number;
+}
+
+export interface SyncState {
+  lastSyncChecksum: string;
+  lastSyncTime: Date;
+  version: number;
+  vectorClock: VectorClock;
+  baseContent?: string; // For three-way merge
+  baseChecksum?: string;
 }
 
 export interface ConflictResolution {
   artifactId: string;
   artifactType: ArtifactType;
   conflictId: string;
-  resolution: "keep_ide" | "keep_server" | "merge" | "manual";
+  resolution: "keep_ide" | "keep_server" | "merge" | "manual" | "three_way";
   resolvedContent?: string;
   resolvedBy: string;
   resolvedAt: Date;
@@ -49,7 +71,8 @@ export interface SyncEvent {
   checksum: string;
   timestamp: Date;
   userId: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
+  vectorClock?: VectorClock;
 }
 
 export interface SyncConflict {
@@ -59,16 +82,20 @@ export interface SyncConflict {
   artifactId: string;
   ideContent: string;
   serverContent: string;
+  baseContent?: string; // For three-way merge
   ideChecksum: string;
   serverChecksum: string;
-  conflictType: "content" | "version" | "lock";
+  baseChecksum?: string;
+  ideVectorClock: VectorClock;
+  serverVectorClock: VectorClock;
+  conflictType: "content" | "version" | "lock" | "concurrent";
   detectedAt: Date;
   status: "pending" | "resolved" | "ignored";
 }
 
 /**
- * Bidirectional Sync Service
- * Handles synchronization between IDE and server with conflict resolution
+ * Enhanced Bidirectional Sync Service
+ * Handles synchronization between IDE and server with advanced conflict resolution
  */
 export class BidirectionalSyncService {
   private workflowIntegration: WorkflowIntegrationService;
@@ -77,6 +104,9 @@ export class BidirectionalSyncService {
   private syncEvents: SyncEvent[] = [];
   private conflicts: Map<string, SyncConflict> = new Map();
   private syncIntervals: Map<string, NodeJS.Timeout> = new Map();
+  private fileWatchers: Map<string, FSWatcher> = new Map();
+  private syncStates: Map<string, SyncState> = new Map();
+  private dmp = new diff_match_patch();
   private isInitialized: boolean = false;
 
   constructor(
@@ -97,10 +127,20 @@ export class BidirectionalSyncService {
     };
 
     try {
-      logger.info("Initializing bidirectional sync service", this.config);
+      logger.info("Initializing enhanced bidirectional sync service", this.config);
 
       // Validate configuration
       this.validateConfiguration();
+
+      // Load persisted sync states
+      if (this.config.projectPath) {
+        await this.loadSyncStates();
+      }
+
+      // Start file watchers if enabled
+      if (this.config.enableFileWatchers && this.config.projectPath) {
+        await this.startFileWatchers();
+      }
 
       // Start auto-sync if enabled
       if (this.config.enableAutoSync) {
@@ -108,7 +148,7 @@ export class BidirectionalSyncService {
       }
 
       this.isInitialized = true;
-      logger.info("Bidirectional sync service initialized successfully");
+      logger.info("Enhanced bidirectional sync service initialized successfully");
 
     } catch (error) {
       const recoveryResult = await errorHandler.handleError(error, context);
@@ -132,7 +172,7 @@ export class BidirectionalSyncService {
     artifactId: string,
     content: string,
     userId: string,
-    metadata?: any
+    metadata?: Record<string, unknown>
   ): Promise<SyncStatus> {
     const context: ErrorContext = {
       operation: "syncToIDE",
@@ -154,15 +194,21 @@ export class BidirectionalSyncService {
 
       const statusKey = this.getStatusKey(projectId, artifactType, artifactId);
       const checksum = this.calculateChecksum(content);
+      const vectorClock = this.updateVectorClock(statusKey, userId);
 
+      // Load sync state for three-way merge
+      const syncState = this.syncStates.get(statusKey);
+      
       // Check for conflicts before syncing
-      const conflict = await this.detectConflict(
+      const conflict = await this.detectConflictWithVectorClock(
         projectId,
         artifactType,
         artifactId,
         content,
         checksum,
-        "to_ide"
+        vectorClock,
+        "to_ide",
+        syncState
       );
 
       if (conflict) {
@@ -172,7 +218,8 @@ export class BidirectionalSyncService {
           lastSyncTime: new Date(),
           syncDirection: "to_ide",
           status: "conflict",
-          conflictReason: `Conflict detected: ${conflict.conflictType}`
+          conflictReason: `Conflict detected: ${conflict.conflictType}`,
+          vectorClock
         };
         this.syncStatuses.set(statusKey, status);
         return status;
@@ -189,7 +236,8 @@ export class BidirectionalSyncService {
         checksum,
         timestamp: new Date(),
         userId,
-        metadata
+        metadata,
+        vectorClock
       };
 
       this.syncEvents.push(syncEvent);
@@ -203,13 +251,25 @@ export class BidirectionalSyncService {
         userId
       );
 
+      // Update sync state
+      await this.updateSyncState(statusKey, {
+        lastSyncChecksum: checksum,
+        lastSyncTime: new Date(),
+        version: (syncState?.version || 0) + 1,
+        vectorClock,
+        baseContent: syncState?.baseContent || content,
+        baseChecksum: syncState?.baseChecksum || checksum
+      });
+
       // Update sync status
       const status: SyncStatus = {
         artifactId,
         artifactType,
         lastSyncTime: new Date(),
         syncDirection: "to_ide",
-        status: "synced"
+        status: "synced",
+        version: syncState ? (syncState.version + 1) : 1,
+        vectorClock
       };
       this.syncStatuses.set(statusKey, status);
 
@@ -248,7 +308,7 @@ export class BidirectionalSyncService {
     artifactId: string,
     content: string,
     userId: string,
-    metadata?: any
+    metadata?: Record<string, unknown>
   ): Promise<SyncStatus> {
     const context: ErrorContext = {
       operation: "syncFromIDE",
@@ -270,15 +330,21 @@ export class BidirectionalSyncService {
 
       const statusKey = this.getStatusKey(projectId, artifactType, artifactId);
       const checksum = this.calculateChecksum(content);
+      const vectorClock = this.updateVectorClock(statusKey, userId);
+
+      // Load sync state
+      const syncState = this.syncStates.get(statusKey);
 
       // Check for conflicts before syncing
-      const conflict = await this.detectConflict(
+      const conflict = await this.detectConflictWithVectorClock(
         projectId,
         artifactType,
         artifactId,
         content,
         checksum,
-        "from_ide"
+        vectorClock,
+        "from_ide",
+        syncState
       );
 
       if (conflict) {
@@ -288,7 +354,8 @@ export class BidirectionalSyncService {
           lastSyncTime: new Date(),
           syncDirection: "from_ide",
           status: "conflict",
-          conflictReason: `Conflict detected: ${conflict.conflictType}`
+          conflictReason: `Conflict detected: ${conflict.conflictType}`,
+          vectorClock
         };
         this.syncStatuses.set(statusKey, status);
         return status;
@@ -305,7 +372,8 @@ export class BidirectionalSyncService {
         checksum,
         timestamp: new Date(),
         userId,
-        metadata
+        metadata,
+        vectorClock
       };
 
       this.syncEvents.push(syncEvent);
@@ -321,7 +389,7 @@ export class BidirectionalSyncService {
 
       // Detect and record the change
       const existingStatus = this.syncStatuses.get(statusKey);
-      const oldContent = existingStatus ? undefined : ""; // Would fetch from server in real implementation
+      const oldContent = syncState?.baseContent || "";
 
       await this.workflowIntegration.detectChange(
         projectId,
@@ -336,13 +404,25 @@ export class BidirectionalSyncService {
         metadata
       );
 
+      // Update sync state
+      await this.updateSyncState(statusKey, {
+        lastSyncChecksum: checksum,
+        lastSyncTime: new Date(),
+        version: (syncState?.version || 0) + 1,
+        vectorClock,
+        baseContent: syncState?.baseContent || content,
+        baseChecksum: syncState?.baseChecksum || checksum
+      });
+
       // Update sync status
       const status: SyncStatus = {
         artifactId,
         artifactType,
         lastSyncTime: new Date(),
         syncDirection: "from_ide",
-        status: "synced"
+        status: "synced",
+        version: syncState ? (syncState.version + 1) : 1,
+        vectorClock
       };
       this.syncStatuses.set(statusKey, status);
 
@@ -373,7 +453,7 @@ export class BidirectionalSyncService {
   }
 
   /**
-   * Perform bidirectional sync for an artifact
+   * Perform bidirectional sync for an artifact with three-way merge support
    */
   async bidirectionalSync(
     projectId: string,
@@ -405,8 +485,11 @@ export class BidirectionalSyncService {
         userId
       });
 
+      const statusKey = this.getStatusKey(projectId, artifactType, artifactId);
       const ideChecksum = this.calculateChecksum(ideContent);
       const serverChecksum = this.calculateChecksum(serverContent);
+      const ideVectorClock = this.updateVectorClock(statusKey, userId);
+      const serverVectorClock = this.updateVectorClock(statusKey, "server");
 
       // Check if content is identical
       if (ideChecksum === serverChecksum) {
@@ -415,16 +498,26 @@ export class BidirectionalSyncService {
           artifactType,
           lastSyncTime: new Date(),
           syncDirection: "bidirectional",
-          status: "synced"
+          status: "synced",
+          vectorClock: ideVectorClock
         };
         
-        const statusKey = this.getStatusKey(projectId, artifactType, artifactId);
         this.syncStatuses.set(statusKey, status);
-        
         return { status };
       }
 
-      // Content differs - check for conflicts
+      // Load sync state for three-way merge
+      const syncState = this.syncStates.get(statusKey);
+      const baseContent = syncState?.baseContent;
+      const baseChecksum = syncState?.baseChecksum;
+
+      // Check for concurrent modifications using vector clocks
+      const isConcurrent = this.isConcurrentModification(
+        ideVectorClock,
+        serverVectorClock
+      );
+
+      // Create conflict
       const conflict = await this.createConflict(
         projectId,
         artifactType,
@@ -432,22 +525,42 @@ export class BidirectionalSyncService {
         ideContent,
         serverContent,
         ideChecksum,
-        serverChecksum
+        serverChecksum,
+        ideVectorClock,
+        serverVectorClock,
+        baseContent,
+        baseChecksum,
+        isConcurrent
       );
 
       // Attempt automatic resolution based on configuration
       if (this.config.conflictResolution !== "manual") {
-        const resolution = await this.resolveConflictAutomatically(conflict, userId);
+        const resolution = await this.resolveConflictAutomatically(
+          conflict,
+          userId,
+          baseContent
+        );
         if (resolution) {
+          // Update sync state with merged content
+          await this.updateSyncState(statusKey, {
+            lastSyncChecksum: this.calculateChecksum(resolution.resolvedContent || ""),
+            lastSyncTime: new Date(),
+            version: (syncState?.version || 0) + 1,
+            vectorClock: this.mergeVectorClocks(ideVectorClock, serverVectorClock),
+            baseContent: resolution.resolvedContent,
+            baseChecksum: this.calculateChecksum(resolution.resolvedContent || "")
+          });
+
           const status: SyncStatus = {
             artifactId,
             artifactType,
             lastSyncTime: new Date(),
             syncDirection: "bidirectional",
-            status: "synced"
+            status: "synced",
+            version: syncState ? (syncState.version + 1) : 1,
+            vectorClock: this.mergeVectorClocks(ideVectorClock, serverVectorClock)
           };
           
-          const statusKey = this.getStatusKey(projectId, artifactType, artifactId);
           this.syncStatuses.set(statusKey, status);
           
           return { 
@@ -464,10 +577,10 @@ export class BidirectionalSyncService {
         lastSyncTime: new Date(),
         syncDirection: "bidirectional",
         status: "conflict",
-        conflictReason: "Manual resolution required"
+        conflictReason: "Manual resolution required",
+        vectorClock: this.mergeVectorClocks(ideVectorClock, serverVectorClock)
       };
       
-      const statusKey = this.getStatusKey(projectId, artifactType, artifactId);
       this.syncStatuses.set(statusKey, status);
       
       return { status, conflict };
@@ -498,7 +611,7 @@ export class BidirectionalSyncService {
    */
   async resolveConflict(
     conflictId: string,
-    resolution: "keep_ide" | "keep_server" | "merge" | "manual",
+    resolution: "keep_ide" | "keep_server" | "merge" | "manual" | "three_way",
     resolvedContent?: string,
     resolvedBy?: string
   ): Promise<ConflictResolution> {
@@ -537,6 +650,16 @@ export class BidirectionalSyncService {
         case "merge":
           finalContent = this.mergeContent(conflict.ideContent, conflict.serverContent);
           break;
+        case "three_way":
+          if (!conflict.baseContent) {
+            throw new Error("Base content required for three-way merge");
+          }
+          finalContent = this.threeWayMerge(
+            conflict.baseContent,
+            conflict.ideContent,
+            conflict.serverContent
+          );
+          break;
         case "manual":
           if (!resolvedContent) {
             throw new Error("Resolved content is required for manual resolution");
@@ -562,19 +685,36 @@ export class BidirectionalSyncService {
       conflict.status = "resolved";
       this.conflicts.set(conflictId, conflict);
 
-      // Update sync status
+      // Update sync state
       const statusKey = this.getStatusKey(
         conflict.projectId,
         conflict.artifactType,
         conflict.artifactId
       );
+
+      await this.updateSyncState(statusKey, {
+        lastSyncChecksum: this.calculateChecksum(finalContent),
+        lastSyncTime: new Date(),
+        version: (this.syncStates.get(statusKey)?.version || 0) + 1,
+        vectorClock: this.mergeVectorClocks(
+          conflict.ideVectorClock,
+          conflict.serverVectorClock
+        ),
+        baseContent: finalContent,
+        baseChecksum: this.calculateChecksum(finalContent)
+      });
       
       const status: SyncStatus = {
         artifactId: conflict.artifactId,
         artifactType: conflict.artifactType,
         lastSyncTime: new Date(),
         syncDirection: "bidirectional",
-        status: "synced"
+        status: "synced",
+        version: (this.syncStates.get(statusKey)?.version || 0) + 1,
+        vectorClock: this.mergeVectorClocks(
+          conflict.ideVectorClock,
+          conflict.serverVectorClock
+        )
       };
       this.syncStatuses.set(statusKey, status);
 
@@ -660,6 +800,17 @@ export class BidirectionalSyncService {
     }
     this.syncIntervals.clear();
 
+    // Close all file watchers
+    for (const [, watcher] of this.fileWatchers) {
+      await watcher.close();
+    }
+    this.fileWatchers.clear();
+
+    // Persist sync states
+    if (this.config.projectPath) {
+      await this.persistSyncStates();
+    }
+
     this.isInitialized = false;
     logger.info("Bidirectional sync service stopped");
   }
@@ -675,8 +826,9 @@ export class BidirectionalSyncService {
       throw new Error("Max sync retries must be non-negative");
     }
 
-    if (!["manual", "auto_merge", "last_writer_wins"].includes(this.config.conflictResolution)) {
-      throw new Error("Invalid conflict resolution strategy");
+    const validResolutions = ["manual", "auto_merge", "last_writer_wins", "three_way_merge"];
+    if (!validResolutions.includes(this.config.conflictResolution)) {
+      throw new Error(`Invalid conflict resolution strategy. Must be one of: ${validResolutions.join(", ")}`);
     }
   }
 
@@ -687,6 +839,36 @@ export class BidirectionalSyncService {
     // For now, just log that it's enabled
   }
 
+  private async startFileWatchers(): Promise<void> {
+    if (!this.config.projectPath) {
+      return;
+    }
+
+    const quikimDir = join(this.config.projectPath, ".quikim");
+    
+    try {
+      await access(quikimDir);
+    } catch {
+      // Directory doesn't exist yet, will be created when needed
+      return;
+    }
+
+    logger.info("Starting file watchers", { path: quikimDir });
+
+    const watcher = watch(quikimDir, {
+      ignoreInitial: true,
+      ignored: /(^|[\/\\])\../, // Ignore dotfiles
+    });
+
+    watcher.on("change", async (path) => {
+      logger.info("File change detected", { path });
+      // Handle file change - would trigger sync
+      // This is a placeholder for actual implementation
+    });
+
+    this.fileWatchers.set(quikimDir, watcher);
+  }
+
   private getStatusKey(
     projectId: string,
     artifactType: ArtifactType,
@@ -695,27 +877,98 @@ export class BidirectionalSyncService {
     return `${projectId}:${artifactType}:${artifactId}`;
   }
 
+  /**
+   * Calculate SHA-256 checksum for content
+   */
   private calculateChecksum(content: string): string {
-    // Simple checksum implementation
-    let hash = 0;
-    for (let i = 0; i < content.length; i++) {
-      const char = content.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
-    }
-    return hash.toString(16);
+    return createHash("sha256").update(content).digest("hex");
   }
 
-  private async detectConflict(
+  /**
+   * Update vector clock for a user
+   */
+  private updateVectorClock(statusKey: string, userId: string): VectorClock {
+    const syncState = this.syncStates.get(statusKey);
+    const vectorClock = syncState?.vectorClock || {};
+    
+    vectorClock[userId] = (vectorClock[userId] || 0) + 1;
+    return { ...vectorClock };
+  }
+
+  /**
+   * Check if two vector clocks indicate concurrent modifications
+   */
+  private isConcurrentModification(
+    clock1: VectorClock,
+    clock2: VectorClock
+  ): boolean {
+    const allUsers = new Set([...Object.keys(clock1), ...Object.keys(clock2)]);
+    
+    let clock1HappenedBefore = true;
+    let clock2HappenedBefore = true;
+
+    for (const user of allUsers) {
+      const v1 = clock1[user] || 0;
+      const v2 = clock2[user] || 0;
+
+      if (v1 > v2) {
+        clock2HappenedBefore = false;
+      }
+      if (v2 > v1) {
+        clock1HappenedBefore = false;
+      }
+    }
+
+    // If neither happened before the other, they're concurrent
+    return !clock1HappenedBefore && !clock2HappenedBefore;
+  }
+
+  /**
+   * Merge two vector clocks (take maximum for each user)
+   */
+  private mergeVectorClocks(
+    clock1: VectorClock,
+    clock2: VectorClock
+  ): VectorClock {
+    const merged: VectorClock = {};
+    const allUsers = new Set([...Object.keys(clock1), ...Object.keys(clock2)]);
+
+    for (const user of allUsers) {
+      merged[user] = Math.max(clock1[user] || 0, clock2[user] || 0);
+    }
+
+    return merged;
+  }
+
+  private async detectConflictWithVectorClock(
     _projectId: string,
     _artifactType: ArtifactType,
     _artifactId: string,
     _content: string,
-    _checksum: string,
-    _direction: "to_ide" | "from_ide"
+    checksum: string,
+    vectorClock: VectorClock,
+    _direction: "to_ide" | "from_ide",
+    syncState?: SyncState
   ): Promise<SyncConflict | null> {
-    // Implementation would check for actual conflicts
-    // For now, return null (no conflicts)
+    // Check if content has changed since last sync
+    if (syncState && syncState.lastSyncChecksum === checksum) {
+      return null; // No change, no conflict
+    }
+
+    // Check for concurrent modifications using vector clocks
+    if (syncState?.vectorClock) {
+      const isConcurrent = this.isConcurrentModification(
+        vectorClock,
+        syncState.vectorClock
+      );
+
+      if (isConcurrent) {
+        // Would need to fetch server content to create full conflict
+        // For now, return null and let bidirectionalSync handle it
+        return null;
+      }
+    }
+
     return null;
   }
 
@@ -726,7 +979,12 @@ export class BidirectionalSyncService {
     ideContent: string,
     serverContent: string,
     ideChecksum: string,
-    serverChecksum: string
+    serverChecksum: string,
+    ideVectorClock: VectorClock,
+    serverVectorClock: VectorClock,
+    baseContent?: string,
+    baseChecksum?: string,
+    isConcurrent?: boolean
   ): Promise<SyncConflict> {
     const conflict: SyncConflict = {
       id: this.generateId(),
@@ -735,9 +993,13 @@ export class BidirectionalSyncService {
       artifactId,
       ideContent,
       serverContent,
+      baseContent,
       ideChecksum,
       serverChecksum,
-      conflictType: "content",
+      baseChecksum,
+      ideVectorClock,
+      serverVectorClock,
+      conflictType: isConcurrent ? "concurrent" : "content",
       detectedAt: new Date(),
       status: "pending"
     };
@@ -748,11 +1010,15 @@ export class BidirectionalSyncService {
 
   private async resolveConflictAutomatically(
     conflict: SyncConflict,
-    _userId: string
+    _userId: string,
+    baseContent?: string
   ): Promise<ConflictResolution | null> {
     switch (this.config.conflictResolution) {
       case "auto_merge":
-        const mergedContent = this.mergeContent(conflict.ideContent, conflict.serverContent);
+        const mergedContent = this.mergeContent(
+          conflict.ideContent,
+          conflict.serverContent
+        );
         return {
           artifactId: conflict.artifactId,
           artifactType: conflict.artifactType,
@@ -763,14 +1029,46 @@ export class BidirectionalSyncService {
           resolvedAt: new Date()
         };
 
-      case "last_writer_wins":
-        // In a real implementation, would check timestamps
+      case "three_way_merge":
+        if (baseContent || conflict.baseContent) {
+          const threeWayMerged = this.threeWayMerge(
+            baseContent || conflict.baseContent || "",
+            conflict.ideContent,
+            conflict.serverContent
+          );
+          return {
+            artifactId: conflict.artifactId,
+            artifactType: conflict.artifactType,
+            conflictId: conflict.id,
+            resolution: "three_way",
+            resolvedContent: threeWayMerged,
+            resolvedBy: "three_way_merge",
+            resolvedAt: new Date()
+          };
+        }
+        // Fallback to regular merge if no base
+        const fallbackMerged = this.mergeContent(
+          conflict.ideContent,
+          conflict.serverContent
+        );
         return {
           artifactId: conflict.artifactId,
           artifactType: conflict.artifactType,
           conflictId: conflict.id,
-          resolution: "keep_ide",
-          resolvedContent: conflict.ideContent,
+          resolution: "merge",
+          resolvedContent: fallbackMerged,
+          resolvedBy: "auto_merge",
+          resolvedAt: new Date()
+        };
+
+      case "last_writer_wins":
+        // Compare timestamps from vector clocks (simplified - use server as default)
+        return {
+          artifactId: conflict.artifactId,
+          artifactType: conflict.artifactType,
+          conflictId: conflict.id,
+          resolution: "keep_server",
+          resolvedContent: conflict.serverContent,
           resolvedBy: "last_writer_wins",
           resolvedAt: new Date()
         };
@@ -780,40 +1078,77 @@ export class BidirectionalSyncService {
     }
   }
 
+  /**
+   * Merge content using diff-match-patch
+   */
   private mergeContent(ideContent: string, serverContent: string): string {
-    // Simple merge implementation - in practice would use proper diff/merge algorithms
-    const ideLines = ideContent.split("\n");
-    const serverLines = serverContent.split("\n");
-    
-    // Simple line-by-line merge
-    const merged: string[] = [];
-    const maxLines = Math.max(ideLines.length, serverLines.length);
-    
-    for (let i = 0; i < maxLines; i++) {
-      const ideLine = ideLines[i] || "";
-      const serverLine = serverLines[i] || "";
-      
-      if (ideLine === serverLine) {
-        merged.push(ideLine);
-      } else if (ideLine && serverLine) {
-        merged.push(`<<<<<<< IDE`);
-        merged.push(ideLine);
-        merged.push("=======");
-        merged.push(serverLine);
-        merged.push(">>>>>>> SERVER");
-      } else {
-        merged.push(ideLine || serverLine);
-      }
+    const diffs = this.dmp.diff_main(ideContent, serverContent);
+    this.dmp.diff_cleanupSemantic(diffs);
+
+    // Try to create patches and apply them
+    const patches = this.dmp.patch_make(ideContent, diffs);
+    const [mergedText, results] = this.dmp.patch_apply(patches, ideContent);
+
+    // If merge failed, return conflict markers
+    if (results.some((r: boolean) => !r)) {
+      return this.createConflictMarkers(ideContent, serverContent);
     }
-    
-    return merged.join("\n");
+
+    return mergedText;
+  }
+
+  /**
+   * Three-way merge using base, local, and remote
+   */
+  private threeWayMerge(
+    baseContent: string,
+    localContent: string,
+    remoteContent: string
+  ): string {
+    // Calculate diffs from base to local and remote
+    const localDiffs = this.dmp.diff_main(baseContent, localContent);
+    const remoteDiffs = this.dmp.diff_main(baseContent, remoteContent);
+
+    this.dmp.diff_cleanupSemantic(localDiffs);
+    this.dmp.diff_cleanupSemantic(remoteDiffs);
+
+    // Create patches
+    const localPatches = this.dmp.patch_make(baseContent, localDiffs);
+    const remotePatches = this.dmp.patch_make(baseContent, remoteDiffs);
+
+    // Apply local patches first
+    const [afterLocal, localResults] = this.dmp.patch_apply(localPatches, baseContent);
+    if (localResults.some((r: boolean) => !r)) {
+      // Local patch failed, fallback to conflict markers
+      return this.createConflictMarkers(localContent, remoteContent);
+    }
+
+    // Apply remote patches to the result
+    const [finalContent, remoteResults] = this.dmp.patch_apply(remotePatches, afterLocal);
+    if (remoteResults.some((r: boolean) => !r)) {
+      // Remote patch failed, fallback to conflict markers
+      return this.createConflictMarkers(localContent, remoteContent);
+    }
+
+    return finalContent;
+  }
+
+  /**
+   * Create conflict markers for manual resolution
+   */
+  private createConflictMarkers(localContent: string, remoteContent: string): string {
+    return `<<<<<<< IDE
+${localContent}
+=======
+${remoteContent}
+>>>>>>> SERVER
+`;
   }
 
   private inferChangeCategory(
     artifactType: ArtifactType,
     content: string
   ): ChangeCategory {
-    // Simple heuristics to infer change category
     if (content.includes("BREAKING") || content.includes("breaking")) {
       return "breaking";
     }
@@ -830,10 +1165,102 @@ export class BidirectionalSyncService {
       return "docs";
     }
     
-    return "feature"; // Default
+    return "feature";
   }
 
   private generateId(): string {
     return `sync_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  }
+
+  /**
+   * Update sync state and persist it
+   */
+  private async updateSyncState(
+    statusKey: string,
+    state: SyncState
+  ): Promise<void> {
+    this.syncStates.set(statusKey, state);
+
+    if (this.config.projectPath) {
+      await this.persistSyncState(statusKey, state);
+    }
+  }
+
+  /**
+   * Persist a single sync state to disk
+   */
+  private async persistSyncState(
+    statusKey: string,
+    state: SyncState
+  ): Promise<void> {
+    if (!this.config.projectPath) {
+      return;
+    }
+
+    const syncStateDir = join(this.config.projectPath, ".quikim", ".sync-state");
+    await mkdir(syncStateDir, { recursive: true });
+
+    const stateFile = join(syncStateDir, `${statusKey.replace(/:/g, "_")}.json`);
+    await writeFile(stateFile, JSON.stringify(state, null, 2), "utf-8");
+  }
+
+  /**
+   * Load sync state from disk
+   */
+  private async loadSyncState(statusKey: string): Promise<SyncState | null> {
+    if (!this.config.projectPath) {
+      return null;
+    }
+
+    const syncStateDir = join(this.config.projectPath, ".quikim", ".sync-state");
+    const stateFile = join(syncStateDir, `${statusKey.replace(/:/g, "_")}.json`);
+
+    try {
+      const content = await readFile(stateFile, "utf-8");
+      const state = JSON.parse(content) as SyncState;
+      
+      // Convert date strings back to Date objects
+      state.lastSyncTime = new Date(state.lastSyncTime);
+      
+      return state;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Load all sync states from disk
+   */
+  private async loadSyncStates(): Promise<void> {
+    if (!this.config.projectPath) {
+      return;
+    }
+
+    const syncStateDir = join(this.config.projectPath, ".quikim", ".sync-state");
+
+    try {
+      const files = await readdir(syncStateDir);
+      
+      for (const file of files) {
+        if (file.endsWith(".json")) {
+          const statusKey = file.replace(".json", "").replace(/_/g, ":");
+          const state = await this.loadSyncState(statusKey);
+          if (state) {
+            this.syncStates.set(statusKey, state);
+          }
+        }
+      }
+    } catch {
+      // Directory doesn't exist yet, that's fine
+    }
+  }
+
+  /**
+   * Persist all sync states to disk
+   */
+  private async persistSyncStates(): Promise<void> {
+    for (const [statusKey, state] of this.syncStates) {
+      await this.persistSyncState(statusKey, state);
+    }
   }
 }

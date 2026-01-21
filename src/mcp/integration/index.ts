@@ -33,9 +33,11 @@ export interface IntegrationConfig {
   bidirectionalSync?: {
     enableAutoSync: boolean;
     syncInterval: number;
-    conflictResolution: "manual" | "auto_merge" | "last_writer_wins";
+    conflictResolution: "manual" | "auto_merge" | "last_writer_wins" | "three_way_merge";
     enableVersioning: boolean;
     maxSyncRetries: number;
+    enableFileWatchers: boolean;
+    projectPath?: string;
   };
   realTimeCollaboration?: {
     maxParticipants: number;
@@ -89,9 +91,11 @@ export class ProtocolIntegration {
       bidirectionalSync: {
         enableAutoSync: true,
         syncInterval: 5000,
-        conflictResolution: "manual",
+        conflictResolution: "three_way_merge",
         enableVersioning: true,
         maxSyncRetries: 3,
+        enableFileWatchers: true,
+        projectPath: process.env.PROJECT_PATH || process.cwd(),
         ...config.bidirectionalSync
       },
       realTimeCollaboration: {
