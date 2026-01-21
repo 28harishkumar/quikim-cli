@@ -1,6 +1,11 @@
 /**
- * Tool Response Instructions
+ * Quikim - Tool Response Instructions
  * All instructions for tool handlers - NO hardcoded instructions in handlers
+ * 
+ * Copyright (c) 2026 Quikim Inc.
+ * 
+ * This file is part of Quikim, licensed under the AGPL-3.0 License.
+ * See LICENSE file in the project root for full license information.
  */
 
 import { generateMissingArtifactsInstructions, generateProjectContextInstructions, generateSyncFailureInstructions } from './missing-artifacts.js';
@@ -18,6 +23,14 @@ export function generateHLDMissingInstructions(): string {
     missingArtifacts: ['hld'],
     projectName: 'your project',
     nextStep: 'pushing HLD'
+  });
+}
+
+export function generateLLDMissingInstructions(): string {
+  return generateMissingArtifactsInstructions({
+    missingArtifacts: ['lld'],
+    projectName: 'your project',
+    nextStep: 'pushing LLD'
   });
 }
 

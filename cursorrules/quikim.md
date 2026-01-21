@@ -38,13 +38,22 @@ The Quikim MCP Server provides tools for managing project artifacts (requirement
 .quikim/
 ├── v1/
 │   ├── requirements.md
+│   ├── hld.md
+│   ├── lld/
+│   │   ├── auth-service.md
+│   │   ├── payment-module.md
+│   │   └── user-api.md
 │   ├── wireframes.md
 │   ├── er-diagram.md
-│   ├── hld.md
-│   └── tasks.md
+│   ├── tasks.md
+│   └── diagrams/
+│       ├── flowchart.md
+│       └── sequence.md
 ├── v2/
 │   ├── requirements.md
 │   ├── hld.md
+│   ├── lld/
+│   │   └── auth-service.md
 │   └── tasks.md
 └── v3/
     └── requirements.md
@@ -64,10 +73,11 @@ The Quikim MCP Server provides tools for managing project artifacts (requirement
 
 - **Pull Requirements / Push Requirements**: Latest version `requirements.md` (and previous version if updating)
 - **Pull HLD / Push HLD**: Latest version `requirements.md` (dependency) + latest version `hld.md` (and previous if updating)
+- **Pull LLD / Push LLD**: Latest version `requirements.md` + `hld.md` (dependencies) + latest version `lld/*.md` files (if updating)
 - **Pull wireframe / Push wireframes**: Latest version `requirements.md` + `hld.md` (dependencies) + latest version `wireframes.md` (if updating)
 - **ER diagram pull / ER diagram push**: Latest version `requirements.md` + `hld.md` + `wireframes.md` (if exists) + latest version `er-diagram.md` (if updating)
 - **Pull Tasks / Push Tasks**: Latest version `requirements.md` + `hld.md` + `wireframes.md` (if exists) + `er-diagram.md` (if exists) + latest version `tasks.md` (if updating)
-- **Update code**: Latest version `requirements.md` + `hld.md` + `tasks.md` + Prisma schema + relevant source code files
+- **Update code**: Latest version `requirements.md` + `hld.md` + `lld/*.md` (if exists) + `tasks.md` + Prisma schema + relevant source code files
 - **Pull rules**: No .quikim/ files needed
 
 ## Quikim Tools
@@ -102,7 +112,30 @@ The MCP server provides the following tools:
   - Update files as given, OR
   - Analyze and create/update HLD files, then ask user if HLD should be updated further or proceed to wireframe
 
-### 5. Pull wireframe
+### 5. Pull LLD
+
+- **Purpose**: Fetch or generate Low-Level Design (LLD) for a specific component
+- **When to use**: 
+  - After HLD is complete and before implementation
+  - When detailed component specifications are needed
+  - Before implementing complex services, modules, or APIs
+- **Component Types**: service, module, feature, api, ui, database
+- **Returns**:
+  - List of existing LLDs if no component specified
+  - Detailed LLD template with sections for interfaces, data models, methods, sequence diagrams
+- **File Structure**: `.quikim/v*/lld/{component-name}.md`
+- **Example prompts**:
+  - "Create LLD for authentication service"
+  - "Generate low-level design for payment module"
+  - "Pull LLD for user management API"
+
+### 6. Push LLD
+
+- **Purpose**: Sync local LLD files to server
+- **When to use**: After creating/updating LLD locally
+- **Returns**: Success confirmation with synced components list
+
+### 7. Pull wireframe
 
 - **Purpose**: Update local wireframes from server
 - **When to use**: When user requests wireframes or needs to sync from server
@@ -110,13 +143,13 @@ The MCP server provides the following tools:
   - Update files as given, OR
   - Analyze and create/update wireframe files, then ask user if wireframe should be updated further or proceed to tasks
 
-### 6. Push wireframes
+### 8. Push wireframes
 
 - **Purpose**: Update server wireframes from local and sync to Penpot
 - **When to use**: After creating/updating wireframes locally
 - **Returns**: Success confirmation with Penpot file URL
 
-### 7. Sync wireframe from Penpot
+### 9. Sync wireframe from Penpot
 
 - **Purpose**: Pull latest wireframe changes from Penpot back to Quikim
 - **When to use**: 
@@ -126,7 +159,7 @@ The MCP server provides the following tools:
 - **Prerequisites**: Wireframe must be pushed to Penpot first
 - **Returns**: Updated wireframe files with new version and change summary
 
-### 8. Generate code from wireframe
+### 10. Generate code from wireframe
 
 - **Purpose**: Convert wireframe to production-ready React components
 - **When to use**:
@@ -136,7 +169,7 @@ The MCP server provides the following tools:
 - **Prerequisites**: Wireframe must exist, framework and styling preferences configured
 - **Returns**: Generated React component files with integration instructions
 
-### 9. List Penpot syncs
+### 11. List Penpot syncs
 
 - **Purpose**: Show all Penpot sync states for project
 - **When to use**:
@@ -145,13 +178,13 @@ The MCP server provides the following tools:
   - To identify conflicts or pending syncs
 - **Returns**: List of sync states with status and last sync time
 
-### 10. Push Tasks
+### 12. Push Tasks
 
 - **Purpose**: Update tasks at server from local tasks
 - **When to use**: After creating/updating tasks locally
 - **Returns**: Success confirmation
 
-### 8. Pull Tasks
+### 13. Pull Tasks
 
 - **Purpose**: Update local tasks from server tasks
 - **When to use**: When user requests tasks or needs to sync from server
@@ -159,7 +192,7 @@ The MCP server provides the following tools:
   - Update files as given, OR
   - Analyze and create/update task files, then ask user if tasks should be updated further or proceed to code modification
 
-### 9. Update code
+### 14. Update code
 
 - **Purpose**: Take local code context to MCP server, server uses RAG pipeline to find relevant code snippets
 - **When to use**: When user requests code implementation or modification
@@ -168,7 +201,7 @@ The MCP server provides the following tools:
   - Code guidelines
   - Instructions to update code and task files
 
-### 10. ER diagram pull
+### 15. ER diagram pull
 
 - **Purpose**: Update local ER diagram from server
 - **When to use**: When user requests ER diagram or needs to sync from server
@@ -176,19 +209,19 @@ The MCP server provides the following tools:
   - Update files as given, OR
   - Analyze and create/update ER diagram (mermaid) files, then ask user if ER diagram should be updated further or proceed to update/create Prisma database
 
-### 11. ER diagram push
+### 16. ER diagram push
 
 - **Purpose**: Push local ER diagram to server
 - **When to use**: After creating/updating ER diagram locally
 - **Returns**: Success confirmation
 
-### 12. Pull rules
+### 17. Pull rules
 
 - **Purpose**: Update local Quikim cursor rules files
 - **When to use**: When user requests rules sync or needs to update cursor rules
 - **Returns**: Success confirmation
 
-### 13. Pull mermaid
+### 18. Pull mermaid
 
 - **Purpose**: Fetch mermaid diagrams from server
 - **When to use**: When user requests mermaid diagrams or needs to sync diagram artifacts
@@ -207,7 +240,7 @@ The MCP server provides the following tools:
   - Update files as given, OR
   - Create diagram files in `.quikim/v*/diagrams/` directory
 
-### 14. Push mermaid
+### 19. Push mermaid
 
 - **Purpose**: Push local mermaid diagrams to server
 - **When to use**: After creating/updating mermaid diagrams locally

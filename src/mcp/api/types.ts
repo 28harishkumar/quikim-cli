@@ -47,6 +47,58 @@ export interface HLD {
   createdAt: string;
 }
 
+export interface LLD {
+  id: string;
+  projectId: string;
+  version: number;
+  content: string;
+  componentName: string;
+  componentType: "service" | "module" | "feature" | "api" | "ui" | "database" | "other";
+  specifications: {
+    interfaces: LLDInterface[];
+    dataModels: LLDDataModel[];
+    methods: LLDMethod[];
+    dependencies: string[];
+  };
+  sequenceDiagrams?: string[];
+  classDiagrams?: string[];
+  linkedHldSection?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LLDInterface {
+  name: string;
+  description: string;
+  methods: Array<{
+    name: string;
+    parameters: Array<{ name: string; type: string }>;
+    returnType: string;
+    description: string;
+  }>;
+}
+
+export interface LLDDataModel {
+  name: string;
+  description: string;
+  fields: Array<{
+    name: string;
+    type: string;
+    required: boolean;
+    description?: string;
+  }>;
+}
+
+export interface LLDMethod {
+  name: string;
+  signature: string;
+  description: string;
+  inputs: Array<{ name: string; type: string }>;
+  outputs: { type: string; description: string };
+  pseudocode?: string;
+  complexity?: string;
+}
+
 export interface Tasks {
   id: string;
   projectId: string;
@@ -169,7 +221,7 @@ export interface LLMKeyStatus {
 // Sync Operations
 export interface SyncRequest {
   projectId: string;
-  artifactType: "requirements" | "hld" | "tasks" | "er_diagram" | "prisma_schema" | "wireframes" | "theme" | "code_guidelines" | "mermaid";
+  artifactType: "requirements" | "hld" | "lld" | "tasks" | "er_diagram" | "prisma_schema" | "wireframes" | "theme" | "code_guidelines" | "mermaid";
   content: string;
   version?: number;
   metadata?: Record<string, unknown>;
@@ -180,8 +232,9 @@ export interface SyncResponse {
   artifactId: string;
   version: number;
   message?: string;
-  wireframeId?: string; // For wireframe syncs
-  erDiagramId?: string; // For ER diagram syncs
-  taskId?: string; // For task syncs
-  mermaidDiagramId?: string; // For mermaid diagram syncs
+  wireframeId?: string;
+  erDiagramId?: string;
+  taskId?: string;
+  mermaidDiagramId?: string;
+  lldId?: string;
 }

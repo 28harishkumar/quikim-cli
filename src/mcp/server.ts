@@ -14,8 +14,14 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
+import {
+  generateMCPPrompts,
+  getPromptContent,
+} from './prompts/capabilities.js';
 
 import { XMLProtocolParser, xmlParser } from './xml/parser.js';
 import { SessionManager, sessionManager } from './session/manager.js';
@@ -53,6 +59,7 @@ export class MCPCursorProtocolServer {
       {
         capabilities: {
           tools: {},
+          prompts: {},
         },
       }
     );
@@ -92,6 +99,7 @@ export class MCPCursorProtocolServer {
     );
 
     this.setupToolHandlers();
+    this.setupPromptHandlers();
     this.setupErrorHandlers();
   }
 
@@ -320,6 +328,32 @@ export class MCPCursorProtocolServer {
             required: ["codebase", "user_prompt"],
           },
         } as Tool,
+        {
+          name: "pull_lld",
+          description: "Fetch or generate Low-Level Design (LLD) for a specific component. LLD provides detailed specifications including interfaces, data models, method specifications, and sequence diagrams.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              codebase: { type: "object" },
+              user_prompt: { type: "string", description: "Include component name, e.g., 'pull_lld for auth service' or 'LLD for payment module'" },
+              project_context: { type: "object" },
+            },
+            required: ["user_prompt"],
+          },
+        } as Tool,
+        {
+          name: "push_lld",
+          description: "Push local Low-Level Design (LLD) files to server. Syncs component-specific detailed designs.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              codebase: { type: "object" },
+              user_prompt: { type: "string", description: "Optionally specify component name to push specific LLD" },
+              project_context: { type: "object" },
+            },
+            required: ["codebase", "user_prompt"],
+          },
+        } as Tool,
       ];
 
       // Get workflow engine tools
@@ -453,6 +487,18 @@ export class MCPCursorProtocolServer {
             userPrompt,
             projectContext
           );
+        case "pull_lld":
+          return await this.toolHandlers.handlePullLLD(
+            codebase,
+            userPrompt,
+            projectContext
+          );
+        case "push_lld":
+          return await this.toolHandlers.handlePushLLD(
+            codebase,
+            userPrompt,
+            projectContext
+          );
         
         // Workflow engine tools
         case "detect_change":
@@ -472,6 +518,37 @@ export class MCPCursorProtocolServer {
         default:
           throw new Error(`Unknown tool: ${name}`);
       }
+    });
+  }
+
+  /**
+   * Set up MCP prompt handlers for capability discovery
+   * This allows LLMs to discover available tools without cursor rules
+   */
+  private setupPromptHandlers(): void {
+    // List available prompts
+    this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
+      const prompts = generateMCPPrompts();
+      return { prompts };
+    });
+
+    // Get prompt content
+    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+      const { name, arguments: args } = request.params;
+      const content = getPromptContent(name, args as Record<string, string>);
+
+      return {
+        description: `Quikim MCP capability information for: ${name}`,
+        messages: [
+          {
+            role: "user",
+            content: {
+              type: "text",
+              text: content,
+            },
+          },
+        ],
+      };
     });
   }
 

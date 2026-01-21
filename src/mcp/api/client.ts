@@ -18,6 +18,7 @@ import {
   APIResponse,
   Requirements,
   HLD,
+  LLD,
   Tasks,
   ERDiagram,
   PrismaSchema,
@@ -207,6 +208,42 @@ export class QuikimAPIClient {
     try {
       const response = await this.request<HLD>(
         `/api/projects/${projectId}/hld/latest`,
+        { method: "GET" },
+      );
+      return response.data || null;
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch all LLDs for a project
+   */
+  async fetchLLDs(projectId: string): Promise<LLD[]> {
+    try {
+      const response = await this.request<LLD[]>(
+        `/api/projects/${projectId}/lld`,
+        { method: "GET" },
+      );
+      return response.data || [];
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        return [];
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch a specific LLD by component name
+   */
+  async fetchLLD(projectId: string, componentName: string): Promise<LLD | null> {
+    try {
+      const response = await this.request<LLD>(
+        `/api/projects/${projectId}/lld/${encodeURIComponent(componentName)}`,
         { method: "GET" },
       );
       return response.data || null;

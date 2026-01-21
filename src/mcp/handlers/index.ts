@@ -195,6 +195,30 @@ export class ToolHandlers {
     );
   }
 
+  async handlePullLLD(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+  ) {
+    return this.designHandlers.handlePullLLD(
+      codebase,
+      userPrompt,
+      projectContext,
+    );
+  }
+
+  async handlePushLLD(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+  ) {
+    return this.designHandlers.handlePushLLD(
+      codebase,
+      userPrompt,
+      projectContext,
+    );
+  }
+
   // Task handlers
   async handlePushTasks(
     codebase: CodebaseContext,

@@ -1,6 +1,11 @@
 /**
- * Design Handlers
- * Push and pull handlers for HLD, wireframes, ER diagrams
+ * Quikim - Design Handlers
+ * Push and pull handlers for HLD, LLD, wireframes, ER diagrams
+ * 
+ * Copyright (c) 2026 Quikim Inc.
+ * 
+ * This file is part of Quikim, licensed under the AGPL-3.0 License.
+ * See LICENSE file in the project root for full license information.
  */
 
 import { XMLResponse } from '../types.js';
@@ -26,6 +31,20 @@ import {
   extractMermaidFromMarkdown,
 } from '../workflows/mermaid.js';
 import {
+  extractLLDContext,
+  generateLLDInstructions,
+  getLLDFilePath,
+  validateLLDPrerequisites,
+  extractExistingLLDs,
+  parseComponentFromPrompt,
+  suggestComponentsForLLD,
+} from '../workflows/lld.js';
+import {
+  generateLLDPullInstructions,
+  generateLLDPushInstructions,
+} from '../instructions/lld.js';
+import { extractProjectName } from '../utils/project-name.js';
+import {
   generateMermaidPullInstructions,
   generateMermaidPushInstructions,
   generateMermaidNotFoundInstructions,
@@ -33,6 +52,7 @@ import {
 import {
   generateRequirementsMissingInstructions,
   generateHLDMissingInstructions,
+  generateLLDMissingInstructions,
   generateWireframesMissingInstructions,
   generateERDiagramMissingInstructions,
   generateArtifactSyncedInstructions,
@@ -1177,6 +1197,243 @@ export class DesignHandlers extends BaseHandler {
         parameters: {},
         reasoning: "API sync failed",
         finalResponse: "Failed to push mermaid diagrams.",
+      };
+      return this.formatToolResponse(response);
+    }
+  }
+
+  /**
+   * Pull LLD - Fetch from server or generate new
+   * Creates detailed low-level design for specific components
+   */
+  async handlePullLLD(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+  ): Promise<{ content: Array<{ type: string; text: string }> }> {
+    const requestId = this.generateRequestId();
+
+    // Validate prerequisites
+    const prerequisites = validateLLDPrerequisites(codebase);
+    if (!prerequisites.valid) {
+      const response: XMLResponse = {
+        requestId,
+        action: "create_file",
+        instructions: generateRequirementsMissingInstructions(),
+        parameters: {
+          filePath: ".quikim/v1/requirements.md",
+          content: "# Requirements\n\n[To be created]",
+        },
+        reasoning: "Prerequisites missing for LLD generation",
+        finalResponse: "Please create requirements first.",
+      };
+      return this.formatToolResponse(response);
+    }
+
+    // Parse component name from user prompt
+    const { componentName, componentType } = parseComponentFromPrompt(userPrompt);
+
+    // If no component specified, list existing LLDs and suggest components
+    if (!componentName) {
+      const existingLLDs = extractExistingLLDs(codebase);
+      const hldFile = codebase.files.find((f) =>
+        f.path.match(/\.quikim\/v\d+\/hld\.md/),
+      );
+      const suggestions = hldFile ? suggestComponentsForLLD(hldFile.content) : [];
+      const projectName = extractProjectName(codebase);
+
+      const instructions = generateLLDPullInstructions({
+        projectName: projectName || "your project",
+        existingLLDs: existingLLDs.map((lld) => ({
+          name: lld.name,
+          type: lld.type,
+          version: lld.version,
+        })),
+        hldSections: suggestions.map((s) => `${s.name} (${s.type}): ${s.reason}`),
+      });
+
+      const response: XMLResponse = {
+        requestId,
+        action: "complete",
+        instructions,
+        parameters: {},
+        reasoning: "No specific component specified - showing existing LLDs and suggestions",
+        finalResponse: existingLLDs.length > 0
+          ? `Found ${existingLLDs.length} existing LLD(s). Specify a component name to create/update LLD.`
+          : "No LLDs found. Specify a component name to create LLD (e.g., 'pull_lld for auth service').",
+      };
+      return this.formatToolResponse(response);
+    }
+
+    // Check if HLD exists (warning if not)
+    const hldFile = codebase.files.find((f) =>
+      f.path.match(/\.quikim\/v\d+\/hld\.md/),
+    );
+    if (!hldFile && prerequisites.warnings.length > 0) {
+      logger.warn("Creating LLD without HLD reference", { componentName });
+    }
+
+    // Extract LLD context
+    const lldContext = extractLLDContext(codebase, componentName);
+    if (!lldContext) {
+      const response: XMLResponse = {
+        requestId,
+        action: "create_file",
+        instructions: generateContextExtractionFailedInstructions("LLD"),
+        parameters: {
+          filePath: `.quikim/v1/lld/${componentName.toLowerCase().replace(/\s+/g, "-")}.md`,
+          content: `# Low-Level Design: ${componentName}\n\n[To be created]`,
+        },
+        reasoning: "Could not extract LLD context",
+        finalResponse: "Please review requirements and create LLD manually.",
+      };
+      return this.formatToolResponse(response);
+    }
+
+    // Override component type if specified in prompt
+    if (componentType) {
+      lldContext.componentType = componentType;
+    }
+
+    const latestVersion =
+      projectContext.latestVersion ||
+      projectContextResolver.getLatestVersion(codebase);
+    const filePath = getLLDFilePath(latestVersion, componentName);
+    const instructions = generateLLDInstructions(lldContext);
+
+    const response: XMLResponse = {
+      requestId,
+      action: "create_file",
+      instructions:
+        instructions + `\n\nSave to ${filePath}. Then create LLDs for other components or proceed to implementation.`,
+      parameters: {
+        filePath,
+        content: `# Low-Level Design: ${componentName}\n\n[To be generated by Cursor]`,
+      },
+      reasoning: `Generating LLD for ${componentName} based on requirements and HLD`,
+      finalResponse: `LLD file for ${componentName} will be created at ${filePath}.`,
+    };
+    return this.formatToolResponse(response);
+  }
+
+  /**
+   * Push LLD - Sync local LLD to server
+   */
+  async handlePushLLD(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+  ): Promise<{ content: Array<{ type: string; text: string }> }> {
+    const requestId = this.generateRequestId();
+
+    // Find LLD files
+    const lldFiles = codebase.files.filter((f) =>
+      f.path.match(/\.quikim\/v\d+\/lld\/.*\.md$/),
+    );
+
+    if (lldFiles.length === 0) {
+      const response: XMLResponse = {
+        requestId,
+        action: "create_file",
+        instructions: generateLLDMissingInstructions(),
+        parameters: {
+          filePath: ".quikim/v1/lld/component.md",
+          content: "# Low-Level Design\n\n[To be created]",
+        },
+        reasoning: "No LLD files found",
+        finalResponse: "Please create LLD first using pull_lld tool.",
+      };
+      return this.formatToolResponse(response);
+    }
+
+    if (!projectContext.projectId) {
+      const response: XMLResponse = {
+        requestId,
+        action: "create_file",
+        instructions: generateProjectContextInstructions(),
+        parameters: {
+          filePath: ".quikim/project.json",
+          content: JSON.stringify(
+            { projectId: "", organizationId: "" },
+            null,
+            2,
+          ),
+        },
+        reasoning: "Project context missing",
+        finalResponse: "Please set up project context first.",
+      };
+      return this.formatToolResponse(response);
+    }
+
+    // Parse which LLD to push from prompt, or push all
+    const { componentName } = parseComponentFromPrompt(userPrompt);
+    const filesToPush = componentName
+      ? lldFiles.filter((f) =>
+          f.path.toLowerCase().includes(componentName.toLowerCase().replace(/\s+/g, "-")),
+        )
+      : lldFiles;
+
+    if (filesToPush.length === 0) {
+      const response: XMLResponse = {
+        requestId,
+        action: "complete",
+        instructions: `No LLD found for component "${componentName}". Available LLDs:\n${lldFiles.map((f) => `- ${f.path}`).join("\n")}`,
+        parameters: {},
+        reasoning: "Specified component LLD not found",
+        finalResponse: `LLD for "${componentName}" not found. Check available LLDs.`,
+      };
+      return this.formatToolResponse(response);
+    }
+
+    try {
+      const syncResults: string[] = [];
+
+      for (const lldFile of filesToPush) {
+        const nameMatch = lldFile.path.match(/\/lld\/(.+)\.md$/);
+        const lldName = nameMatch ? nameMatch[1] : "unknown";
+
+        await this.apiClient.syncArtifact({
+          projectId: projectContext.projectId,
+          artifactType: "lld",
+          content: lldFile.content,
+          metadata: {
+            componentName: lldName,
+            filePath: lldFile.path,
+          },
+        });
+
+        syncResults.push(`✅ ${lldName}`);
+        logger.info("LLD synced to platform", {
+          projectId: projectContext.projectId,
+          component: lldName,
+        });
+      }
+
+      const response: XMLResponse = {
+        requestId,
+        action: "complete",
+        instructions: generateLLDPushInstructions(
+          filesToPush.length === 1
+            ? filesToPush[0].path.match(/\/lld\/(.+)\.md$/)?.[1] || "component"
+            : `${filesToPush.length} components`,
+        ) + `\n\n**Sync Results:**\n${syncResults.join("\n")}`,
+        parameters: {},
+        reasoning: `Synced ${filesToPush.length} LLD(s) to database`,
+        finalResponse: `${filesToPush.length} LLD(s) successfully synced to Quikim platform.`,
+      };
+      return this.formatToolResponse(response);
+    } catch (error) {
+      logger.error("Failed to sync LLD", { error });
+      const response: XMLResponse = {
+        requestId,
+        action: "complete",
+        instructions: generateSyncFailureInstructions(
+          "LLD",
+          (error as Error).message,
+        ),
+        parameters: {},
+        reasoning: "API sync failed",
+        finalResponse: "Failed to sync LLD. Please check your API configuration.",
       };
       return this.formatToolResponse(response);
     }
