@@ -100,6 +100,24 @@ export interface PrismaSchema {
   createdAt: string;
 }
 
+export type MermaidDiagramType = "flowchart" | "sequence" | "classDiagram" | "stateDiagram" | "erDiagram" | "gantt" | "pie" | "mindmap" | "timeline" | "journey" | "other";
+
+export interface MermaidDiagram {
+  id: string;
+  projectId: string;
+  version: number;
+  content: string;
+  diagramType: MermaidDiagramType;
+  name: string;
+  description?: string;
+  linkedArtifact?: {
+    type: "hld" | "requirements" | "wireframes" | "tasks";
+    id: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Wireframe {
   id: string;
   projectId: string;
@@ -151,9 +169,10 @@ export interface LLMKeyStatus {
 // Sync Operations
 export interface SyncRequest {
   projectId: string;
-  artifactType: 'requirements' | 'hld' | 'tasks' | 'er_diagram' | 'prisma_schema' | 'wireframes' | 'theme' | 'code_guidelines';
+  artifactType: "requirements" | "hld" | "tasks" | "er_diagram" | "prisma_schema" | "wireframes" | "theme" | "code_guidelines" | "mermaid";
   content: string;
   version?: number;
+  metadata?: Record<string, unknown>;
 }
 
 export interface SyncResponse {
@@ -164,4 +183,5 @@ export interface SyncResponse {
   wireframeId?: string; // For wireframe syncs
   erDiagramId?: string; // For ER diagram syncs
   taskId?: string; // For task syncs
+  mermaidDiagramId?: string; // For mermaid diagram syncs
 }

@@ -171,6 +171,30 @@ export class ToolHandlers {
     );
   }
 
+  async handlePullMermaid(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+  ) {
+    return this.designHandlers.handlePullMermaid(
+      codebase,
+      userPrompt,
+      projectContext,
+    );
+  }
+
+  async handlePushMermaid(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+  ) {
+    return this.designHandlers.handlePushMermaid(
+      codebase,
+      userPrompt,
+      projectContext,
+    );
+  }
+
   // Task handlers
   async handlePushTasks(
     codebase: CodebaseContext,

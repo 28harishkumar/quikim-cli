@@ -28,6 +28,8 @@ import {
   LLMKeyStatus,
   SyncRequest,
   SyncResponse,
+  MermaidDiagram,
+  MermaidDiagramType,
 } from './types.js';
 import {
   APIError,
@@ -659,6 +661,127 @@ export class QuikimAPIClient {
     } catch (error) {
       if (error instanceof NotFoundError) {
         return [];
+      }
+      throw error;
+    }
+  }
+
+  // ==================== Mermaid Diagrams ====================
+
+  /**
+   * Fetch all mermaid diagrams for a project
+   * GET /api/projects/:projectId/mermaid-diagrams
+   */
+  async fetchMermaidDiagrams(projectId: string): Promise<MermaidDiagram[]> {
+    try {
+      const response = await this.request<MermaidDiagram[]>(
+        `/api/projects/${projectId}/mermaid-diagrams`,
+        { method: "GET" },
+      );
+      return response.data || [];
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        return [];
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch a specific mermaid diagram by ID
+   * GET /api/projects/:projectId/mermaid-diagrams/:diagramId
+   */
+  async fetchMermaidDiagram(
+    projectId: string,
+    diagramId: string,
+  ): Promise<MermaidDiagram | null> {
+    try {
+      const response = await this.request<MermaidDiagram>(
+        `/api/projects/${projectId}/mermaid-diagrams/${diagramId}`,
+        { method: "GET" },
+      );
+      return response.data || null;
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch mermaid diagrams by type
+   * GET /api/projects/:projectId/mermaid-diagrams?type=:type
+   */
+  async fetchMermaidDiagramsByType(
+    projectId: string,
+    diagramType: MermaidDiagramType,
+  ): Promise<MermaidDiagram[]> {
+    try {
+      const response = await this.request<MermaidDiagram[]>(
+        `/api/projects/${projectId}/mermaid-diagrams?type=${diagramType}`,
+        { method: "GET" },
+      );
+      return response.data || [];
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        return [];
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Create or update a mermaid diagram
+   * POST /api/projects/:projectId/mermaid-diagrams
+   */
+  async syncMermaidDiagram(
+    projectId: string,
+    diagram: {
+      content: string;
+      diagramType: MermaidDiagramType;
+      name: string;
+      description?: string;
+      linkedArtifact?: {
+        type: "hld" | "requirements" | "wireframes" | "tasks";
+        id: string;
+      };
+    },
+  ): Promise<MermaidDiagram | null> {
+    try {
+      const response = await this.request<MermaidDiagram>(
+        `/api/projects/${projectId}/mermaid-diagrams`,
+        {
+          method: "POST",
+          body: JSON.stringify(diagram),
+        },
+      );
+      return response.data || null;
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a mermaid diagram
+   * DELETE /api/projects/:projectId/mermaid-diagrams/:diagramId
+   */
+  async deleteMermaidDiagram(
+    projectId: string,
+    diagramId: string,
+  ): Promise<boolean> {
+    try {
+      await this.request(
+        `/api/projects/${projectId}/mermaid-diagrams/${diagramId}`,
+        { method: "DELETE" },
+      );
+      return true;
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        return false;
       }
       throw error;
     }

@@ -294,6 +294,32 @@ export class MCPCursorProtocolServer {
             required: ["user_prompt"],
           },
         } as Tool,
+        {
+          name: "pull_mermaid",
+          description: "Fetch mermaid diagrams from server (flowchart, sequence, class, ER, state, gantt, etc.)",
+          inputSchema: {
+            type: "object",
+            properties: {
+              codebase: { type: "object" },
+              user_prompt: { type: "string" },
+              project_context: { type: "object" },
+            },
+            required: ["user_prompt"],
+          },
+        } as Tool,
+        {
+          name: "push_mermaid",
+          description: "Push local mermaid diagrams to server (syncs all diagram types)",
+          inputSchema: {
+            type: "object",
+            properties: {
+              codebase: { type: "object" },
+              user_prompt: { type: "string" },
+              project_context: { type: "object" },
+            },
+            required: ["codebase", "user_prompt"],
+          },
+        } as Tool,
       ];
 
       // Get workflow engine tools
@@ -411,6 +437,18 @@ export class MCPCursorProtocolServer {
           );
         case "pull_rules":
           return await this.toolHandlers.handlePullRules(
+            codebase,
+            userPrompt,
+            projectContext
+          );
+        case "pull_mermaid":
+          return await this.toolHandlers.handlePullMermaid(
+            codebase,
+            userPrompt,
+            projectContext
+          );
+        case "push_mermaid":
+          return await this.toolHandlers.handlePushMermaid(
             codebase,
             userPrompt,
             projectContext

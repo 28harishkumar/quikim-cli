@@ -19,6 +19,18 @@ import {
   generateERDiagramInstructions,
 } from '../workflows/er-diagram.js';
 import {
+  extractMermaidContext,
+  formatMermaidForMarkdown,
+  getMermaidFilePath,
+  detectMermaidDiagramType,
+  extractMermaidFromMarkdown,
+} from '../workflows/mermaid.js';
+import {
+  generateMermaidPullInstructions,
+  generateMermaidPushInstructions,
+  generateMermaidNotFoundInstructions,
+} from '../instructions/mermaid.js';
+import {
   generateRequirementsMissingInstructions,
   generateHLDMissingInstructions,
   generateWireframesMissingInstructions,
@@ -30,6 +42,7 @@ import {
 } from '../instructions/tool-responses.js';
 import { BaseHandler } from './base-handler.js';
 import { logger } from '../utils/logger.js';
+import { MermaidDiagramType } from '../api/types.js';
 
 export class DesignHandlers extends BaseHandler {
   /**
@@ -836,6 +849,334 @@ export class DesignHandlers extends BaseHandler {
         parameters: {},
         reasoning: "API error",
         finalResponse: "❌ Failed to list sync states.",
+      };
+      return this.formatToolResponse(response);
+    }
+  }
+
+  /**
+   * Pull Mermaid diagrams from server
+   * Fetches all mermaid diagrams for the project
+   */
+  async handlePullMermaid(
+    codebase: CodebaseContext,
+    _userPrompt: string,
+    projectContext: ProjectContext,
+  ): Promise<{ content: Array<{ type: string; text: string }> }> {
+    const requestId = this.generateRequestId();
+
+    if (!projectContext.projectId) {
+      const response: XMLResponse = {
+        requestId,
+        action: "create_file",
+        instructions: generateProjectContextInstructions(),
+        parameters: {
+          filePath: ".quikim/project.json",
+          content: JSON.stringify(
+            { projectId: "", organizationId: "" },
+            null,
+            2,
+          ),
+        },
+        reasoning: "Project context missing",
+        finalResponse: "Please set up project context first.",
+      };
+      return this.formatToolResponse(response);
+    }
+
+    try {
+      // Fetch diagrams from server
+      const serverDiagrams = await this.apiClient.fetchMermaidDiagrams(
+        projectContext.projectId,
+      );
+
+      // Extract local context
+      const localContext = extractMermaidContext(codebase);
+      const projectName = localContext?.projectName || "your project";
+
+      if (!serverDiagrams || serverDiagrams.length === 0) {
+        // No diagrams on server, check local
+        if (!localContext || localContext.diagrams.length === 0) {
+          const response: XMLResponse = {
+            requestId,
+            action: "complete",
+            instructions: generateMermaidNotFoundInstructions(projectName),
+            parameters: {},
+            reasoning: "No mermaid diagrams found locally or on server",
+            finalResponse: "No mermaid diagrams found. Create new diagrams in .quikim/v1/diagrams/",
+          };
+          return this.formatToolResponse(response);
+        }
+
+        // Return local diagrams info
+        const instructions = generateMermaidPullInstructions({
+          projectName,
+          diagramType: "flowchart",
+          existingDiagrams: localContext.diagrams.map((d) => ({
+            name: d.name,
+            type: d.type,
+          })),
+        });
+
+        const response: XMLResponse = {
+          requestId,
+          action: "complete",
+          instructions: instructions + "\n\n**Note:** These diagrams exist locally but are not yet synced to the server. Use `push_mermaid` to sync them.",
+          parameters: {},
+          reasoning: "Found local diagrams, none on server",
+          finalResponse: `Found ${localContext.diagrams.length} local mermaid diagram(s). Use push_mermaid to sync to server.`,
+        };
+        return this.formatToolResponse(response);
+      }
+
+      // Server has diagrams - create/update local files
+      const latestVersion =
+        projectContext.latestVersion ||
+        projectContextResolver.getLatestVersion(codebase);
+
+      const diagramFiles: Array<{ path: string; content: string }> = [];
+
+      for (const diagram of serverDiagrams) {
+        const filePath = getMermaidFilePath(
+          latestVersion,
+          diagram.diagramType,
+          diagram.name,
+        );
+        const content = formatMermaidForMarkdown(
+          diagram.content,
+          diagram.name,
+        );
+        diagramFiles.push({ path: filePath, content });
+      }
+
+      const existingDiagrams = serverDiagrams.map((d) => ({
+        name: d.name,
+        type: d.diagramType,
+      }));
+
+      const instructions = generateMermaidPullInstructions({
+        projectName,
+        diagramType: "flowchart",
+        existingDiagrams,
+      });
+
+      // Return the first diagram file for creation
+      const firstDiagram = diagramFiles[0];
+      const additionalDiagramsInfo = diagramFiles.length > 1
+        ? `\n\n**Additional diagrams to create:**\n${diagramFiles.slice(1).map((d) => `- ${d.path}`).join("\n")}`
+        : "";
+
+      const response: XMLResponse = {
+        requestId,
+        action: "create_file",
+        instructions: instructions + additionalDiagramsInfo,
+        parameters: {
+          filePath: firstDiagram?.path || `.quikim/v${latestVersion}/diagrams/diagram.md`,
+          content: firstDiagram?.content || "# Mermaid Diagram\n\n```mermaid\nflowchart TD\n    A[Start] --> B[End]\n```",
+        },
+        reasoning: `Fetched ${serverDiagrams.length} diagram(s) from server`,
+        finalResponse: `Pulled ${serverDiagrams.length} mermaid diagram(s) from server.`,
+      };
+      return this.formatToolResponse(response);
+    } catch (error) {
+      logger.error("Failed to pull mermaid diagrams", { error });
+      const response: XMLResponse = {
+        requestId,
+        action: "complete",
+        instructions: generateSyncFailureInstructions(
+          "mermaid diagrams",
+          (error as Error).message,
+        ),
+        parameters: {},
+        reasoning: "API fetch failed",
+        finalResponse: "Failed to pull mermaid diagrams from server.",
+      };
+      return this.formatToolResponse(response);
+    }
+  }
+
+  /**
+   * Push Mermaid diagrams to server
+   * Syncs local mermaid diagrams to the platform
+   */
+  async handlePushMermaid(
+    codebase: CodebaseContext,
+    _userPrompt: string,
+    projectContext: ProjectContext,
+  ): Promise<{ content: Array<{ type: string; text: string }> }> {
+    const requestId = this.generateRequestId();
+
+    if (!projectContext.projectId) {
+      const response: XMLResponse = {
+        requestId,
+        action: "create_file",
+        instructions: generateProjectContextInstructions(),
+        parameters: {
+          filePath: ".quikim/project.json",
+          content: JSON.stringify(
+            { projectId: "", organizationId: "" },
+            null,
+            2,
+          ),
+        },
+        reasoning: "Project context missing",
+        finalResponse: "Please set up project context first.",
+      };
+      return this.formatToolResponse(response);
+    }
+
+    // Extract local mermaid context
+    const mermaidContext = extractMermaidContext(codebase);
+
+    if (!mermaidContext || mermaidContext.diagrams.length === 0) {
+      // Check for mermaid in HLD or ER diagram files
+      const hldFile = codebase.files.find((f) =>
+        f.path.match(/\.quikim\/v\d+\/hld\.md/),
+      );
+      const erFile = codebase.files.find((f) =>
+        f.path.match(/\.quikim\/v\d+\/er-diagram\.md/),
+      );
+
+      const allMermaidBlocks: Array<{
+        content: string;
+        source: string;
+        type: MermaidDiagramType;
+      }> = [];
+
+      if (hldFile) {
+        const blocks = extractMermaidFromMarkdown(hldFile.content);
+        blocks.forEach((block, idx) => {
+          allMermaidBlocks.push({
+            content: block,
+            source: `hld-diagram-${idx + 1}`,
+            type: detectMermaidDiagramType(block),
+          });
+        });
+      }
+
+      if (erFile) {
+        const blocks = extractMermaidFromMarkdown(erFile.content);
+        blocks.forEach((block, idx) => {
+          allMermaidBlocks.push({
+            content: block,
+            source: `er-diagram-${idx + 1}`,
+            type: detectMermaidDiagramType(block),
+          });
+        });
+      }
+
+      if (allMermaidBlocks.length === 0) {
+        const response: XMLResponse = {
+          requestId,
+          action: "complete",
+          instructions: generateMermaidNotFoundInstructions(
+            mermaidContext?.projectName || "your project",
+          ),
+          parameters: {},
+          reasoning: "No mermaid diagrams found to push",
+          finalResponse: "No mermaid diagrams found. Create diagrams in .quikim/v1/diagrams/ first.",
+        };
+        return this.formatToolResponse(response);
+      }
+
+      // Push embedded diagrams from HLD/ER files
+      try {
+        const syncResults: string[] = [];
+
+        for (const block of allMermaidBlocks) {
+          const result = await this.apiClient.syncMermaidDiagram(
+            projectContext.projectId,
+            {
+              content: block.content,
+              diagramType: block.type,
+              name: block.source,
+              description: `Extracted from ${block.source.includes("hld") ? "HLD" : "ER diagram"} file`,
+            },
+          );
+
+          if (result) {
+            syncResults.push(`✅ ${block.source} (${block.type})`);
+          } else {
+            syncResults.push(`❌ ${block.source} - failed to sync`);
+          }
+        }
+
+        const response: XMLResponse = {
+          requestId,
+          action: "complete",
+          instructions: `**Mermaid Diagrams Synced**\n\nExtracted and synced diagrams from HLD/ER files:\n${syncResults.join("\n")}`,
+          parameters: {},
+          reasoning: "Synced embedded mermaid diagrams",
+          finalResponse: `Synced ${allMermaidBlocks.length} embedded mermaid diagram(s) from HLD/ER files.`,
+        };
+        return this.formatToolResponse(response);
+      } catch (error) {
+        logger.error("Failed to sync embedded mermaid diagrams", { error });
+        const response: XMLResponse = {
+          requestId,
+          action: "complete",
+          instructions: generateSyncFailureInstructions(
+            "mermaid diagrams",
+            (error as Error).message,
+          ),
+          parameters: {},
+          reasoning: "API sync failed",
+          finalResponse: "Failed to sync mermaid diagrams.",
+        };
+        return this.formatToolResponse(response);
+      }
+    }
+
+    // Push dedicated mermaid diagram files
+    try {
+      const syncResults: string[] = [];
+
+      for (const diagram of mermaidContext.diagrams) {
+        const result = await this.apiClient.syncMermaidDiagram(
+          projectContext.projectId,
+          {
+            content: diagram.content,
+            diagramType: diagram.type,
+            name: diagram.name,
+            description: `Synced from ${diagram.filePath}`,
+          },
+        );
+
+        if (result) {
+          syncResults.push(`✅ ${diagram.name} (${diagram.type}) - v${result.version}`);
+        } else {
+          syncResults.push(`❌ ${diagram.name} - failed to sync`);
+        }
+      }
+
+      const successCount = syncResults.filter((r) => r.startsWith("✅")).length;
+
+      const instructions = generateMermaidPushInstructions({
+        projectName: mermaidContext.projectName,
+        diagramType: mermaidContext.diagrams[0]?.type || "flowchart",
+      });
+
+      const response: XMLResponse = {
+        requestId,
+        action: "complete",
+        instructions: instructions + `\n\n**Sync Results:**\n${syncResults.join("\n")}`,
+        parameters: {},
+        reasoning: `Synced ${successCount}/${mermaidContext.diagrams.length} diagrams`,
+        finalResponse: `Pushed ${successCount} mermaid diagram(s) to server.`,
+      };
+      return this.formatToolResponse(response);
+    } catch (error) {
+      logger.error("Failed to push mermaid diagrams", { error });
+      const response: XMLResponse = {
+        requestId,
+        action: "complete",
+        instructions: generateSyncFailureInstructions(
+          "mermaid diagrams",
+          (error as Error).message,
+        ),
+        parameters: {},
+        reasoning: "API sync failed",
+        finalResponse: "Failed to push mermaid diagrams.",
       };
       return this.formatToolResponse(response);
     }
