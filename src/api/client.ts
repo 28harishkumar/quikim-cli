@@ -175,12 +175,18 @@ export class QuikimAPIClient {
 
   /** List projects for the authenticated user */
   async listProjects(): Promise<Project[]> {
-    const response = await this.request<{ projects: Project[] }>(
+    // API returns paginated response: { data: Project[], pagination: {...} }
+    const response = await this.request<Project[]>(
       "/api/v1/projects",
       { method: "GET" }
     );
 
-    return response.data?.projects ?? [];
+    // Handle both paginated response format and direct array
+    const data = response.data;
+    if (Array.isArray(data)) {
+      return data;
+    }
+    return [];
   }
 
   /** Get project details by ID */
