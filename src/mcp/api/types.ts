@@ -1,0 +1,167 @@
+/**
+ * API Types for Quikim Platform Integration
+ * Defines interfaces for communication with Quikim backend services
+ */
+
+export interface APIConfig {
+  baseURL: string;
+  apiKey?: string;
+  timeout?: number;
+  retryAttempts?: number;
+  retryDelay?: number;
+}
+
+export interface APIResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
+}
+
+// Project Artifacts
+export interface Requirements {
+  id: string;
+  projectId: string;
+  version: number;
+  content: string;
+  quikimFeatures: string[];
+  customFeatures: string[];
+  createdAt: string;
+}
+
+export interface HLD {
+  id: string;
+  projectId: string;
+  version: number;
+  content: string;
+  techStack: {
+    frontend: string[];
+    backend: string[];
+    database: string[];
+    mobile: string[];
+  };
+  architecture: {
+    pattern: string;
+    structure: Record<string, string>;
+  };
+  createdAt: string;
+}
+
+export interface Tasks {
+  id: string;
+  projectId: string;
+  version: number;
+  content: string;
+  milestones: Milestone[];
+  createdAt: string;
+}
+
+export interface Milestone {
+  id: string;
+  name: string;
+  deadline: string;
+  tasks: Task[];
+}
+
+export interface Task {
+  id: string;
+  description: string;
+  estimatedHours: number;
+  status: 'pending' | 'in_progress' | 'completed';
+}
+
+export interface ERDiagram {
+  id: string;
+  projectId: string;
+  version: number;
+  content: string;
+  entities: Entity[];
+  createdAt: string;
+}
+
+export interface Entity {
+  name: string;
+  source: 'quikim' | 'custom';
+  fields: Field[];
+}
+
+export interface Field {
+  name: string;
+  type: string;
+  required: boolean;
+}
+
+export interface PrismaSchema {
+  id: string;
+  projectId: string;
+  version: number;
+  content: string;
+  generatedFrom: string;
+  createdAt: string;
+}
+
+export interface Wireframe {
+  id: string;
+  projectId: string;
+  version: number;
+  penpotFileId: string;
+  penpotPageIds: string[];
+  metadata: {
+    componentType: 'website' | 'portal' | 'mobile';
+    componentName: string;
+  };
+  createdAt: string;
+}
+
+export interface Theme {
+  id: string;
+  projectId: string;
+  version: number;
+  content: string;
+  createdAt: string;
+}
+
+export interface CodeGuidelines {
+  id: string;
+  projectId: string;
+  version: number;
+  content: string;
+  createdAt: string;
+}
+
+// Request Queue
+export interface QueuedRequest {
+  id: string;
+  projectId: string;
+  type: 'wireframe' | 'er_diagram' | 'prisma_schema' | 'hld' | 'tasks' | 'code_generation';
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  context: Record<string, any>;
+  result?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// LLM Integration
+export interface LLMKeyStatus {
+  integrated: boolean;
+  provider?: 'openai' | 'anthropic';
+  hasKeys: boolean;
+}
+
+// Sync Operations
+export interface SyncRequest {
+  projectId: string;
+  artifactType: 'requirements' | 'hld' | 'tasks' | 'er_diagram' | 'prisma_schema' | 'wireframes' | 'theme' | 'code_guidelines';
+  content: string;
+  version?: number;
+}
+
+export interface SyncResponse {
+  success: boolean;
+  artifactId: string;
+  version: number;
+  message?: string;
+  wireframeId?: string; // For wireframe syncs
+  erDiagramId?: string; // For ER diagram syncs
+  taskId?: string; // For task syncs
+}
