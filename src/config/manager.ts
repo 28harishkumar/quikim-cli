@@ -8,7 +8,7 @@
  */
 
 import Conf from "conf";
-import { readFile, writeFile, access } from "fs/promises";
+import { readFile, writeFile, access, mkdir } from "fs/promises";
 import { join } from "path";
 import type { CLIConfig, AuthConfig, ProjectConfig } from "../types/index.js";
 import {
@@ -16,6 +16,7 @@ import {
   LOCAL_USER_SERVICE_URL,
   LOCAL_PROJECT_SERVICE_URL,
   CONFIG_FILE_NAME,
+  QUIKIM_DIR,
   PROJECT_CONFIG_FILE,
 } from "./constants.js";
 
@@ -147,9 +148,23 @@ export class ProjectConfigManager {
     this.projectPath = projectPath;
   }
 
-  /** Get the config file path */
+  /** Get the .quikim directory path */
+  private getQuikimDirPath(): string {
+    return join(this.projectPath, QUIKIM_DIR);
+  }
+
+  /** Get the config file path (.quikim/project.json) */
   private getConfigFilePath(): string {
-    return join(this.projectPath, PROJECT_CONFIG_FILE);
+    return join(this.getQuikimDirPath(), PROJECT_CONFIG_FILE);
+  }
+
+  /** Ensure .quikim directory exists */
+  private async ensureQuikimDir(): Promise<void> {
+    try {
+      await mkdir(this.getQuikimDirPath(), { recursive: true });
+    } catch {
+      // Directory may already exist
+    }
   }
 
   /** Check if project config exists */
@@ -174,6 +189,7 @@ export class ProjectConfigManager {
 
   /** Write project configuration */
   async write(config: ProjectConfig): Promise<void> {
+    await this.ensureQuikimDir();
     const content = JSON.stringify(config, null, 2);
     await writeFile(this.getConfigFilePath(), content, "utf-8");
   }
@@ -186,6 +202,11 @@ export class ProjectConfigManager {
     } catch {
       // Ignore if file doesn't exist
     }
+  }
+
+  /** Get the .quikim directory path (for display) */
+  getQuikimDirectory(): string {
+    return this.getQuikimDirPath();
   }
 }
 

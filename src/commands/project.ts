@@ -69,7 +69,7 @@ async function listProjectsHandler(options: {
     const currentProject = configManager.getCurrentProject();
 
     for (const project of filteredProjects) {
-      const isConnected = currentProject?.id === project.id;
+      const isConnected = currentProject?.projectId === project.id;
       const prefix = isConnected ? "→ " : "  ";
       const connectedLabel = isConnected ? " (connected)" : "";
       
@@ -149,19 +149,21 @@ async function connectProjectHandler(
       }
     }
 
-    // Create project config
+    // Create project config (format expected by MCP server)
     const projectConfig: ProjectConfig = {
-      id: project.id,
+      projectId: project.id,
+      organizationId: project.organizationId,
+      userId: auth?.userId,
       name: project.name,
       slug: project.slug,
-      organizationId: project.organizationId,
+      latestVersion: 0,
       connectedAt: new Date().toISOString(),
     };
 
     // Save to global config
     configManager.setCurrentProject(projectConfig);
 
-    // Save to local project config if in a directory
+    // Save to local project config (.quikim/project.json for MCP server)
     const cwd = process.cwd();
     const projectConfigManager = createProjectConfig(cwd);
     await projectConfigManager.write(projectConfig);
@@ -178,7 +180,7 @@ async function connectProjectHandler(
     output.tableRow("ID", project.id);
     output.tableRow("Status", output.formatStatus(project.status));
     output.separator();
-    output.success("Project configuration saved to .quikim.json");
+    output.success("Project configuration saved to .quikim/project.json");
   } catch (err) {
     spinner.fail("Failed to connect to project");
     if (err instanceof NotFoundError) {
@@ -240,7 +242,7 @@ async function projectInfoHandler(options: { json?: boolean }): Promise<void> {
 
   try {
     const client = getProjectServiceClient();
-    const project = await client.getProject(currentProject.id);
+    const project = await client.getProject(currentProject.projectId);
 
     spinner.stop();
 

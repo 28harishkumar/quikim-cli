@@ -87,7 +87,7 @@ program
 
     if (currentProject) {
       output.success(`Connected to project: ${currentProject.name}`);
-      output.tableRow("Project ID", currentProject.id);
+      output.tableRow("Project ID", currentProject.projectId);
       output.tableRow("Slug", currentProject.slug);
     } else {
       output.warning("No project connected");

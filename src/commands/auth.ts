@@ -203,7 +203,7 @@ async function whoamiHandler(options: { json?: boolean }): Promise<void> {
     output.separator();
     output.header("Connected Project");
     output.tableRow("Name", currentProject.name);
-    output.tableRow("ID", currentProject.id);
+    output.tableRow("ID", currentProject.projectId);
     output.tableRow("Connected", output.formatDate(currentProject.connectedAt));
   }
 

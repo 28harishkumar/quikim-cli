@@ -104,7 +104,7 @@ async function showConfigHandler(options: { json?: boolean }): Promise<void> {
   if (currentProject) {
     output.separator();
     output.tableRow("Current Project", currentProject.name);
-    output.tableRow("Project ID", currentProject.id);
+    output.tableRow("Project ID", currentProject.projectId);
   }
 
   output.separator();

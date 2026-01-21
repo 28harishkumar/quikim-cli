@@ -26,12 +26,21 @@ export interface AuthConfig {
   expiresAt?: string;
 }
 
-/** Project configuration for connected project */
+/** Project configuration for connected project (stored in .quikim/project.json) */
 export interface ProjectConfig {
-  id: string;
-  name: string;
-  slug: string;
+  /** Project ID - used by MCP server */
+  projectId: string;
+  /** Organization ID - used by MCP server */
   organizationId: string;
+  /** User ID - used by MCP server */
+  userId?: string;
+  /** Project name (for display) */
+  name: string;
+  /** Project slug (for display) */
+  slug: string;
+  /** Latest artifact version number */
+  latestVersion?: number;
+  /** When the project was connected */
   connectedAt: string;
 }
 
