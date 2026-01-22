@@ -11,10 +11,13 @@ import { Command } from "commander";
 import { configManager } from "../config/manager.js";
 import * as output from "../utils/output.js";
 import { homedir, platform } from "os";
-import { join } from "path";
+import { join, dirname } from "path";
 import { readFile, writeFile, mkdir } from "fs/promises";
+import { existsSync } from "fs";
 import { cwd } from "process";
 import chalk from "chalk";
+import { execSync } from "child_process";
+import { fileURLToPath } from "url";
 
 /** Supported editor types */
 type EditorType = "cursor" | "kiro" | "windsurf" | "zed" | "vscode" | "claude-code";
@@ -62,7 +65,7 @@ interface WindsurfMCPConfig {
 
 /** Kiro MCP config structure */
 interface KiroMCPConfig {
-  servers?: Record<string, MCPServerConfig>;
+  mcpServers?: Record<string, MCPServerConfig>;
   [key: string]: unknown;
 }
 
@@ -118,7 +121,7 @@ function getEditorConfig(editor: EditorType): EditorConfig {
           const content = await readFile(path, "utf-8");
           return JSON.parse(content) as KiroMCPConfig;
         } catch {
-          return { servers: {} } as KiroMCPConfig;
+          return { mcpServers: {} } as KiroMCPConfig;
         }
       },
       writeConfig: async (path: string, config: unknown) => {
@@ -228,6 +231,61 @@ function getEditorConfig(editor: EditorType): EditorConfig {
   return configs[editor];
 }
 
+/** Find the quikim binary path */
+function findQuikimBinary(): { command: string; args: string[] } {
+  try {
+    // Try to find quikim in PATH
+    if (platform() === "win32") {
+      const result = execSync("where quikim", { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] });
+      const path = result.trim().split("\n")[0];
+      if (path && existsSync(path)) {
+        return { command: path, args: ["mcp", "serve"] };
+      }
+    } else {
+      const result = execSync("which quikim", { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] });
+      const path = result.trim();
+      if (path && existsSync(path)) {
+        return { command: path, args: ["mcp", "serve"] };
+      }
+    }
+  } catch {
+    // which/where command failed, try alternative methods
+  }
+
+  // Try npm's global bin directory
+  try {
+    const npmPrefix = execSync("npm config get prefix", { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    if (npmPrefix) {
+      const globalBin = platform() === "win32" 
+        ? join(npmPrefix, "quikim.cmd")
+        : join(npmPrefix, "bin", "quikim");
+      if (existsSync(globalBin)) {
+        return { command: globalBin, args: ["mcp", "serve"] };
+      }
+    }
+  } catch {
+    // npm config failed
+  }
+
+  // Fallback: try to use node with the current script
+  // This works when quikim is installed via npm link or in development
+  try {
+    const currentFile = fileURLToPath(import.meta.url);
+    const cliDir = dirname(dirname(dirname(currentFile)));
+    const distIndex = join(cliDir, "dist", "index.js");
+    // Check if the file exists synchronously
+    if (existsSync(distIndex)) {
+      return { command: process.execPath, args: [distIndex, "mcp", "serve"] };
+    }
+  } catch {
+    // Fallback failed
+  }
+
+  // Last resort: return "quikim" and hope it's in PATH
+  // The user will need to ensure quikim is in their PATH
+  return { command: "quikim", args: ["mcp", "serve"] };
+}
+
 /** Get MCP server configuration */
 function getMCPServerConfig(): MCPServerConfig {
   const env: Record<string, string> = {};
@@ -239,20 +297,23 @@ function getMCPServerConfig(): MCPServerConfig {
     env.QUIKIM_API_BASE_URL = configManager.getApiUrl();
   }
 
+  // Find the quikim binary path
+  const { command, args } = findQuikimBinary();
+
   return {
-    command: "quikim",
-    args: ["mcp", "serve"],
+    command,
+    args,
     env: Object.keys(env).length > 0 ? env : undefined,
   };
 }
 
 /** Check if Quikim is configured in editor config */
 function isQuikimConfigured(config: unknown, editor: EditorType): boolean {
-  if (editor === "cursor" || editor === "vscode") {
-    const c = config as CursorMCPConfig | VSCodeMCPConfig;
+  if (editor === "cursor" || editor === "vscode" || editor === "kiro") {
+    const c = config as CursorMCPConfig | VSCodeMCPConfig | KiroMCPConfig;
     return !!(c.mcpServers && c.mcpServers.quikim);
-  } else if (editor === "kiro" || editor === "windsurf") {
-    const c = config as KiroMCPConfig | WindsurfMCPConfig;
+  } else if (editor === "windsurf") {
+    const c = config as WindsurfMCPConfig;
     return !!(c.servers && c.servers.quikim);
   } else if (editor === "zed") {
     const c = config as ZedSettings;
@@ -268,15 +329,15 @@ function isQuikimConfigured(config: unknown, editor: EditorType): boolean {
 function addQuikimToConfig(config: unknown, editor: EditorType): unknown {
   const serverConfig = getMCPServerConfig();
 
-  if (editor === "cursor" || editor === "vscode") {
-    const c = config as CursorMCPConfig | VSCodeMCPConfig;
+  if (editor === "cursor" || editor === "vscode" || editor === "kiro") {
+    const c = config as CursorMCPConfig | VSCodeMCPConfig | KiroMCPConfig;
     if (!c.mcpServers) {
       c.mcpServers = {};
     }
     c.mcpServers.quikim = serverConfig;
     return c;
-  } else if (editor === "kiro" || editor === "windsurf") {
-    const c = config as KiroMCPConfig | WindsurfMCPConfig;
+  } else if (editor === "windsurf") {
+    const c = config as WindsurfMCPConfig;
     if (!c.servers) {
       c.servers = {};
     }
@@ -308,14 +369,14 @@ function addQuikimToConfig(config: unknown, editor: EditorType): unknown {
 
 /** Remove Quikim from editor config */
 function removeQuikimFromConfig(config: unknown, editor: EditorType): unknown {
-  if (editor === "cursor" || editor === "vscode") {
-    const c = config as CursorMCPConfig | VSCodeMCPConfig;
+  if (editor === "cursor" || editor === "vscode" || editor === "kiro") {
+    const c = config as CursorMCPConfig | VSCodeMCPConfig | KiroMCPConfig;
     if (c.mcpServers && c.mcpServers.quikim) {
       delete c.mcpServers.quikim;
     }
     return c;
-  } else if (editor === "kiro" || editor === "windsurf") {
-    const c = config as KiroMCPConfig | WindsurfMCPConfig;
+  } else if (editor === "windsurf") {
+    const c = config as WindsurfMCPConfig;
     if (c.servers && c.servers.quikim) {
       delete c.servers.quikim;
     }

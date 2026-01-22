@@ -7,7 +7,8 @@
  * See LICENSE file in the project root for full license information.
  */
 
-import { protocolIntegration } from '../integration/index.js';
+// Lazy import to avoid circular dependency: server.ts -> workflow-tools.ts -> integration/index.ts -> server.ts
+// import { protocolIntegration } from '../integration/index.js';
 import { logger } from '../utils/logger.js';
 import { errorHandler, ErrorContext } from '../utils/error-handler.js';
 
@@ -409,6 +410,8 @@ export class WorkflowEngineTools {
 
     try {
       const { name, arguments: args } = request.params;
+      // Lazy import to avoid circular dependency
+      const { protocolIntegration } = await import('../integration/index.js');
       const components = protocolIntegration.getComponents();
 
       switch (name) {

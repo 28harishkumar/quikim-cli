@@ -25,7 +25,8 @@ import {
 
 import { XMLProtocolParser, xmlParser } from './xml/parser.js';
 import { SessionManager, sessionManager } from './session/manager.js';
-import { WorkflowEngineTools } from './handlers/workflow-tools.js';
+// Lazy import to avoid circular dependency: server.ts -> workflow-tools.ts -> integration/index.ts -> server.ts
+// import { WorkflowEngineTools } from './handlers/workflow-tools.js';
 import { logger } from './utils/logger.js';
 import { errorHandler, ErrorContext } from './utils/error-handler.js';
 import { PROTOCOL_CONFIG } from './utils/constants.js';
@@ -356,7 +357,8 @@ export class MCPCursorProtocolServer {
         } as Tool,
       ];
 
-      // Get workflow engine tools
+      // Get workflow engine tools (lazy import to avoid circular dependency)
+      const { WorkflowEngineTools } = await import('./handlers/workflow-tools.js');
       const workflowTools = await WorkflowEngineTools.listTools();
 
       // Combine all tools
@@ -513,6 +515,8 @@ export class MCPCursorProtocolServer {
         case "leave_collaboration_session":
         case "generate_code_from_requirements":
         case "generate_code_from_design":
+          // Lazy import to avoid circular dependency
+          const { WorkflowEngineTools } = await import('./handlers/workflow-tools.js');
           return await WorkflowEngineTools.handleToolCall(request);
         
         default:
