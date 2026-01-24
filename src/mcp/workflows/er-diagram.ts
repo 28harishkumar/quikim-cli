@@ -5,6 +5,7 @@
 
 import { CodebaseContext } from '../session/types.js';
 import { extractProjectName } from '../utils/project-name.js';
+import { generateERDiagramInstructions as generateInstructions } from '../instructions/er-diagram.js';
 
 export interface ERDiagramGenerationContext {
   requirements: string;
@@ -51,9 +52,6 @@ export function generateERDiagramInstructions(
     entities?: any[];
   }>
 ): string {
-  const {
-    generateERDiagramInstructions: generateInstructions,
-  } = require("../instructions/er-diagram");
   return generateInstructions({
     projectName: context.projectName,
     quikimFeatures,

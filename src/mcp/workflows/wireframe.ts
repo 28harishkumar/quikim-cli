@@ -5,6 +5,7 @@
 
 import { CodebaseContext } from '../session/types.js';
 import { extractProjectName } from '../utils/project-name.js';
+import { generateWireframeInstructions as generateInstructions } from '../instructions/wireframes.js';
 
 export interface WireframeGenerationContext {
   requirements: string;
@@ -53,9 +54,6 @@ export function extractWireframeContext(
 export function generateWireframeInstructions(
   context: WireframeGenerationContext
 ): string {
-  const {
-    generateWireframeInstructions: generateInstructions,
-  } = require("../instructions/wireframes");
   return generateInstructions({
     projectName: context.projectName,
     components: context.components,

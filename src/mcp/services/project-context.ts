@@ -36,7 +36,20 @@ export class ProjectContextResolver {
 
     if (projectFile) {
       try {
-        const projectData = JSON.parse(projectFile.content);
+        // Extract content - handle different formats from Cursor
+        let contentStr: string = '';
+        const content = (projectFile as any).content;
+        
+        if (typeof content === 'string') {
+          contentStr = content;
+        } else if (Array.isArray(content)) {
+          // Cursor sends content as array of {text, type} objects
+          contentStr = content.map((block: any) => block.text || '').join('\n');
+        } else if (content && typeof content === 'object' && 'text' in content) {
+          contentStr = content.text;
+        }
+        
+        const projectData = JSON.parse(contentStr);
         return {
           projectId: projectData.projectId,
           organizationId: projectData.organizationId,

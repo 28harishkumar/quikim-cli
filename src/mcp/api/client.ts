@@ -1,10 +1,4 @@
 /**
- * Quikim Platform API Client
- * Handles communication with Quikim backend services
- * Implements artifact fetching, syncing, and request queuing
- */
-
-/**
  * Quikim - MCP API Client
  * 
  * Copyright (c) 2026 Quikim Inc.
@@ -188,11 +182,15 @@ export class QuikimAPIClient {
    */
   async fetchRequirements(projectId: string): Promise<Requirements | null> {
     try {
-      const response = await this.request<Requirements>(
-        `/api/projects/${projectId}/requirements/latest`,
+      // GET /api/v1/requirements/?projectId=xxx
+      const response = await this.request<{ success: boolean; data: any[] }>(
+        `/api/v1/requirements/?projectId=${projectId}`,
         { method: "GET" },
       );
-      return response.data || null;
+      
+      // Return the latest version (first item since they're sorted desc by version)
+      const requirements = response.data?.data || [];
+      return requirements.length > 0 ? requirements[0] : null;
     } catch (error) {
       if (error instanceof NotFoundError) {
         return null;
@@ -206,11 +204,15 @@ export class QuikimAPIClient {
    */
   async fetchHLD(projectId: string): Promise<HLD | null> {
     try {
-      const response = await this.request<HLD>(
-        `/api/projects/${projectId}/hld/latest`,
+      // GET /api/v1/designs/?projectId=xxx&type=hld
+      const response = await this.request<{ success: boolean; data: any[] }>(
+        `/api/v1/designs/?projectId=${projectId}&type=hld`,
         { method: "GET" },
       );
-      return response.data || null;
+      
+      // Return the latest version (first item since they're sorted desc by version)
+      const designs = response.data?.data || [];
+      return designs.length > 0 ? designs[0] : null;
     } catch (error) {
       if (error instanceof NotFoundError) {
         return null;
@@ -224,11 +226,12 @@ export class QuikimAPIClient {
    */
   async fetchLLDs(projectId: string): Promise<LLD[]> {
     try {
-      const response = await this.request<LLD[]>(
-        `/api/projects/${projectId}/lld`,
+      // GET /api/v1/designs/?projectId=xxx&type=lld
+      const response = await this.request<{ success: boolean; data: any[] }>(
+        `/api/v1/designs/?projectId=${projectId}&type=lld`,
         { method: "GET" },
       );
-      return response.data || [];
+      return response.data?.data || [];
     } catch (error) {
       if (error instanceof NotFoundError) {
         return [];
@@ -242,11 +245,13 @@ export class QuikimAPIClient {
    */
   async fetchLLD(projectId: string, componentName: string): Promise<LLD | null> {
     try {
-      const response = await this.request<LLD>(
-        `/api/projects/${projectId}/lld/${encodeURIComponent(componentName)}`,
+      // GET /api/v1/designs/?projectId=xxx&type=lld&componentName=xxx
+      const response = await this.request<{ success: boolean; data: any[] }>(
+        `/api/v1/designs/?projectId=${projectId}&type=lld&componentName=${encodeURIComponent(componentName)}`,
         { method: "GET" },
       );
-      return response.data || null;
+      const designs = response.data?.data || [];
+      return designs.length > 0 ? designs[0] : null;
     } catch (error) {
       if (error instanceof NotFoundError) {
         return null;
@@ -260,11 +265,27 @@ export class QuikimAPIClient {
    */
   async fetchTasks(projectId: string): Promise<Tasks | null> {
     try {
-      const response = await this.request<Tasks>(
-        `/api/projects/${projectId}/tasks/latest`,
+      // GET /api/v1/tasks/?projectId=xxx
+      const response = await this.request<{ success: boolean; data: any[] }>(
+        `/api/v1/tasks/?projectId=${projectId}`,
         { method: "GET" },
       );
-      return response.data || null;
+      
+      // Return all tasks for the project
+      const tasks = response.data?.data || [];
+      // Format as Tasks object
+      if (tasks.length === 0) {
+        return null;
+      }
+      
+      return {
+        id: projectId,
+        projectId: projectId,
+        version: 1,
+        content: JSON.stringify(tasks),
+        milestones: [],
+        createdAt: new Date().toISOString(),
+      };
     } catch (error) {
       if (error instanceof NotFoundError) {
         return null;
@@ -278,11 +299,15 @@ export class QuikimAPIClient {
    */
   async fetchERDiagram(projectId: string): Promise<ERDiagram | null> {
     try {
-      const response = await this.request<ERDiagram>(
-        `/api/projects/${projectId}/er-diagram/latest`,
+      // GET /api/v1/er-diagrams/?projectId=xxx
+      const response = await this.request<{ success: boolean; data: any[] }>(
+        `/api/v1/er-diagrams/?projectId=${projectId}`,
         { method: "GET" },
       );
-      return response.data || null;
+      
+      // Return the latest version
+      const erDiagrams = response.data?.data || [];
+      return erDiagrams.length > 0 ? erDiagrams[0] : null;
     } catch (error) {
       if (error instanceof NotFoundError) {
         return null;
@@ -314,11 +339,12 @@ export class QuikimAPIClient {
    */
   async fetchWireframes(projectId: string): Promise<Wireframe[]> {
     try {
-      const response = await this.request<Wireframe[]>(
-        `/api/projects/${projectId}/wireframes`,
+      // GET /api/v1/projects/:projectId/wireframes
+      const response = await this.request<{ success: boolean; data: any[] }>(
+        `/api/v1/projects/${projectId}/wireframes`,
         { method: "GET" },
       );
-      return response.data || [];
+      return response.data?.data || [];
     } catch (error) {
       if (error instanceof NotFoundError) {
         return [];
@@ -533,21 +559,112 @@ export class QuikimAPIClient {
 
   /**
    * Sync artifact to platform (creates new version)
+   * Routes to correct service endpoint based on artifact type
+   * 
+   * Project Service Endpoints (port 8002):
+   * - POST /api/v1/requirements/ (create requirement)
+   * - POST /api/v1/designs/ (create HLD/LLD)
+   * - POST /api/v1/tasks/ (create task)
+   * - POST /api/v1/er-diagrams/ (create ER diagram)
+   * - POST /api/v1/projects/:projectId/wireframes (create wireframe)
    */
   async syncArtifact(request: SyncRequest): Promise<SyncResponse> {
-    const response = await this.request<SyncResponse>(
-      `/api/projects/${request.projectId}/artifacts/sync`,
+    let endpoint: string;
+    let requestBody: any;
+
+    // Route to the correct service endpoint
+    switch (request.artifactType) {
+      case "requirements":
+        // POST /api/v1/requirements/
+        endpoint = `/api/v1/requirements/`;
+        requestBody = {
+          projectId: request.projectId,
+          content: request.content,
+          changeSummary: request.metadata?.changeSummary,
+          changeType: request.metadata?.changeType || "minor",
+        };
+        break;
+
+      case "hld":
+      case "lld":
+        // POST /api/v1/designs/
+        endpoint = `/api/v1/designs/`;
+        requestBody = {
+          projectId: request.projectId,
+          type: request.artifactType, // "hld" or "lld"
+          content: request.content,
+          componentName: request.metadata?.componentName,
+          changeSummary: request.metadata?.changeSummary,
+        };
+        break;
+
+      case "tasks":
+        // POST /api/v1/tasks/
+        endpoint = `/api/v1/tasks/`;
+        requestBody = {
+          projectId: request.projectId,
+          title: request.metadata?.title || "Task from MCP",
+          description: request.content,
+          status: request.metadata?.status || "todo",
+          priority: request.metadata?.priority || "medium",
+          type: request.metadata?.type || "feature",
+        };
+        break;
+
+      case "er_diagram":
+        // POST /api/v1/er-diagrams/
+        endpoint = `/api/v1/er-diagrams/`;
+        requestBody = {
+          projectId: request.projectId,
+          content: request.content,
+          name: request.metadata?.name || "ER Diagram",
+          changeSummary: request.metadata?.changeSummary,
+        };
+        break;
+
+      case "wireframes":
+        // POST /api/v1/projects/:projectId/wireframes
+        endpoint = `/api/v1/projects/${request.projectId}/wireframes`;
+        requestBody = {
+          name: request.metadata?.name || "Wireframe from MCP",
+          content: request.content,
+          componentType: request.metadata?.componentType || "website",
+        };
+        break;
+
+      case "prisma_schema":
+      case "theme":
+      case "code_guidelines":
+      case "mermaid":
+        // For now, throw error for unsupported types
+        throw new APIError(
+          `Syncing ${request.artifactType} is not yet implemented. Please use the specific service endpoints.`
+        );
+
+      default:
+        throw new APIError(`Unknown artifact type: ${request.artifactType}`);
+    }
+
+    const response = await this.request<{ success: boolean; data: any }>(
+      endpoint,
       {
         method: "POST",
-        body: JSON.stringify(request),
+        body: JSON.stringify(requestBody),
       },
     );
 
     if (!response.success || !response.data) {
-      throw new APIError("Failed to sync artifact");
+      throw new APIError(`Failed to sync ${request.artifactType}`);
     }
 
-    return response.data;
+    // Extract artifact data from response.data (which contains the actual artifact object)
+    const artifactData = response.data as any;
+    return {
+      success: true,
+      artifactId: artifactData.id || "",
+      version: artifactData.version || 1,
+      message: `${request.artifactType} synced successfully`,
+    };
   }
 
   // ==================== Request Queue ====================

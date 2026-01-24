@@ -13,6 +13,8 @@ import { configManager, createProjectConfig } from "../config/manager.js";
 import { createAPIClient } from "../api/client.js";
 import { NotFoundError } from "../api/errors.js";
 import * as output from "../utils/output.js";
+import { installIDERules } from "../utils/ide-rules.js";
+import { generateAPIStructureFile } from "../utils/api-structure.js";
 import type { Project, ProjectConfig } from "../types/index.js";
 
 /** Ensure user is authenticated */
@@ -289,10 +291,39 @@ async function projectInfoHandler(options: { json?: boolean }): Promise<void> {
 }
 
 /** Initialize project from local config */
-async function initProjectHandler(): Promise<void> {
+async function initProjectHandler(options: { all?: boolean; force?: boolean }): Promise<void> {
   requireAuth();
 
   const cwd = process.cwd();
+  
+  output.header("Quikim Project Initialization");
+  output.separator();
+
+  // Step 1: Install IDE rules
+  output.info("Step 1: Installing IDE rules...");
+  output.separator();
+  await installIDERules(cwd, { all: options.all, force: options.force });
+  output.separator();
+
+  // Step 2: Generate API structure file
+  output.info("Step 2: Generating API structure cache...");
+  output.separator();
+  try {
+    const apiStructureFile = await generateAPIStructureFile(cwd);
+    output.success(`API structure file created: ${apiStructureFile}`);
+    output.info("This file contains all API endpoints and schemas for faster MCP operations");
+  } catch (err) {
+    output.warning("Failed to generate API structure file (non-critical)");
+    if (err instanceof Error) {
+      output.info(`  ${err.message}`);
+    }
+  }
+  output.separator();
+
+  // Step 3: Connect to project
+  output.info("Step 3: Connecting to project...");
+  output.separator();
+
   const projectConfigManager = createProjectConfig(cwd);
 
   // Check if already initialized
@@ -314,6 +345,8 @@ async function initProjectHandler(): Promise<void> {
       ]);
 
       if (action === "keep") {
+        output.separator();
+        output.success("Initialization complete!");
         return;
       }
     }
@@ -321,6 +354,14 @@ async function initProjectHandler(): Promise<void> {
 
   // Connect to a project
   await connectProjectHandler();
+  
+  output.separator();
+  output.success("Initialization complete!");
+  output.separator();
+  output.info("Next steps:");
+  output.info("  1. Open your project in Cursor/VSCode");
+  output.info("  2. MCP will use .quikim/api_structure.json for fast API operations");
+  output.info("  3. Run 'quikim project info' to view project details");
 }
 
 /** Create project commands */
@@ -368,5 +409,7 @@ export function createConnectCommand(): Command {
 export function createInitCommand(): Command {
   return new Command("init")
     .description("Initialize Quikim in the current directory")
+    .option("-a, --all", "Install rules for all supported IDEs (not just detected ones)")
+    .option("-f, --force", "Force overwrite existing IDE rules")
     .action(initProjectHandler);
 }

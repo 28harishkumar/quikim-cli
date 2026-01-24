@@ -12,6 +12,7 @@
     "dev": "tsc --watch",
     "start": "node dist/index.js",
     "mcp": "node dist/index.js mcp serve",
+    "mcp-inspector": "npx @modelcontextprotocol/inspector node dist/index.js mcp serve",
     "lint": "eslint src --ext .ts",
     "clean": "rm -rf dist"
   },
@@ -26,22 +27,23 @@
   "author": "Quikim Inc.",
   "license": "AGPL-3.0",
   "dependencies": {
+    "@modelcontextprotocol/inspector": "^0.19.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "chalk": "^5.3.0",
+    "chokidar": "^3.6.0",
     "commander": "^12.1.0",
     "conf": "^13.0.1",
+    "diff-match-patch": "^1.0.5",
     "fast-xml-parser": "^4.3.0",
     "inquirer": "^9.3.7",
     "ora": "^8.1.0",
-    "uuid": "^9.0.0",
-    "diff-match-patch": "^1.0.5",
-    "chokidar": "^3.6.0"
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
+    "@types/diff-match-patch": "^1.0.36",
     "@types/inquirer": "^9.0.7",
     "@types/node": "^22.10.0",
     "@types/uuid": "^9.0.0",
-    "@types/diff-match-patch": "^1.0.36",
     "typescript": "^5.6.3"
   },
   "engines": {

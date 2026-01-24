@@ -22,34 +22,31 @@ import {
   generateMCPPrompts,
   getPromptContent,
 } from './prompts/capabilities.js';
+import { mkdirSync, appendFileSync } from 'fs';
+import { join, dirname } from 'path';
 
-import { XMLProtocolParser, xmlParser } from './xml/parser.js';
 import { SessionManager, sessionManager } from './session/manager.js';
 // Lazy import to avoid circular dependency: server.ts -> workflow-tools.ts -> integration/index.ts -> server.ts
 // import { WorkflowEngineTools } from './handlers/workflow-tools.js';
 import { logger } from './utils/logger.js';
 import { errorHandler, ErrorContext } from './utils/error-handler.js';
 import { PROTOCOL_CONFIG } from './utils/constants.js';
-import { RequirementHandler } from './workflows/requirement-handler.js';
 import { CodebaseContext } from './session/types.js';
 import { ToolHandlers } from './handlers/index.js';
-import { QuikimAPIClient } from './api/client.js';
+import { ServiceAwareAPIClient } from './api/service-client.js';
 import {
   projectContextResolver,
   ProjectContext,
 } from './services/project-context.js';
-import { RAGService } from './services/rag.js';
 
 // Import CLI config manager for shared authentication
 import { configManager } from '../config/manager.js';
 
 export class MCPCursorProtocolServer {
   private server: Server;
-  private xmlParser: XMLProtocolParser;
   private sessionManager: SessionManager;
-  private requirementHandler: RequirementHandler;
   private toolHandlers: ToolHandlers;
-  private apiClient: QuikimAPIClient;
+  private apiClient: ServiceAwareAPIClient;
 
   constructor() {
     this.server = new Server(
@@ -65,56 +62,32 @@ export class MCPCursorProtocolServer {
       }
     );
 
-    this.xmlParser = xmlParser;
     this.sessionManager = sessionManager;
-    this.requirementHandler = new RequirementHandler();
 
     // Initialize API client using CLI's shared configuration
     // Priority: 1) Environment variable, 2) CLI config
-    const apiBaseURL = this.resolveApiBaseUrl();
     const apiKey = this.resolveApiKey();
     
-    logger.info("Initializing MCP server with API configuration", {
-      apiBaseURL,
+    logger.info("Initializing MCP server with service-aware API configuration", {
+      userServiceUrl: configManager.getUserServiceUrl(),
+      projectServiceUrl: configManager.getProjectServiceUrl(),
       hasApiKey: !!apiKey,
       isLocalMode: configManager.isLocalMode(),
     });
 
-    this.apiClient = new QuikimAPIClient({
-      baseURL: apiBaseURL,
+    this.apiClient = new ServiceAwareAPIClient({
       apiKey,
       timeout: 30000,
       retryAttempts: 3,
       retryDelay: 1000,
     });
 
-    // Initialize RAG service with API client
-    const ragService = new RAGService(this.apiClient);
-
-    // Initialize tool handlers
-    this.toolHandlers = new ToolHandlers(
-      this.requirementHandler,
-      this.apiClient,
-      this.xmlParser,
-      ragService
-    );
+    // Initialize tool handlers - now using simplified AI Agent based handlers
+    this.toolHandlers = new ToolHandlers(this.apiClient);
 
     this.setupToolHandlers();
     this.setupPromptHandlers();
     this.setupErrorHandlers();
-  }
-
-  /**
-   * Resolve API base URL from environment or CLI config
-   */
-  private resolveApiBaseUrl(): string {
-    // Environment variable takes precedence
-    if (process.env.QUIKIM_API_BASE_URL) {
-      return process.env.QUIKIM_API_BASE_URL;
-    }
-    
-    // Use CLI's configured project service URL
-    return configManager.getProjectServiceUrl();
   }
 
   /**
@@ -146,12 +119,18 @@ export class MCPCursorProtocolServer {
         {
           name: "push_requirements",
           description:
-            "Update requirements on server from local requirements",
+            "Upload requirements to server. REQUIRED: codebase.files array must contain a file with path matching '.quikim/v*/requirements.md' and content property with markdown string. Example: {codebase: {files: [{path: '.quikim/v1/requirements.md', content: '# Requirements\\n\\n...'}]}, user_prompt: 'string'}",
           inputSchema: {
             type: "object",
             properties: {
-              codebase: { type: "object" },
-              user_prompt: { type: "string" },
+              codebase: { 
+                type: "object",
+                description: "Object with 'files' array. Each file must have 'path' and 'content' properties. Path must match pattern: .quikim/v*/requirements.md"
+              },
+              user_prompt: { 
+                type: "string",
+                description: "Original user request"
+              },
               project_context: { type: "object" },
             },
             required: ["codebase", "user_prompt"],
@@ -371,6 +350,31 @@ export class MCPCursorProtocolServer {
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
 
+      // DEBUG: Write to workspace file
+      try {
+        const logPath = join(process.cwd(), '.quikim', 'mcp-debug.log');
+        mkdirSync(dirname(logPath), { recursive: true });
+        appendFileSync(logPath, `\n=== ${new Date().toISOString()} ===\n`);
+        appendFileSync(logPath, `Tool: ${name}\n`);
+        appendFileSync(logPath, `Args keys: ${Object.keys(args || {}).join(', ')}\n`);
+        if (args?.codebase) {
+          const files = (args.codebase as any)?.files;
+          appendFileSync(logPath, `Files count: ${files?.length || 0}\n`);
+          if (files && files.length > 0) {
+            files.forEach((f: any, i: number) => {
+              appendFileSync(logPath, `  File ${i}: ${f.path}\n`);
+              appendFileSync(logPath, `    Content type: ${typeof f.content}\n`);
+              if (Array.isArray(f.content)) {
+                appendFileSync(logPath, `    Content array length: ${f.content.length}\n`);
+                appendFileSync(logPath, `    First block: ${JSON.stringify(f.content[0]).substring(0, 100)}\n`);
+              }
+            });
+          }
+        }
+      } catch (e) {
+        // Ignore
+      }
+
       if (!args) {
         throw new Error(`Missing arguments for tool: ${name}`);
       }
@@ -393,6 +397,20 @@ export class MCPCursorProtocolServer {
       };
 
       const userPrompt = args.user_prompt as string;
+      const data = args.data as any; // Extract data field for direct execution
+
+      // Log what we're extracting
+      if (data) {
+        console.log('[MCP Server] Data field detected:', {
+          hasEndpoint: !!data.endpoint,
+          hasMethod: !!data.method,
+          endpoint: data.endpoint,
+          method: data.method,
+          dataKeys: Object.keys(data)
+        });
+      } else {
+        console.log('[MCP Server] No data field in args');
+      }
 
       // Resolve project context from codebase
       const resolvedContext = await projectContextResolver.resolveFromCodebase(
@@ -403,103 +421,125 @@ export class MCPCursorProtocolServer {
         ...((args.project_context as any) || {}),
       };
 
+      console.log('[MCP Server] Calling handler:', {
+        toolName: name,
+        hasData: !!data,
+        projectId: projectContext.projectId
+      });
+
       // Route to appropriate handler
       switch (name) {
         case "push_requirements":
           return await this.toolHandlers.handlePushRequirements(
             codebase,
             userPrompt,
-            projectContext
+            projectContext,
+            data  // Pass data for direct execution
           );
         case "pull_requirements":
           return await this.toolHandlers.handlePullRequirements(
             codebase,
             userPrompt,
-            projectContext
+            projectContext,
+            data
           );
         case "push_hld":
           return await this.toolHandlers.handlePushHLD(
             codebase,
             userPrompt,
-            projectContext
+            projectContext,
+            data
           );
         case "pull_hld":
           return await this.toolHandlers.handlePullHLD(
             codebase,
             userPrompt,
-            projectContext
+            projectContext,
+            data
           );
         case "pull_wireframe":
           return await this.toolHandlers.handlePullWireframe(
             codebase,
             userPrompt,
-            projectContext
+            projectContext,
+            data
           );
         case "push_wireframes":
           return await this.toolHandlers.handlePushWireframes(
             codebase,
             userPrompt,
-            projectContext
+            projectContext,
+            data
           );
         case "push_tasks":
           return await this.toolHandlers.handlePushTasks(
             codebase,
             userPrompt,
-            projectContext
+            projectContext,
+            data
           );
         case "pull_tasks":
           return await this.toolHandlers.handlePullTasks(
             codebase,
             userPrompt,
-            projectContext
+            projectContext,
+            data
           );
         case "update_code":
           return await this.toolHandlers.handleUpdateCode(
             codebase,
             userPrompt,
-            projectContext
+            projectContext,
+            data
           );
         case "er_diagram_pull":
           return await this.toolHandlers.handleERDiagramPull(
             codebase,
             userPrompt,
-            projectContext
+            projectContext,
+            data
           );
         case "er_diagram_push":
           return await this.toolHandlers.handleERDiagramPush(
             codebase,
             userPrompt,
-            projectContext
+            projectContext,
+            data
           );
         case "pull_rules":
           return await this.toolHandlers.handlePullRules(
             codebase,
             userPrompt,
-            projectContext
+            projectContext,
+            data
           );
         case "pull_mermaid":
           return await this.toolHandlers.handlePullMermaid(
             codebase,
             userPrompt,
-            projectContext
+            projectContext,
+            data
           );
         case "push_mermaid":
           return await this.toolHandlers.handlePushMermaid(
             codebase,
             userPrompt,
-            projectContext
+            projectContext,
+            data
           );
         case "pull_lld":
           return await this.toolHandlers.handlePullLLD(
             codebase,
             userPrompt,
-            projectContext
+            projectContext,
+            data
           );
         case "push_lld":
           return await this.toolHandlers.handlePushLLD(
             codebase,
             userPrompt,
-            projectContext
+            projectContext,
+            data
           );
         
         // Workflow engine tools

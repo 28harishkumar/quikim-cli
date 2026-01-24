@@ -5,267 +5,93 @@
 
 import { CodebaseContext } from '../session/types.js';
 import { ProjectContext } from '../services/project-context.js';
-import { RequirementHandler } from '../workflows/requirement-handler.js';
-import { QuikimAPIClient } from '../api/client.js';
-import { XMLProtocolParser } from '../xml/parser.js';
-import { RAGService } from '../services/rag.js';
-import { RequirementHandlers } from './requirement-handlers.js';
-import { DesignHandlers } from './design-handlers.js';
-import { TaskHandlers } from './task-handlers.js';
-import { CodeHandlers } from './code-handlers.js';
+import { ServiceAwareAPIClient } from '../api/service-client.js';
+import { SimplifiedToolHandlers } from './simplified-handlers.js';
 
 export class ToolHandlers {
-  private requirementHandlers: RequirementHandlers;
-  private designHandlers: DesignHandlers;
-  private taskHandlers: TaskHandlers;
-  private codeHandlers: CodeHandlers;
+  private handlers: SimplifiedToolHandlers;
 
   constructor(
-    requirementHandler: RequirementHandler,
-    apiClient: QuikimAPIClient,
-    xmlParser: XMLProtocolParser,
-    ragService: RAGService,
+    apiClient: ServiceAwareAPIClient
   ) {
-    this.requirementHandlers = new RequirementHandlers(
-      requirementHandler,
-      apiClient,
-      xmlParser,
-      ragService,
-    );
-    this.designHandlers = new DesignHandlers(apiClient, xmlParser, ragService);
-    this.taskHandlers = new TaskHandlers(apiClient, xmlParser, ragService);
-    this.codeHandlers = new CodeHandlers(apiClient, xmlParser, ragService);
+    // All handlers now use AI Agent - no validations, just delegate to agent
+    this.handlers = new SimplifiedToolHandlers(apiClient);
   }
 
-  // Requirement handlers
-  async handlePushRequirements(
-    codebase: CodebaseContext,
-    userPrompt: string,
-    projectContext: ProjectContext,
-  ) {
-    return this.requirementHandlers.handlePushRequirements(
-      codebase,
-      userPrompt,
-      projectContext,
-    );
+  // All handlers delegate to AI Agent
+  async handlePushRequirements(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
+    return this.handlers.handlePushRequirements(codebase, userPrompt, projectContext, data);
   }
 
-  async handlePullRequirements(
-    codebase: CodebaseContext,
-    userPrompt: string,
-    projectContext: ProjectContext,
-  ) {
-    return this.requirementHandlers.handlePullRequirements(
-      codebase,
-      userPrompt,
-      projectContext,
-    );
+  async handlePullRequirements(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
+    return this.handlers.handlePullRequirements(codebase, userPrompt, projectContext, data);
   }
 
-  // Design handlers
-  async handlePushHLD(
-    codebase: CodebaseContext,
-    userPrompt: string,
-    projectContext: ProjectContext,
-  ) {
-    return this.designHandlers.handlePushHLD(
-      codebase,
-      userPrompt,
-      projectContext,
-    );
+  async handlePushHLD(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
+    return this.handlers.handlePushHLD(codebase, userPrompt, projectContext, data);
   }
 
-  async handlePullHLD(
-    codebase: CodebaseContext,
-    userPrompt: string,
-    projectContext: ProjectContext,
-  ) {
-    return this.designHandlers.handlePullHLD(
-      codebase,
-      userPrompt,
-      projectContext,
-    );
+  async handlePullHLD(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
+    return this.handlers.handlePullHLD(codebase, userPrompt, projectContext, data);
   }
 
-  async handlePullWireframe(
-    codebase: CodebaseContext,
-    userPrompt: string,
-    projectContext: ProjectContext,
-  ) {
-    return this.designHandlers.handlePullWireframe(
-      codebase,
-      userPrompt,
-      projectContext,
-    );
+  async handlePullWireframe(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
+    return this.handlers.handlePullWireframe(codebase, userPrompt, projectContext, data);
   }
 
-  async handlePushWireframes(
-    codebase: CodebaseContext,
-    userPrompt: string,
-    projectContext: ProjectContext,
-  ) {
-    return this.designHandlers.handlePushWireframes(
-      codebase,
-      userPrompt,
-      projectContext,
-    );
+  async handlePushWireframes(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
+    return this.handlers.handlePushWireframes(codebase, userPrompt, projectContext, data);
   }
 
-  async handleSyncWireframeFromPenpot(
-    codebase: CodebaseContext,
-    userPrompt: string,
-    projectContext: ProjectContext,
-  ) {
-    return this.designHandlers.handleSyncWireframeFromPenpot(
-      codebase,
-      userPrompt,
-      projectContext,
-    );
+  async handleSyncWireframeFromPenpot(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
+    return this.handlers.handleSyncWireframeFromPenpot(codebase, userPrompt, projectContext, data);
   }
 
-  async handleGenerateCodeFromWireframe(
-    codebase: CodebaseContext,
-    userPrompt: string,
-    projectContext: ProjectContext,
-  ) {
-    return this.designHandlers.handleGenerateCodeFromWireframe(
-      codebase,
-      userPrompt,
-      projectContext,
-    );
+  async handleGenerateCodeFromWireframe(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
+    return this.handlers.handleGenerateCodeFromWireframe(codebase, userPrompt, projectContext, data);
   }
 
-  async handleListPenpotSyncs(
-    codebase: CodebaseContext,
-    userPrompt: string,
-    projectContext: ProjectContext,
-  ) {
-    return this.designHandlers.handleListPenpotSyncs(
-      codebase,
-      userPrompt,
-      projectContext,
-    );
+  async handleListPenpotSyncs(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
+    return this.handlers.handleListPenpotSyncs(codebase, userPrompt, projectContext, data);
   }
 
-  async handleERDiagramPull(
-    codebase: CodebaseContext,
-    userPrompt: string,
-    projectContext: ProjectContext,
-  ) {
-    return this.designHandlers.handleERDiagramPull(
-      codebase,
-      userPrompt,
-      projectContext,
-    );
+  async handleERDiagramPull(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
+    return this.handlers.handleERDiagramPull(codebase, userPrompt, projectContext, data);
   }
 
-  async handleERDiagramPush(
-    codebase: CodebaseContext,
-    userPrompt: string,
-    projectContext: ProjectContext,
-  ) {
-    return this.designHandlers.handleERDiagramPush(
-      codebase,
-      userPrompt,
-      projectContext,
-    );
+  async handleERDiagramPush(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
+    return this.handlers.handleERDiagramPush(codebase, userPrompt, projectContext, data);
   }
 
-  async handlePullMermaid(
-    codebase: CodebaseContext,
-    userPrompt: string,
-    projectContext: ProjectContext,
-  ) {
-    return this.designHandlers.handlePullMermaid(
-      codebase,
-      userPrompt,
-      projectContext,
-    );
+  async handlePullMermaid(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
+    return this.handlers.handlePullMermaid(codebase, userPrompt, projectContext, data);
   }
 
-  async handlePushMermaid(
-    codebase: CodebaseContext,
-    userPrompt: string,
-    projectContext: ProjectContext,
-  ) {
-    return this.designHandlers.handlePushMermaid(
-      codebase,
-      userPrompt,
-      projectContext,
-    );
+  async handlePushMermaid(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
+    return this.handlers.handlePushMermaid(codebase, userPrompt, projectContext, data);
   }
 
-  async handlePullLLD(
-    codebase: CodebaseContext,
-    userPrompt: string,
-    projectContext: ProjectContext,
-  ) {
-    return this.designHandlers.handlePullLLD(
-      codebase,
-      userPrompt,
-      projectContext,
-    );
+  async handlePullLLD(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
+    return this.handlers.handlePullLLD(codebase, userPrompt, projectContext, data);
   }
 
-  async handlePushLLD(
-    codebase: CodebaseContext,
-    userPrompt: string,
-    projectContext: ProjectContext,
-  ) {
-    return this.designHandlers.handlePushLLD(
-      codebase,
-      userPrompt,
-      projectContext,
-    );
+  async handlePushLLD(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
+    return this.handlers.handlePushLLD(codebase, userPrompt, projectContext, data);
   }
 
-  // Task handlers
-  async handlePushTasks(
-    codebase: CodebaseContext,
-    userPrompt: string,
-    projectContext: ProjectContext,
-  ) {
-    return this.taskHandlers.handlePushTasks(
-      codebase,
-      userPrompt,
-      projectContext,
-    );
+  async handlePushTasks(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
+    return this.handlers.handlePushTasks(codebase, userPrompt, projectContext, data);
   }
 
-  async handlePullTasks(
-    codebase: CodebaseContext,
-    userPrompt: string,
-    projectContext: ProjectContext,
-  ) {
-    return this.taskHandlers.handlePullTasks(
-      codebase,
-      userPrompt,
-      projectContext,
-    );
+  async handlePullTasks(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
+    return this.handlers.handlePullTasks(codebase, userPrompt, projectContext, data);
   }
 
-  // Code handlers
-  async handleUpdateCode(
-    codebase: CodebaseContext,
-    userPrompt: string,
-    projectContext: ProjectContext,
-  ) {
-    return this.codeHandlers.handleUpdateCode(
-      codebase,
-      userPrompt,
-      projectContext,
-    );
+  async handleUpdateCode(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
+    return this.handlers.handleUpdateCode(codebase, userPrompt, projectContext, data);
   }
 
-  async handlePullRules(
-    codebase: CodebaseContext,
-    userPrompt: string,
-    projectContext: ProjectContext,
-  ) {
-    return this.codeHandlers.handlePullRules(
-      codebase,
-      userPrompt,
-      projectContext,
-    );
+  async handlePullRules(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
+    return this.handlers.handlePullRules(codebase, userPrompt, projectContext, data);
   }
 }

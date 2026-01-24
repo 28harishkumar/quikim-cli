@@ -13,6 +13,8 @@ import { WorkflowIntegrationService } from '../services/workflow-integration.js'
 import { BidirectionalSyncService } from '../services/bidirectional-sync.js';
 import { RealTimeCollaborationService } from '../services/realtime-collaboration.js';
 import { CodeGenerationService } from '../services/code-generation.js';
+import { AIAgent } from '../agent/index.js';
+import { QuikimAPIClient } from '../api/client.js';
 import { logger } from '../utils/logger.js';
 import { errorHandler, ErrorContext } from '../utils/error-handler.js';
 import { PROTOCOL_CONFIG } from '../utils/constants.js';
@@ -22,6 +24,11 @@ export interface IntegrationConfig {
   maxRequestsPerSession?: number;
   sessionTimeoutMs?: number;
   enableErrorRecovery?: boolean;
+  aiAgent?: {
+    enabled: boolean;
+    maxRetries: number;
+    verbose: boolean;
+  };
   workflowEngine?: {
     projectServiceUrl: string;
     apiKey?: string;
@@ -71,6 +78,8 @@ export class ProtocolIntegration {
   private bidirectionalSync: BidirectionalSyncService;
   private realTimeCollaboration: RealTimeCollaborationService;
   private codeGeneration: CodeGenerationService;
+  private aiAgent?: AIAgent;
+  private apiClient?: QuikimAPIClient;
   private config: IntegrationConfig;
   private isInitialized: boolean = false;
 
@@ -80,6 +89,12 @@ export class ProtocolIntegration {
       maxRequestsPerSession: PROTOCOL_CONFIG.MAX_REQUESTS_PER_SESSION,
       sessionTimeoutMs: PROTOCOL_CONFIG.SESSION_TIMEOUT_MS,
       enableErrorRecovery: true,
+      aiAgent: {
+        enabled: true,
+        maxRetries: 3,
+        verbose: true,
+        ...config.aiAgent
+      },
       workflowEngine: {
         projectServiceUrl: process.env.PROJECT_SERVICE_URL || "http://localhost:3001",
         timeout: 30000,
@@ -125,6 +140,22 @@ export class ProtocolIntegration {
     this.xmlParser = xmlParser;
     this.decisionEngine = new DecisionEngine();
     this.sessionManager = sessionManager;
+    
+    // Initialize API client and AI Agent
+    if (this.config.aiAgent?.enabled) {
+      this.apiClient = new QuikimAPIClient({
+        baseURL: this.config.workflowEngine!.projectServiceUrl,
+        apiKey: this.config.workflowEngine!.apiKey,
+        timeout: this.config.workflowEngine!.timeout,
+        retryAttempts: this.config.workflowEngine!.retryAttempts
+      });
+      
+      this.aiAgent = new AIAgent({
+        apiClient: this.apiClient,
+        maxRetries: this.config.aiAgent.maxRetries,
+        verbose: this.config.aiAgent.verbose
+      });
+    }
     
     // Initialize workflow integration services
     this.workflowIntegration = new WorkflowIntegrationService(this.config.workflowEngine!);
@@ -186,6 +217,9 @@ export class ProtocolIntegration {
 
       // Initialize code generation
       await this.initializeCodeGeneration();
+
+      // Initialize AI Agent
+      await this.initializeAIAgent();
 
       // Initialize XML processing
       this.initializeXMLProcessing();
@@ -445,6 +479,20 @@ export class ProtocolIntegration {
   }
 
   /**
+   * Initialize AI Agent
+   */
+  private async initializeAIAgent(): Promise<void> {
+    if (this.config.aiAgent?.enabled && this.aiAgent) {
+      logger.info("AI Agent initialized", {
+        maxRetries: this.config.aiAgent.maxRetries,
+        verbose: this.config.aiAgent.verbose
+      });
+    } else {
+      logger.info("AI Agent disabled");
+    }
+  }
+
+  /**
    * Initialize session management
    */
   private initializeSessionManagement(): void {
@@ -507,6 +555,22 @@ export class ProtocolIntegration {
   }
 
   /**
+   * Process an AI Agent request (for API interaction)
+   */
+  async processAgentRequest(requestId: string, intent: string, data?: any, projectId?: string): Promise<any> {
+    if (!this.aiAgent) {
+      throw new Error('AI Agent is not enabled');
+    }
+
+    return this.aiAgent.processRequest({
+      requestId,
+      intent,
+      data,
+      projectId
+    });
+  }
+
+  /**
    * Get component references (for testing)
    */
   getComponents(): {
@@ -519,6 +583,8 @@ export class ProtocolIntegration {
     bidirectionalSync: BidirectionalSyncService;
     realTimeCollaboration: RealTimeCollaborationService;
     codeGeneration: CodeGenerationService;
+    aiAgent?: AIAgent;
+    apiClient?: QuikimAPIClient;
   } {
     return {
       server: this.server,
@@ -529,7 +595,9 @@ export class ProtocolIntegration {
       workflowIntegration: this.workflowIntegration,
       bidirectionalSync: this.bidirectionalSync,
       realTimeCollaboration: this.realTimeCollaboration,
-      codeGeneration: this.codeGeneration
+      codeGeneration: this.codeGeneration,
+      aiAgent: this.aiAgent,
+      apiClient: this.apiClient
     };
   }
 }

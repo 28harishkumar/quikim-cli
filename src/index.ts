@@ -23,6 +23,7 @@ import {
 } from "./commands/project.js";
 import { createConfigCommands } from "./commands/config.js";
 import { createMCPCommands } from "./commands/mcp.js";
+import { createIDERulesCommands } from "./commands/ide-rules.js";
 import * as output from "./utils/output.js";
 
 /** Main CLI program */
@@ -45,6 +46,7 @@ program.addCommand(createAuthCommands());
 program.addCommand(createProjectCommands());
 program.addCommand(createConfigCommands());
 program.addCommand(createMCPCommands());
+program.addCommand(createIDERulesCommands());
 
 // Add status command at root level
 program

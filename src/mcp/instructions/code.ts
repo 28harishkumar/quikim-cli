@@ -1,7 +1,28 @@
 /**
+ * Quikim - AI Agent for API Integration
+ * 
+ * Copyright (c) 2026 Quikim Inc.
+ * 
+ * This file is part of Quikim, licensed under the AGPL-3.0 License.
+ * See LICENSE file in the project root for full license information.
+ *
  * Code Implementation Instructions
  * Instructions for code modification and implementation
  */
+
+import { AIAgent } from '../agent/index.js';
+import { QuikimAPIClient } from '../api/client.js';
+
+/**
+ * Create AI Agent instance for API interactions
+ */
+export function createAIAgent(apiClient: QuikimAPIClient): AIAgent {
+  return new AIAgent({
+    apiClient,
+    maxRetries: 3,
+    verbose: true
+  });
+}
 
 export interface CodeImplementationContext {
   projectName: string;

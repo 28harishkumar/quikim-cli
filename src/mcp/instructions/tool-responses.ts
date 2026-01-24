@@ -118,5 +118,76 @@ export function generateFileCreatedInstructions(artifactType: string, filePath: 
 After creating the ${artifactType}, you can update it further or proceed to the next artifact.`;
 }
 
+export function generateGatherFilesInstruction(filePattern: string): string {
+  return `Read the file(s) matching pattern: ${filePattern}
+
+**Action Required:**
+1. Use Read tool to get the file content
+2. Include the file in codebase.files array
+3. Call the MCP tool again with the file content
+
+This is a standard workflow - the MCP server needs the file content to process your request.`;
+}
+
+export function generateRequirementsUploadInstructions(existingVersions: number[]): string {
+  const latestVersion = Math.max(...existingVersions, 0);
+  const nextVersion = latestVersion > 0 ? latestVersion : 1;
+  
+  return `To upload requirements to the MCP server:
+
+**Step 1:** Read the existing requirements file
+- File location: .quikim/v${nextVersion}/requirements.md
+
+**Step 2:** Include the file content in your tool call
+- Use the push_requirements tool with codebase.files array containing the requirements file
+
+**Example:**
+Call push_requirements with:
+{
+  "codebase": {
+    "files": [
+      {
+        "path": ".quikim/v${nextVersion}/requirements.md",
+        "content": "[content from the file you read]"
+      }
+    ]
+  },
+  "user_prompt": "Upload cursor rules as requirements to MCP server"
+}
+
+The requirements file already exists locally - you just need to read it and include it in the tool call.`;
+}
+
+export function generateInvalidCodebaseStructureError(userPrompt: string): string {
+  return `ERROR: Invalid request format for MCP tool.
+
+Expected format:
+{
+  "codebase": {
+    "files": [
+      {
+        "path": ".quikim/v1/requirements.md",
+        "content": "# Requirements\\n\\n[your content]"
+      }
+    ]
+  },
+  "user_prompt": "${userPrompt}"
+}
+
+Current issue: codebase.files is missing or not an array.
+
+If you're trying to upload content, you need to:
+1. Read the required files first
+2. Include those files in codebase.files array when calling this tool`;
+}
+
+export function generateRequirementsFileNotFoundError(filesInRequest: string[]): string {
+  return `Requirements file not found in request.
+
+Current files in request: ${filesInRequest.join(', ') || 'none'}
+
+Expected: .quikim/v*/requirements.md file in codebase.files array`;
+}
+
 // Re-export from missing-artifacts
 export { generateProjectContextInstructions, generateSyncFailureInstructions };

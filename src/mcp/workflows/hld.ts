@@ -5,6 +5,7 @@
 
 import { CodebaseContext } from '../session/types.js';
 import { extractProjectName } from '../utils/project-name.js';
+import { generateHLDInstructions as generateInstructions } from '../instructions/hld.js';
 
 export interface HLDGenerationContext {
   requirements: string;
@@ -61,9 +62,6 @@ export function extractHLDContext(
  * Generate HLD instructions for Cursor
  */
 export function generateHLDInstructions(context: HLDGenerationContext): string {
-  const {
-    generateHLDInstructions: generateInstructions,
-  } = require("../instructions/hld");
   return generateInstructions({
     projectName: context.projectName,
     components: context.components,

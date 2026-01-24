@@ -1,0 +1,230 @@
+/**
+ * Quikim - Simplified Tool Handlers using AI Agent
+ * 
+ * Copyright (c) 2026 Quikim Inc.
+ * 
+ * This file is part of Quikim, licensed under the AGPL-3.0 License.
+ * See LICENSE file in the project root for full license information.
+ */
+
+import { CodebaseContext } from "../session/types.js";
+import { ProjectContext } from "../services/project-context.js";
+import { ServiceAwareAPIClient } from "../api/service-client.js";
+import { HandlerResponse } from "../types/handler-types.js";
+
+// Import specialized handlers
+import { RequirementsHandler } from "./requirements-handler.js";
+import { DesignHandler } from "./design-handler.js";
+import { WireframeHandler } from "./wireframe-handler.js";
+import { TaskHandler } from "./task-handler.js";
+import { DiagramHandler } from "./diagram-handler.js";
+import { CodeHandler } from "./code-handler.js";
+
+/**
+ * Simplified Tool Handlers
+ * Delegates to specialized handlers for each artifact type
+ */
+export class SimplifiedToolHandlers {
+  private requirementsHandler: RequirementsHandler;
+  private designHandler: DesignHandler;
+  private wireframeHandler: WireframeHandler;
+  private taskHandler: TaskHandler;
+  private diagramHandler: DiagramHandler;
+  private codeHandler: CodeHandler;
+
+  constructor(apiClient: ServiceAwareAPIClient) {
+    this.requirementsHandler = new RequirementsHandler(apiClient);
+    this.designHandler = new DesignHandler(apiClient);
+    this.wireframeHandler = new WireframeHandler(apiClient);
+    this.taskHandler = new TaskHandler(apiClient);
+    this.diagramHandler = new DiagramHandler(apiClient);
+    this.codeHandler = new CodeHandler(apiClient);
+  }
+
+  // ==================== Requirement Handlers ====================
+
+  async handlePushRequirements(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    _data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.requirementsHandler.handlePush(codebase, userPrompt, projectContext);
+  }
+
+  async handlePullRequirements(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.requirementsHandler.handlePull(codebase, userPrompt, projectContext, data);
+  }
+
+  // ==================== HLD Handlers ====================
+
+  async handlePushHLD(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    _data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.designHandler.handlePushHLD(codebase, userPrompt, projectContext);
+  }
+
+  async handlePullHLD(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.designHandler.handlePullHLD(codebase, userPrompt, projectContext, data);
+  }
+
+  // ==================== LLD Handlers ====================
+
+  async handlePullLLD(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.designHandler.handlePullLLD(codebase, userPrompt, projectContext, data);
+  }
+
+  async handlePushLLD(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    _data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.designHandler.handlePushLLD(codebase, userPrompt, projectContext);
+  }
+
+  // ==================== Wireframe Handlers ====================
+
+  async handlePullWireframe(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.wireframeHandler.handlePull(codebase, userPrompt, projectContext, data);
+  }
+
+  async handlePushWireframes(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    _data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.wireframeHandler.handlePush(codebase, userPrompt, projectContext);
+  }
+
+  async handleSyncWireframeFromPenpot(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.wireframeHandler.handleSyncFromPenpot(codebase, userPrompt, projectContext, data);
+  }
+
+  async handleGenerateCodeFromWireframe(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.wireframeHandler.handleGenerateCode(codebase, userPrompt, projectContext, data);
+  }
+
+  async handleListPenpotSyncs(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.wireframeHandler.handleListPenpotSyncs(codebase, userPrompt, projectContext, data);
+  }
+
+  // ==================== ER Diagram Handlers ====================
+
+  async handleERDiagramPull(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.diagramHandler.handlePullERDiagram(codebase, userPrompt, projectContext, data);
+  }
+
+  async handleERDiagramPush(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    _data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.diagramHandler.handlePushERDiagram(codebase, userPrompt, projectContext);
+  }
+
+  // ==================== Mermaid Diagram Handlers ====================
+
+  async handlePullMermaid(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.diagramHandler.handlePullMermaid(codebase, userPrompt, projectContext, data);
+  }
+
+  async handlePushMermaid(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    _data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.diagramHandler.handlePushMermaid(codebase, userPrompt, projectContext);
+  }
+
+  // ==================== Task Handlers ====================
+
+  async handlePushTasks(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    _data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.taskHandler.handlePush(codebase, userPrompt, projectContext);
+  }
+
+  async handlePullTasks(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.taskHandler.handlePull(codebase, userPrompt, projectContext, data);
+  }
+
+  // ==================== Code Handlers ====================
+
+  async handleUpdateCode(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.codeHandler.handleUpdateCode(codebase, userPrompt, projectContext, data);
+  }
+
+  async handlePullRules(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.codeHandler.handlePullRules(codebase, userPrompt, projectContext, data);
+  }
+}

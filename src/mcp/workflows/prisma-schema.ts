@@ -5,6 +5,7 @@
 
 import { CodebaseContext } from '../session/types.js';
 import { extractProjectName } from '../utils/project-name.js';
+import { generatePrismaSchemaInstructions as generateInstructions } from '../instructions/prisma-schema.js';
 
 export interface PrismaSchemaGenerationContext {
   erDiagram: string;
@@ -59,10 +60,6 @@ export function generatePrismaSchemaInstructions(
   context: PrismaSchemaGenerationContext,
   codebase?: CodebaseContext
 ): string {
-  const {
-    generatePrismaSchemaInstructions: generateInstructions,
-  } = require("../instructions/prisma-schema");
-
   // Determine Prisma schema location from project structure
   let projectStructure: any = {};
   if (codebase) {

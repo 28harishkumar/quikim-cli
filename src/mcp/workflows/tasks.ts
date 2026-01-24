@@ -5,6 +5,7 @@
 
 import { CodebaseContext } from '../session/types.js';
 import { extractProjectName } from '../utils/project-name.js';
+import { generateTasksInstructions as generateInstructions } from '../instructions/tasks.js';
 
 export interface TasksGenerationContext {
   requirements: string;
@@ -54,9 +55,6 @@ export function extractTasksContext(
 export function generateTasksInstructions(
   context: TasksGenerationContext
 ): string {
-  const {
-    generateTasksInstructions: generateInstructions,
-  } = require("../instructions/tasks");
   return generateInstructions({
     projectName: context.projectName,
     hasWireframes: !!context.wireframes,

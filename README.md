@@ -23,16 +23,18 @@ npm link
 # 1. Authenticate with Quikim
 quikim login
 
-# 2. Connect to a project
-quikim connect
+# 2. Initialize Quikim (installs IDE rules & connects to project)
+quikim init
 
-# 3. Configure your IDE (one-time setup)
+# 3. Configure MCP Server (one-time setup)
 # For Cursor:
 quikim mcp install-cursor
 # For other editors: install-kiro, install-windsurf, install-zed, install-vscode, install-claude-code
 
 # 4. Restart your IDE - Quikim tools are now available!
 ```
+
+**Note:** `quikim init` automatically detects your IDE (Cursor, Kiro, Windsurf, VS Code, Zed, or Claude Code) and installs the appropriate cursor rules. Use `quikim init --all` to install rules for all supported IDEs.
 
 ## Commands
 
@@ -47,13 +49,26 @@ quikim mcp install-cursor
 
 ### Project Management
 
-| Command                     | Description                            |
-| --------------------------- | -------------------------------------- |
-| `quikim connect [project]`  | Connect to a project                   |
-| `quikim init`               | Initialize Quikim in current directory |
-| `quikim project list`       | List all projects                      |
-| `quikim project info`       | Show current project details           |
-| `quikim project disconnect` | Disconnect from current project        |
+| Command                     | Description                                              |
+| --------------------------- | -------------------------------------------------------- |
+| `quikim connect [project]`  | Connect to a project                                     |
+| `quikim init`               | Initialize Quikim (install IDE rules & connect project)  |
+| `quikim init --all`         | Initialize with rules for all supported IDEs             |
+| `quikim init --force`       | Force overwrite existing IDE rules                       |
+| `quikim project list`       | List all projects                                        |
+| `quikim project info`       | Show current project details                             |
+| `quikim project disconnect` | Disconnect from current project                          |
+
+
+### IDE Rules Management
+
+| Command                  | Description                               |
+| ------------------------ | ----------------------------------------- |
+| `quikim rules install`   | Install IDE cursor rules (detected IDEs)  |
+| `quikim rules install --all` | Install rules for all supported IDEs  |
+| `quikim rules install --force` | Force overwrite existing rules      |
+| `quikim rules check`     | Check which IDE rules are installed       |
+| `quikim rules list`      | List all supported IDEs                   |
 
 
 ### MCP Server (IDE Integration)
@@ -86,6 +101,41 @@ quikim mcp install-cursor
 | Command         | Description                     |
 | --------------- | ------------------------------- |
 | `quikim status` | Show session and project status |
+
+
+## Supported IDEs
+
+Quikim automatically installs cursor rules for detected IDEs during `quikim init`:
+
+| IDE                  | Rules Location                | Auto-detected |
+| -------------------- | ----------------------------- | ------------- |
+| Cursor               | `.cursor/rules/quikim.mdc`    | ✓             |
+| Windsurf (Codeium)   | `.windsurfrules/quikim.md`    | ✓             |
+| Kiro                 | `.kiro/steering/quikim.md`    | ✓             |
+| VS Code              | `.vscode/rules/quikim.md`     | ✓             |
+| Zed                  | `.zed/rules/quikim.md`        | ✓             |
+| Claude Code          | `.claude/rules/quikim.md`     | ✓             |
+
+### Manual IDE Rules Installation
+
+If you want to manually manage IDE rules:
+
+```bash
+# Install rules for detected IDEs only
+quikim rules install
+
+# Install rules for all supported IDEs
+quikim rules install --all
+
+# Force overwrite existing rules
+quikim rules install --force
+
+# Check installation status
+quikim rules check
+
+# List all supported IDEs
+quikim rules list
+```
 
 
 ## How It Works
