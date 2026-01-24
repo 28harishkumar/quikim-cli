@@ -4,9 +4,19 @@
  * Enterprise architecture: MCP server calls services via HTTP, not direct DB access
  */
 
-import { CodeSnippet } from '../types.js';
 import { logger } from '../utils/logger.js';
 import { QuikimAPIClient } from '../api/client.js';
+
+export interface CodeSnippet {
+  id: string;
+  content: string;
+  file_path: string;  // Changed from filePath to match API response
+  language: string;
+  description?: string;
+  tags?: string[];
+  projectId?: string;
+  organizationId?: string;
+}
 
 export interface RAGSearchParams {
   query: string;
@@ -48,8 +58,10 @@ export class RAGService {
       const componentSnippets = components
         .filter((c: any) => c.code)
         .map((c: any) => ({
+          id: c.id || `component-${Date.now()}-${Math.random()}`,
           file_path: c.githubUrl || `components/${c.slug || c.id}.tsx`,
           content: c.code,
+          language: "typescript",
           description:
             c.description ||
             `${c.name || "Component"} (${c.type || "component"})${
@@ -71,8 +83,10 @@ export class RAGService {
           const penpotSnippets = penpotComponents
             .filter((c: any) => c.type === "penpot-generated" && c.code)
             .map((c: any) => ({
+              id: c.id || `penpot-${Date.now()}-${Math.random()}`,
               file_path: c.githubUrl || `components/${c.slug || c.id}.tsx`,
               content: c.code,
+              language: "typescript",
               description: `Penpot-generated: ${c.name} - ${
                 c.description || "Design-to-code component"
               }`,
@@ -95,12 +109,14 @@ export class RAGService {
           const sampleSnippets = sampleCodeResponse
             .filter((s: any) => s.code)
             .map((s: any) => ({
+              id: s.id || `sample-${Date.now()}-${Math.random()}`,
               file_path:
                 s.githubUrl ||
                 `samples/${s.category}/${s.name}.${
                   s.language === "typescript" ? "ts" : s.language
                 }`,
               content: s.code,
+              language: s.language || "typescript",
               description:
                 s.description || `${s.name} (${s.category}/${s.language})`,
             }));
