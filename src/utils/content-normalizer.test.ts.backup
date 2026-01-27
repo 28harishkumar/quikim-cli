@@ -1,0 +1,215 @@
+/**
+ * Quikim - Content Normalizer Tests
+ *
+ * Copyright (c) 2026 Quikim Inc.
+ *
+ * This file is part of Quikim, licensed under the AGPL-3.0 License.
+ * See LICENSE file in the project root for full license information.
+ */
+import { describe, it } from "node:test";
+import assert from "node:assert";
+import { stripHtmlTags, collapseWhitespace, normalizeForComparison, computeContentHash, } from "./content-normalizer.js";
+describe("stripHtmlTags", () => {
+    it("should remove simple HTML tags", () => {
+        const html = "<p>Hello World</p>";
+        const result = stripHtmlTags(html);
+        // Tags are replaced with spaces, which will be collapsed later
+        assert.strictEqual(result.trim(), "Hello World");
+    });
+    it("should remove nested HTML tags", () => {
+        const html = "<div><p>Hello <strong>World</strong></p></div>";
+        const result = stripHtmlTags(html);
+        // Multiple spaces from tag removal will be collapsed by collapseWhitespace
+        assert.ok(result.includes("Hello"));
+        assert.ok(result.includes("World"));
+    });
+    it("should remove tags with attributes", () => {
+        const html = '<p class="text" id="para">Content</p>';
+        const result = stripHtmlTags(html);
+        assert.strictEqual(result.trim(), "Content");
+    });
+    it("should remove script tags and their content", () => {
+        const html = "<p>Before</p><script>alert('test');</script><p>After</p>";
+        const result = stripHtmlTags(html);
+        // Script content is removed, tags replaced with spaces
+        assert.ok(result.includes("Before"));
+        assert.ok(result.includes("After"));
+        assert.ok(!result.includes("alert"));
+    });
+    it("should remove style tags and their content", () => {
+        const html = "<p>Text</p><style>.class { color: red; }</style>";
+        const result = stripHtmlTags(html);
+        // Style content is removed
+        assert.ok(result.includes("Text"));
+        assert.ok(!result.includes("color"));
+    });
+    it("should handle self-closing tags", () => {
+        const html = "Line 1<br/>Line 2<hr/>Line 3";
+        const result = stripHtmlTags(html);
+        // Self-closing tags are replaced with spaces
+        assert.ok(result.includes("Line 1"));
+        assert.ok(result.includes("Line 2"));
+        assert.ok(result.includes("Line 3"));
+    });
+    it("should decode HTML entities", () => {
+        const html = "&lt;div&gt; &amp; &quot;test&quot; &#39;quote&#39; &nbsp;";
+        const result = stripHtmlTags(html);
+        assert.strictEqual(result, '<div> & "test" \'quote\'  ');
+    });
+    it("should handle empty string", () => {
+        const result = stripHtmlTags("");
+        assert.strictEqual(result, "");
+    });
+    it("should handle plain text without tags", () => {
+        const text = "Plain text without any HTML";
+        const result = stripHtmlTags(text);
+        assert.strictEqual(result, text);
+    });
+    it("should handle null or undefined input", () => {
+        assert.strictEqual(stripHtmlTags(null), "");
+        assert.strictEqual(stripHtmlTags(undefined), "");
+    });
+});
+describe("collapseWhitespace", () => {
+    it("should collapse multiple spaces to single space", () => {
+        const text = "Hello    World";
+        const result = collapseWhitespace(text);
+        assert.strictEqual(result, "Hello World");
+    });
+    it("should collapse tabs and newlines", () => {
+        const text = "Hello\t\tWorld\n\nTest";
+        const result = collapseWhitespace(text);
+        assert.strictEqual(result, "Hello World Test");
+    });
+    it("should trim leading and trailing whitespace", () => {
+        const text = "   Hello World   ";
+        const result = collapseWhitespace(text);
+        assert.strictEqual(result, "Hello World");
+    });
+    it("should handle mixed whitespace characters", () => {
+        const text = "  Hello \t\n World  \r\n  Test  ";
+        const result = collapseWhitespace(text);
+        assert.strictEqual(result, "Hello World Test");
+    });
+    it("should handle empty string", () => {
+        const result = collapseWhitespace("");
+        assert.strictEqual(result, "");
+    });
+    it("should handle string with only whitespace", () => {
+        const text = "   \t\n   ";
+        const result = collapseWhitespace(text);
+        assert.strictEqual(result, "");
+    });
+    it("should handle null or undefined input", () => {
+        assert.strictEqual(collapseWhitespace(null), "");
+        assert.strictEqual(collapseWhitespace(undefined), "");
+    });
+});
+describe("normalizeForComparison", () => {
+    it("should strip HTML tags and normalize whitespace", () => {
+        const html = "<p>Hello   World</p>";
+        const result = normalizeForComparison(html);
+        assert.strictEqual(result, "hello world");
+    });
+    it("should convert to lowercase", () => {
+        const text = "Hello WORLD Test";
+        const result = normalizeForComparison(text);
+        assert.strictEqual(result, "hello world test");
+    });
+    it("should handle complex HTML with nested tags", () => {
+        const html = "<div><h1>Title</h1><p>Paragraph with <strong>bold</strong> text</p></div>";
+        const result = normalizeForComparison(html);
+        assert.strictEqual(result, "title paragraph with bold text");
+    });
+    it("should produce same result for semantically equivalent HTML", () => {
+        const html1 = "<p>Hello World</p>";
+        const html2 = "<div>Hello   World</div>";
+        const html3 = "HELLO WORLD";
+        const result1 = normalizeForComparison(html1);
+        const result2 = normalizeForComparison(html2);
+        const result3 = normalizeForComparison(html3);
+        assert.strictEqual(result1, result2);
+        assert.strictEqual(result2, result3);
+    });
+    it("should handle empty string", () => {
+        const result = normalizeForComparison("");
+        assert.strictEqual(result, "");
+    });
+    it("should handle null or undefined input", () => {
+        assert.strictEqual(normalizeForComparison(null), "");
+        assert.strictEqual(normalizeForComparison(undefined), "");
+    });
+});
+describe("computeContentHash", () => {
+    it("should generate consistent hash for same content", () => {
+        const content = "Hello World";
+        const hash1 = computeContentHash(content);
+        const hash2 = computeContentHash(content);
+        assert.strictEqual(hash1, hash2);
+    });
+    it("should generate same hash for semantically equivalent content", () => {
+        const content1 = "<p>Hello World</p>";
+        const content2 = "<div>HELLO   WORLD</div>";
+        const hash1 = computeContentHash(content1);
+        const hash2 = computeContentHash(content2);
+        assert.strictEqual(hash1, hash2);
+    });
+    it("should generate different hash for different content", () => {
+        const content1 = "Hello World";
+        const content2 = "Goodbye World";
+        const hash1 = computeContentHash(content1);
+        const hash2 = computeContentHash(content2);
+        assert.notStrictEqual(hash1, hash2);
+    });
+    it("should return valid SHA-256 hash format", () => {
+        const content = "Test content";
+        const hash = computeContentHash(content);
+        // SHA-256 hash is 64 hexadecimal characters
+        assert.strictEqual(hash.length, 64);
+        assert.match(hash, /^[a-f0-9]{64}$/);
+    });
+    it("should handle empty string", () => {
+        const hash = computeContentHash("");
+        assert.strictEqual(hash.length, 64);
+        assert.match(hash, /^[a-f0-9]{64}$/);
+    });
+    it("should handle null or undefined input", () => {
+        const hash1 = computeContentHash(null);
+        const hash2 = computeContentHash(undefined);
+        const hash3 = computeContentHash("");
+        // All should produce the same hash as empty string
+        assert.strictEqual(hash1, hash3);
+        assert.strictEqual(hash2, hash3);
+    });
+    it("should normalize before hashing", () => {
+        const content1 = "<p>Test   Content</p>";
+        const content2 = "TEST CONTENT";
+        const hash1 = computeContentHash(content1);
+        const hash2 = computeContentHash(content2);
+        assert.strictEqual(hash1, hash2);
+    });
+});
+describe("Round-trip consistency", () => {
+    it("should produce consistent results across multiple normalizations", () => {
+        const original = "<div><p>Hello   <strong>World</strong></p></div>";
+        const normalized1 = normalizeForComparison(original);
+        const normalized2 = normalizeForComparison(normalized1);
+        assert.strictEqual(normalized1, normalized2);
+    });
+    it("should handle complex HTML structures consistently", () => {
+        const html = `
+      <div class="container">
+        <h1>Title</h1>
+        <p>Paragraph with <em>emphasis</em> and <strong>bold</strong></p>
+        <ul>
+          <li>Item 1</li>
+          <li>Item 2</li>
+        </ul>
+      </div>
+    `;
+        const hash1 = computeContentHash(html);
+        const hash2 = computeContentHash(html);
+        assert.strictEqual(hash1, hash2);
+    });
+});
+//# sourceMappingURL=content-normalizer.test.js.map

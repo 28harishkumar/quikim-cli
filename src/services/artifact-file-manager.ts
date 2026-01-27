@@ -1,14 +1,15 @@
 /**
  * Quikim - Artifact File Manager
- * 
+ *
  * Copyright (c) 2026 Quikim Inc.
- * 
+ *
  * This file is part of Quikim, licensed under the AGPL-3.0 License.
  * See LICENSE file in the project root for full license information.
  */
 
+import { existsSync } from "fs";
 import { promises as fs } from "fs";
-import { join } from "path";
+import { dirname, join, basename, resolve } from "path";
 import {
   ArtifactFilters,
   ArtifactMetadata,
@@ -16,11 +17,33 @@ import {
   ArtifactType,
 } from "../types/artifacts.js";
 
+/** Walk up from cwd to find a directory containing .quikim/artifacts */
+function resolveArtifactsRoot(): string {
+  let dir = process.cwd();
+  while (true) {
+    const candidate = join(dir, ".quikim", "artifacts");
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return join(process.cwd(), ".quikim", "artifacts");
+}
+
 export class ArtifactFileManager {
   private artifactsDir: string;
 
-  constructor() {
-    this.artifactsDir = join(process.cwd(), ".quikim", "artifacts");
+  constructor(artifactsDir?: string) {
+    this.artifactsDir = artifactsDir || resolveArtifactsRoot();
+  }
+
+  /**
+   * Get the artifacts root directory
+   */
+  getArtifactsRoot(): string {
+    return this.artifactsDir;
   }
 
   /**
@@ -109,7 +132,7 @@ export class ArtifactFileManager {
   }
 
   /**
-   * Write artifact file to local filesystem
+   * Write artifact file to local filesystem with atomic write and backup
    * Uses artifactId if available, otherwise uses artifactName
    */
   async writeArtifactFile(artifact: ArtifactMetadata & { artifactId?: string }): Promise<void> {
@@ -121,11 +144,31 @@ export class ArtifactFileManager {
     const filePath = join(this.artifactsDir, artifact.specName, fileName);
     const dirPath = join(this.artifactsDir, artifact.specName);
 
+    // Validate file path to prevent directory traversal
+    this.validateFilePath(filePath);
+
     // Ensure directory exists
     await fs.mkdir(dirPath, { recursive: true });
 
-    // Write file
-    await fs.writeFile(filePath, artifact.content, "utf-8");
+    // Create backup if file exists
+    if (existsSync(filePath)) {
+      await this.createBackup(filePath);
+    }
+
+    // Atomic write: write to temp file, then rename
+    const tempFilePath = `${filePath}.tmp`;
+    try {
+      await fs.writeFile(tempFilePath, artifact.content, "utf-8");
+      await fs.rename(tempFilePath, filePath);
+    } catch (error) {
+      // Clean up temp file if it exists
+      try {
+        await fs.unlink(tempFilePath);
+      } catch {
+        // Ignore cleanup errors
+      }
+      throw error;
+    }
   }
 
   /**
@@ -171,13 +214,15 @@ export class ArtifactFileManager {
       "tasks",
     ];
 
-    if (!validTypes.includes(typeStr as ArtifactType)) {
+    // "flow" is alias for flow_diagram (e.g. flow_<uuid>.md)
+    const type = (typeStr === "flow" ? "flow_diagram" : typeStr) as ArtifactType;
+    if (!validTypes.includes(type)) {
       return null;
     }
 
     return {
-      type: typeStr as ArtifactType,
-      name: nameOrId, // Can be either name or ID
+      type,
+      name: nameOrId,
     };
   }
 
@@ -203,6 +248,189 @@ export class ArtifactFileManager {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
         throw error;
       }
+    }
+  }
+
+  /**
+   * Rename artifact file with proper error handling
+   * @param oldPath - Current file path
+   * @param newPath - New file path
+   * @throws Error if rename fails
+   */
+  async renameArtifactFile(oldPath: string, newPath: string): Promise<void> {
+    // Validate both paths
+    this.validateFilePath(oldPath);
+    this.validateFilePath(newPath);
+
+    // Check if old file exists
+    if (!existsSync(oldPath)) {
+      throw new Error(`Source file does not exist: ${oldPath}`);
+    }
+
+    // Check if new file already exists
+    if (existsSync(newPath)) {
+      // Create backup of existing file
+      await this.createBackup(newPath);
+    }
+
+    // Ensure target directory exists
+    const targetDir = dirname(newPath);
+    await fs.mkdir(targetDir, { recursive: true });
+
+    // Perform rename
+    try {
+      await fs.rename(oldPath, newPath);
+    } catch (error) {
+      throw new Error(
+        `Failed to rename file from ${oldPath} to ${newPath}: ${(error as Error).message}`
+      );
+    }
+  }
+
+  /**
+   * Generate filename following naming conventions
+   * @param artifactType - Type of artifact
+   * @param artifactId - Artifact ID (or name if ID not available)
+   * @returns Filename in format: <artifact_type>_<artifact_id>.md
+   */
+  generateFilename(artifactType: ArtifactType, artifactId: string): string {
+    // Validate inputs
+    if (!artifactType || !artifactId) {
+      throw new Error("artifactType and artifactId are required");
+    }
+
+    // Sanitize artifactId to prevent path traversal
+    const sanitizedId = artifactId.replace(/[^a-zA-Z0-9_-]/g, "_");
+
+    return `${artifactType}_${sanitizedId}.md`;
+  }
+
+  /**
+   * Extract artifact ID from filename
+   * Handles both name-based and ID-based formats
+   * @param filename - Filename to parse
+   * @returns Artifact ID or null if invalid format
+   */
+  extractArtifactIdFromFilename(filename: string): string | null {
+    // Pattern: <type>_<id>.md or <type>_<name>.md
+    const match = filename.match(/^([a-z_]+)_([a-zA-Z0-9_-]+)\.md$/);
+    if (!match) {
+      return null;
+    }
+
+    const [, typeStr, idOrName] = match;
+
+    // Validate artifact type
+    const validTypes: ArtifactType[] = [
+      "requirement",
+      "context",
+      "code_guideline",
+      "lld",
+      "hld",
+      "wireframe_files",
+      "flow_diagram",
+      "tasks",
+    ];
+
+    // "flow" is alias for flow_diagram
+    const type = (typeStr === "flow" ? "flow_diagram" : typeStr) as ArtifactType;
+    if (!validTypes.includes(type)) {
+      return null;
+    }
+
+    return idOrName;
+  }
+
+  /**
+   * Validate file path to prevent directory traversal attacks
+   * @param filePath - Path to validate
+   * @throws Error if path is invalid or attempts directory traversal
+   */
+  private validateFilePath(filePath: string): void {
+    // Resolve to absolute path
+    const absolutePath = resolve(filePath);
+    const artifactsRoot = resolve(this.artifactsDir);
+
+    // Check if path is within artifacts directory
+    if (!absolutePath.startsWith(artifactsRoot)) {
+      throw new Error(
+        `Invalid file path: ${filePath} is outside artifacts directory`
+      );
+    }
+
+    // Check for directory traversal patterns
+    if (filePath.includes("..") || filePath.includes("./")) {
+      throw new Error(
+        `Invalid file path: ${filePath} contains directory traversal patterns`
+      );
+    }
+
+    // Check for absolute paths (should be relative to artifacts dir)
+    const fileName = basename(filePath);
+    if (fileName.startsWith("/") || fileName.includes("\\")) {
+      throw new Error(`Invalid file path: ${filePath} contains invalid characters`);
+    }
+  }
+
+  /**
+   * Create backup of existing file
+   * @param filePath - Path to file to backup
+   */
+  private async createBackup(filePath: string): Promise<void> {
+    const backupDir = join(dirname(filePath), ".backups");
+    await fs.mkdir(backupDir, { recursive: true });
+
+    const fileName = basename(filePath);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const backupPath = join(backupDir, `${fileName}.${timestamp}.bak`);
+
+    try {
+      await fs.copyFile(filePath, backupPath);
+
+      // Clean up old backups (keep last 5)
+      await this.cleanupOldBackups(backupDir, fileName);
+    } catch (error) {
+      // Log warning but don't fail the operation
+      console.warn(`Warning: Failed to create backup: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Clean up old backup files, keeping only the most recent ones
+   * @param backupDir - Directory containing backups
+   * @param fileName - Base filename to filter backups
+   */
+  private async cleanupOldBackups(
+    backupDir: string,
+    fileName: string
+  ): Promise<void> {
+    try {
+      const files = await fs.readdir(backupDir);
+      const backupFiles = files
+        .filter((f) => f.startsWith(fileName) && f.endsWith(".bak"))
+        .map((f) => join(backupDir, f));
+
+      // Sort by modification time (newest first)
+      const filesWithStats = await Promise.all(
+        backupFiles.map(async (f) => ({
+          path: f,
+          mtime: (await fs.stat(f)).mtime,
+        }))
+      );
+
+      filesWithStats.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+
+      // Delete old backups (keep last 5)
+      const maxBackups = 5;
+      if (filesWithStats.length > maxBackups) {
+        const toDelete = filesWithStats.slice(maxBackups);
+        await Promise.all(toDelete.map((f) => fs.unlink(f.path)));
+      }
+    } catch (error) {
+      // Log warning but don't fail
+      console.warn(
+        `Warning: Failed to cleanup old backups: ${(error as Error).message}`
+      );
     }
   }
 }

@@ -63,7 +63,8 @@ export interface PushResult {
   success: boolean;
   pushed: number;
   skipped: number;
-  errors: Array<{ artifact: string; error: string }>;
+  errors: Array<{ artifact: string; error: string; version?: number }>;
+  versions?: Array<{ artifact: string; version: number }>;
 }
 
 export interface PullResult {
@@ -71,7 +72,9 @@ export interface PullResult {
   pulled: number;
   created: number;
   updated: number;
+  skipped: number;
   errors: Array<{ artifact: string; error: string }>;
+  versions?: Array<{ artifact: string; version: number }>;
 }
 
 export interface SyncResult {
