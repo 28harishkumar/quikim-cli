@@ -414,4 +414,53 @@ export class ServiceAwareAPIClient {
       return false;
     }
   }
+
+  // ==================== Queue Management ====================
+
+  /**
+   * Fetch pending queue requests for a project
+   */
+  async fetchPendingQueueRequests(projectId: string): Promise<Array<{
+    id: string;
+    projectId: string;
+    type: string;
+    status: string;
+    context: Record<string, unknown>;
+  }>> {
+    try {
+      const response = await this.request<Array<{
+        id: string;
+        projectId: string;
+        type: string;
+        status: string;
+        context: Record<string, unknown>;
+      }>>('project', `/api/projects/${projectId}/queue/pending`, {
+        method: 'GET',
+      });
+      return response.data || [];
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        return [];
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Update queue request status
+   */
+  async updateQueueRequestStatus(
+    requestId: string,
+    status: 'pending' | 'processing' | 'completed' | 'failed',
+    result?: Record<string, unknown>
+  ): Promise<void> {
+    try {
+      await this.request('project', `/api/projects/queue/${requestId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status, result }),
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
 }
