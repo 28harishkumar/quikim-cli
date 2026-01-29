@@ -9,14 +9,15 @@
 
 import { dirname, join } from "path";
 import { existsSync } from "fs";
+import { getQuikimProjectRoot } from "../config/project-root.js";
 
 /**
  * Resolve the artifacts root directory
- * Searches current directory and parents for .quikim/artifacts
+ * Searches from project root (QUIKIM_PROJECT_DIR or cwd) and parents for .quikim/artifacts
  * @returns The path to the artifacts directory
  */
 export function resolveArtifactsRoot(): string {
-  let currentDir = process.cwd();
+  let currentDir = getQuikimProjectRoot();
   const maxDepth = 10;
   let depth = 0;
 
@@ -34,8 +35,7 @@ export function resolveArtifactsRoot(): string {
     depth++;
   }
 
-  // Default to current directory if not found
-  return join(process.cwd(), ".quikim", "artifacts");
+  return join(getQuikimProjectRoot(), ".quikim", "artifacts");
 }
 
 /**

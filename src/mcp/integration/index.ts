@@ -15,6 +15,7 @@ import { AIAgent } from '../agent/index.js';
 import { QuikimAPIClient } from '../api/client.js';
 import { logger } from '../utils/logger.js';
 import { errorHandler, ErrorContext } from '../utils/error-handler.js';
+import { getQuikimProjectRoot } from '../../config/project-root.js';
 
 export interface IntegrationConfig {
   enableLogging?: boolean;
@@ -98,7 +99,7 @@ export class ProtocolIntegration {
         enableVersioning: true,
         maxSyncRetries: 3,
         enableFileWatchers: true,
-        projectPath: process.env.PROJECT_PATH || process.cwd(),
+        projectPath: getQuikimProjectRoot(),
         ...config.bidirectionalSync
       },
       realTimeCollaboration: {

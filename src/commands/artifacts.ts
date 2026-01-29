@@ -28,6 +28,7 @@ export function createArtifactCommands(program: Command): void {
     "hld",
     "wireframe_files",
     "flow_diagram",
+    "er_diagram",
     "tasks",
   ];
 
@@ -96,7 +97,7 @@ async function handleEditArtifact(
     spec?: string;
   }
 ): Promise<void> {
-  const editableTypes = ["requirement", "context", "hld", "lld", "wireframe_files", "tasks"];
+  const editableTypes = ["requirement", "context", "hld", "lld", "wireframe_files", "flow_diagram", "er_diagram", "tasks"];
   
   if (!editableTypes.includes(type)) {
     output.error(`Cannot edit ${type}. Only ${editableTypes.join(", ")} can be edited.`);

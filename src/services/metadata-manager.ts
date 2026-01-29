@@ -149,20 +149,22 @@ export class MetadataManager {
   }
 
   /**
-   * Update metadata after successful pull
+   * Update metadata after successful pull.
+   * storageKey: rootId for versioned artifacts (filename key), artifactId for others.
    */
   async updateAfterPull(
     artifactsRoot: string,
     specName: string,
-    artifactId: string,
+    storageKey: string,
     artifactType: string,
     artifactName: string,
     versionNumber: number,
-    content: string
+    content: string,
+    artifactId?: string
   ): Promise<void> {
     const contentHash = computeContentHash(content);
     const artifactMetadata: LocalVersionMetadata = {
-      artifactId,
+      artifactId: artifactId ?? storageKey,
       artifactType,
       artifactName,
       specName,
@@ -171,7 +173,9 @@ export class MetadataManager {
       lastSyncTimestamp: new Date().toISOString(),
     };
 
-    await this.updateArtifactMetadata(artifactsRoot, specName, artifactMetadata);
+    const metadata = await this.loadMetadata(artifactsRoot, specName);
+    metadata.artifacts[storageKey] = artifactMetadata;
+    await this.saveMetadata(artifactsRoot, specName, metadata);
   }
 
   /**

@@ -13,6 +13,8 @@ import { VersionManager } from "./version-manager.js";
 import { promises as fs } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
+import { getQuikimProjectRoot } from "../config/project-root.js";
+
 
 describe("VersionManager", () => {
   let versionManager: VersionManager;
@@ -21,7 +23,7 @@ describe("VersionManager", () => {
 
   beforeEach(async () => {
     versionManager = new VersionManager();
-    originalCwd = process.cwd();
+    originalCwd = getQuikimProjectRoot();
 
     // Create a temporary test directory
     testDir = join(tmpdir(), `version-manager-test-${Date.now()}`);

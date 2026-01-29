@@ -44,13 +44,13 @@ async function setConfigHandler(key: string, value: string): Promise<void> {
 async function getConfigHandler(key: string): Promise<void> {
   switch (key) {
     case "api-url":
-      console.log(configManager.getApiUrl());
+      output.info(configManager.getApiUrl());
       break;
     case "user-service-url":
-      console.log(configManager.getUserServiceUrl());
+      output.info(configManager.getUserServiceUrl());
       break;
     case "project-service-url":
-      console.log(configManager.getProjectServiceUrl());
+      output.info(configManager.getProjectServiceUrl());
       break;
     default:
       output.error(`Unknown config key: ${key}`);

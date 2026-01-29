@@ -28,6 +28,7 @@ import {
   PullResult,
   SyncResult,
   ArtifactType,
+  isVersionedArtifactType,
 } from "../types/artifacts.js";
 import { extractTitleFromMarkdown } from "../utils/markdown-parser.js";
 import { markdownToHtml, htmlToMarkdown, isHtmlContent } from "./content-converter.js";
@@ -38,6 +39,7 @@ import { VersionManager } from "./version-manager.js";
 import { extractContent } from "../utils/content-extractor.js";
 import { retryNetworkRequest } from "../utils/retry-helper.js";
 import { ProgressReporter, displaySyncSummary } from "../utils/progress-reporter.js";
+import * as output from "../utils/output.js";
 
 /** Minimal project context for push (projectId + organizationId) */
 type PushProjectContext = { projectId: string; organizationId: string };
@@ -86,12 +88,12 @@ export class ArtifactSyncService {
       const localArtifacts = await this.fileManager.scanLocalArtifacts(filters);
 
       if (options.dryRun) {
-        console.log(`[DRY RUN] Would push ${localArtifacts.length} artifacts`);
+        output.info(`[DRY RUN] Would push ${localArtifacts.length} artifacts`);
         return result;
       }
 
       if (localArtifacts.length === 0) {
-        console.error(
+        output.error(
           "[push] No local artifacts to push. Run from the project root (where .quikim/artifacts exists) or run \"artifacts pull\" first."
         );
         return result;
@@ -115,7 +117,7 @@ export class ArtifactSyncService {
           if (!shouldPush) {
             result.skipped++;
             if (options.verbose) {
-              console.log(`Skipped: ${artifact.filePath} (no changes)`);
+              output.info(`Skipped: ${artifact.filePath} (no changes)`);
             }
             continue;
           }
@@ -138,40 +140,40 @@ export class ArtifactSyncService {
               await this.pushTasksWithTaskFileManager(project.projectId, artifact);
             }
           } else {
-            console.error(`[push] ${artifact.artifactType} ${artifact.filePath}`);
-            const artifactId = await this.pushSingleArtifact(projectContext, artifact, options);
-            // Rename file to use artifact ID
-            if (artifactId) {
-              await this.renameArtifactFile(artifact, artifactId);
-              
-              // Update local metadata with version information after push
+            output.error(`[push] ${artifact.artifactType} ${artifact.filePath}`);
+            const pushResult = await this.pushSingleArtifact(projectContext, artifact, options);
+            if (pushResult) {
+              const { artifactId, rootId } = pushResult;
+              await this.renameArtifactFile(artifact, artifactId, rootId);
+
               const artifactsRoot = this.fileManager.getArtifactsRoot();
+              const fileKey = isVersionedArtifactType(artifact.artifactType) && rootId ? rootId : artifactId;
               const serverArtifact = await this.fetchServerArtifact(
                 project.projectId,
                 artifact.specName,
                 artifact.artifactType,
-                artifact.artifactName
+                fileKey
               );
-              
+
               if (serverArtifact) {
                 await this.metadataManager.updateAfterPull(
                   artifactsRoot,
                   artifact.specName,
-                  artifactId,
+                  fileKey,
                   artifact.artifactType,
                   artifact.artifactName,
                   serverArtifact.version,
-                  artifact.content
+                  artifact.content,
+                  artifactId
                 );
-                
-                // Track version in result
+
                 result.versions?.push({
                   artifact: artifact.filePath,
                   version: serverArtifact.version,
                 });
-                
+
                 if (options.verbose) {
-                  console.log(`[VERBOSE] Updated local metadata after push (version ${serverArtifact.version})`);
+                  output.info(`[VERBOSE] Updated local metadata after push (version ${serverArtifact.version})`);
                 }
               }
             }
@@ -189,11 +191,11 @@ export class ArtifactSyncService {
             error: errorMsg 
           });
           
-          console.error(`[push] Error processing ${artifact.filePath}: ${errorMsg}`);
+          output.error(`[push] Error processing ${artifact.filePath}: ${errorMsg}`);
           
           if (options.verbose) {
-            console.log(`[VERBOSE] Error details: ${errorMsg}`);
-            console.log(`[VERBOSE] Continuing with next artifact...`);
+            output.info(`[VERBOSE] Error details: ${errorMsg}`);
+            output.info(`[VERBOSE] Continuing with next artifact...`);
           }
           
           // Update progress even on error
@@ -216,7 +218,7 @@ export class ArtifactSyncService {
       // Mark as failed if there were any errors
       if (result.errors.length > 0) {
         result.success = false;
-        console.log(`\n⚠ Push completed with ${result.errors.length} error(s). See details above.`);
+        output.info(`\n⚠ Push completed with ${result.errors.length} error(s). See details above.`);
       }
 
       return result;
@@ -228,7 +230,7 @@ export class ArtifactSyncService {
         error: errorMsg,
       });
       
-      console.error(`[push] Fatal error: ${errorMsg}`);
+      output.error(`[push] Fatal error: ${errorMsg}`);
       
       // Display summary even on fatal error
       const duration = Date.now() - startTime;
@@ -272,7 +274,7 @@ export class ArtifactSyncService {
       try {
         serverArtifacts = await retryNetworkRequest(
           () => this.fetchServerArtifacts(project.projectId, filters),
-          { verbose: options.verbose }
+          { verbose: options.verbose, onLog: (msg) => output.info(msg) }
         );
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
@@ -297,7 +299,7 @@ export class ArtifactSyncService {
       }
 
       if (options.dryRun) {
-        console.log(`[DRY RUN] Would pull ${serverArtifacts.length} artifacts`);
+        output.info(`[DRY RUN] Would pull ${serverArtifacts.length} artifacts`);
         return result;
       }
 
@@ -311,23 +313,24 @@ export class ArtifactSyncService {
           const exists = await this.fileManager.artifactExists(artifact);
           
           if (options.verbose) {
-            console.log(`\n[VERBOSE] Processing artifact: ${this.getArtifactPath(artifact)}`);
-            console.log(`[VERBOSE]   Spec: ${artifact.specName}`);
-            console.log(`[VERBOSE]   Type: ${artifact.artifactType}`);
-            console.log(`[VERBOSE]   Name: ${artifact.artifactName}`);
-            console.log(`[VERBOSE]   Version: ${artifact.version}`);
-            console.log(`[VERBOSE]   Content size: ${artifact.content.length} bytes`);
-            console.log(`[VERBOSE]   Exists locally: ${exists ? "YES" : "NO"}`);
+            output.info(`\n[VERBOSE] Processing artifact: ${this.getArtifactPath(artifact)}`);
+            output.info(`[VERBOSE]   Spec: ${artifact.specName}`);
+            output.info(`[VERBOSE]   Type: ${artifact.artifactType}`);
+            output.info(`[VERBOSE]   Name: ${artifact.artifactName}`);
+            output.info(`[VERBOSE]   Version: ${artifact.version}`);
+            output.info(`[VERBOSE]   Content size: ${artifact.content.length} bytes`);
+            output.info(`[VERBOSE]   Exists locally: ${exists ? "YES" : "NO"}`);
           }
           
-          // Get artifacts root for metadata management
           const artifactsRoot = this.fileManager.getArtifactsRoot();
-          
-          // Check if content has changed using metadata
+          const storageKey = isVersionedArtifactType(artifact.artifactType) && artifact.rootId
+            ? artifact.rootId
+            : artifact.artifactId;
+
           const contentChanged = await this.metadataManager.hasContentChanged(
             artifactsRoot,
             artifact.specName,
-            artifact.artifactId,
+            storageKey,
             artifact.content
           );
           
@@ -335,13 +338,13 @@ export class ArtifactSyncService {
             // Skip unchanged files
             result.skipped++;
             if (options.verbose) {
-              console.log(`[VERBOSE] Skipped: ${this.getArtifactPath(artifact)} (content unchanged)`);
+              output.info(`[VERBOSE] Skipped: ${this.getArtifactPath(artifact)} (content unchanged)`);
             }
             continue;
           }
           
           if (options.verbose && contentChanged) {
-            console.log(`[VERBOSE] Content has changed, will update local file`);
+            output.info(`[VERBOSE] Content has changed, will update local file`);
           }
           
           // Handle tasks differently - use TaskFileManager
@@ -357,17 +360,17 @@ export class ArtifactSyncService {
               await this.taskFileManager.downloadTaskAssets(task, artifact.specName);
               
               if (options.verbose) {
-                console.log(`[VERBOSE] Task conversion successful for ${this.getArtifactPath(artifact)}`);
+                output.info(`[VERBOSE] Task conversion successful for ${this.getArtifactPath(artifact)}`);
               }
             } catch (conversionError) {
               // Log conversion error and use fallback: write raw content
               const errorMsg = conversionError instanceof Error ? conversionError.message : String(conversionError);
-              console.warn(`[pull] Failed to convert task format for ${this.getArtifactPath(artifact)}: ${errorMsg}`);
-              console.warn(`[pull] Fallback: Writing raw content to file`);
+              output.warning(`[pull] Failed to convert task format for ${this.getArtifactPath(artifact)}: ${errorMsg}`);
+              output.warning(`[pull] Fallback: Writing raw content to file`);
               
               if (options.verbose) {
-                console.log(`[VERBOSE] Task conversion error details: ${errorMsg}`);
-                console.log(`[VERBOSE] Fallback: Using raw content without conversion`);
+                output.info(`[VERBOSE] Task conversion error details: ${errorMsg}`);
+                output.info(`[VERBOSE] Fallback: Using raw content without conversion`);
               }
               
               // Fallback: write raw content as-is
@@ -379,7 +382,7 @@ export class ArtifactSyncService {
             const isHtml = isHtmlContent(artifact.content);
             
             if (options.verbose) {
-              console.log(`[VERBOSE] Content format detection: ${isHtml ? "HTML" : "Markdown/Plain text"}`);
+              output.info(`[VERBOSE] Content format detection: ${isHtml ? "HTML" : "Markdown/Plain text"}`);
             }
 
             try {
@@ -389,58 +392,58 @@ export class ArtifactSyncService {
                 contentToWrite = htmlToMarkdown(artifact.content);
                 
                 if (contentToWrite && contentToWrite !== artifact.content) {
-                  console.error(`[pull] Converted HTML to Markdown for ${this.getArtifactPath(artifact)}`);
+                  output.error(`[pull] Converted HTML to Markdown for ${this.getArtifactPath(artifact)}`);
                   
                   if (options.verbose) {
-                    console.log(`[VERBOSE] HTML → Markdown conversion successful`);
-                    console.log(`[VERBOSE]   Original size: ${originalLength} bytes`);
-                    console.log(`[VERBOSE]   Converted size: ${contentToWrite.length} bytes`);
-                    console.log(`[VERBOSE]   Size change: ${contentToWrite.length - originalLength > 0 ? "+" : ""}${contentToWrite.length - originalLength} bytes`);
+                    output.info(`[VERBOSE] HTML → Markdown conversion successful`);
+                    output.info(`[VERBOSE]   Original size: ${originalLength} bytes`);
+                    output.info(`[VERBOSE]   Converted size: ${contentToWrite.length} bytes`);
+                    output.info(`[VERBOSE]   Size change: ${contentToWrite.length - originalLength > 0 ? "+" : ""}${contentToWrite.length - originalLength} bytes`);
                   }
                 } else {
                   // Content didn't change, might already be plain text
                   if (options.verbose) {
-                    console.log(`[VERBOSE] No conversion needed - content unchanged`);
+                    output.info(`[VERBOSE] No conversion needed - content unchanged`);
                   }
                 }
               } else {
-                console.error(`[pull] Content already in Markdown/plain text format for ${this.getArtifactPath(artifact)}`);
+                output.error(`[pull] Content already in Markdown/plain text format for ${this.getArtifactPath(artifact)}`);
                 
                 if (options.verbose) {
-                  console.log(`[VERBOSE] Skipping conversion - content already in Markdown/plain text format`);
+                  output.info(`[VERBOSE] Skipping conversion - content already in Markdown/plain text format`);
                 }
               }
             } catch (conversionError) {
               // Log conversion error but continue with original content
               const errorMsg = conversionError instanceof Error ? conversionError.message : String(conversionError);
-              console.warn(`[pull] Failed to convert HTML to Markdown for ${this.getArtifactPath(artifact)}: ${errorMsg}`);
-              console.warn(`[pull] Fallback: Using original content without conversion`);
+              output.warning(`[pull] Failed to convert HTML to Markdown for ${this.getArtifactPath(artifact)}: ${errorMsg}`);
+              output.warning(`[pull] Fallback: Using original content without conversion`);
               
               if (options.verbose) {
-                console.log(`[VERBOSE] Conversion error details: ${errorMsg}`);
-                console.log(`[VERBOSE] Fallback: Writing original content as-is`);
+                output.info(`[VERBOSE] Conversion error details: ${errorMsg}`);
+                output.info(`[VERBOSE] Fallback: Writing original content as-is`);
               }
               
               // Fallback: use original content
               contentToWrite = artifact.content;
             }
 
-            // Write artifact with converted content
             await this.fileManager.writeArtifactFile({
               ...artifact,
               content: contentToWrite,
+              rootId: artifact.rootId,
             });
           }
-          
-          // Update local metadata after successful pull
+
           await this.metadataManager.updateAfterPull(
             artifactsRoot,
             artifact.specName,
-            artifact.artifactId,
+            storageKey,
             artifact.artifactType,
             artifact.artifactName,
             artifact.version,
-            artifact.content
+            artifact.content,
+            artifact.artifactId
           );
           
           // Track version in result
@@ -450,18 +453,18 @@ export class ArtifactSyncService {
           });
           
           if (options.verbose) {
-            console.log(`[VERBOSE] Updated local metadata for ${this.getArtifactPath(artifact)}`);
+            output.info(`[VERBOSE] Updated local metadata for ${this.getArtifactPath(artifact)}`);
           }
           
           if (exists) {
             result.updated++;
             if (options.verbose) {
-              console.log(`[VERBOSE] Updated: ${this.getArtifactPath(artifact)}`);
+              output.info(`[VERBOSE] Updated: ${this.getArtifactPath(artifact)}`);
             }
           } else {
             result.created++;
             if (options.verbose) {
-              console.log(`[VERBOSE] Created: ${this.getArtifactPath(artifact)}`);
+              output.info(`[VERBOSE] Created: ${this.getArtifactPath(artifact)}`);
             }
           }
           
@@ -477,11 +480,11 @@ export class ArtifactSyncService {
             error: errorMsg,
           });
           
-          console.error(`[pull] Error processing ${this.getArtifactPath(artifact)}: ${errorMsg}`);
+          output.error(`[pull] Error processing ${this.getArtifactPath(artifact)}: ${errorMsg}`);
           
           if (options.verbose) {
-            console.log(`[VERBOSE] Error details: ${errorMsg}`);
-            console.log(`[VERBOSE] Continuing with next artifact...`);
+            output.info(`[VERBOSE] Error details: ${errorMsg}`);
+            output.info(`[VERBOSE] Continuing with next artifact...`);
           }
           
           // Update progress even on error
@@ -506,7 +509,7 @@ export class ArtifactSyncService {
       // Mark as failed if there were any errors
       if (result.errors.length > 0) {
         result.success = false;
-        console.log(`\n⚠ Pull completed with ${result.errors.length} error(s). See details above.`);
+        output.info(`\n⚠ Pull completed with ${result.errors.length} error(s). See details above.`);
       }
 
       return result;
@@ -518,7 +521,7 @@ export class ArtifactSyncService {
         error: errorMsg,
       });
       
-      console.error(`[pull] Fatal error: ${errorMsg}`);
+      output.error(`[pull] Fatal error: ${errorMsg}`);
       
       // Display summary even on fatal error
       const duration = Date.now() - startTime;
@@ -553,8 +556,8 @@ export class ArtifactSyncService {
   }
 
   /**
-   * Check if artifact should be pushed (has changes)
-   * Uses VersionManager for content comparison
+   * Check if artifact should be pushed (has changes).
+   * Uses local metadata hash first for speed; only fetches server when needed.
    */
   private async shouldPushArtifact(
     artifact: LocalArtifact,
@@ -564,39 +567,65 @@ export class ArtifactSyncService {
       return true;
     }
 
-    // Check if artifact exists on server
     const project = configManager.getCurrentProject();
     if (!project) {
-      return true; // Push if no project (will fail later, but let it)
+      return true;
     }
 
+    const artifactsRoot = this.fileManager.getArtifactsRoot();
+    const fileKey = artifact.artifactName;
+
     try {
+      const metadata = await this.metadataManager.getArtifactMetadata(
+        artifactsRoot,
+        artifact.specName,
+        fileKey
+      );
+      if (metadata) {
+        const currentHash = computeContentHash(artifact.content);
+        if (currentHash === metadata.contentHash) {
+          if (options.verbose) {
+            output.info(`[VERBOSE] Skipping ${artifact.filePath}: hash unchanged (no server fetch)`);
+          }
+          return false;
+        }
+      }
+
       const serverArtifact = await this.fetchServerArtifact(
         project.projectId,
         artifact.specName,
         artifact.artifactType,
-        artifact.artifactName
+        fileKey
       );
 
       if (!serverArtifact) {
-        return true; // New artifact, push it
+        return true;
       }
 
-      // Use VersionManager to determine if content has changed
+      if (serverArtifact.contentHash) {
+        const currentHash = computeContentHash(artifact.content);
+        if (currentHash === serverArtifact.contentHash) {
+          if (options.verbose) {
+            output.info(`[VERBOSE] Skipping ${artifact.filePath}: content unchanged (version ${serverArtifact.version})`);
+          }
+          return false;
+        }
+        return true;
+      }
+
       const contentChanged = this.versionManager.shouldCreateNewVersion(
         artifact.content,
         serverArtifact.content
       );
 
       if (options.verbose && !contentChanged) {
-        console.log(`[VERBOSE] Skipping ${artifact.filePath}: content unchanged (version ${serverArtifact.version})`);
+        output.info(`[VERBOSE] Skipping ${artifact.filePath}: content unchanged (version ${serverArtifact.version})`);
       }
 
       return contentChanged;
     } catch (error) {
-      // If we can't check, push it (server will handle)
       if (options.verbose) {
-        console.log(`[VERBOSE] Error checking artifact version: ${error instanceof Error ? error.message : String(error)}`);
+        output.info(`[VERBOSE] Error checking artifact version: ${error instanceof Error ? error.message : String(error)}`);
       }
       return true;
     }
@@ -610,18 +639,18 @@ export class ArtifactSyncService {
     project: PushProjectContext,
     artifact: LocalArtifact,
     options: PushOptions = {}
-  ): Promise<string | null> {
+  ): Promise<{ artifactId: string; rootId?: string } | null> {
     const { projectId, organizationId } = project;
     let endpoint: string;
     let requestBody: Record<string, unknown>;
-    let method: "PATCH" | "POST" = "POST";
+    let method: "PATCH" | "POST" | "PUT" = "POST";
 
     if (options.verbose) {
-      console.log(`\n[VERBOSE] Processing artifact: ${artifact.filePath}`);
-      console.log(`[VERBOSE]   Spec: ${artifact.specName}`);
-      console.log(`[VERBOSE]   Type: ${artifact.artifactType}`);
-      console.log(`[VERBOSE]   Name: ${artifact.artifactName}`);
-      console.log(`[VERBOSE]   Content size: ${artifact.content.length} bytes`);
+      output.info(`\n[VERBOSE] Processing artifact: ${artifact.filePath}`);
+      output.info(`[VERBOSE]   Spec: ${artifact.specName}`);
+      output.info(`[VERBOSE]   Type: ${artifact.artifactType}`);
+      output.info(`[VERBOSE]   Name: ${artifact.artifactName}`);
+      output.info(`[VERBOSE]   Content size: ${artifact.content.length} bytes`);
     }
 
     // Convert Markdown content to HTML before pushing
@@ -629,41 +658,41 @@ export class ArtifactSyncService {
     const isHtml = isHtmlContent(artifact.content);
     
     if (options.verbose) {
-      console.log(`[VERBOSE] Content format detection: ${isHtml ? "HTML" : "Markdown"}`);
+      output.info(`[VERBOSE] Content format detection: ${isHtml ? "HTML" : "Markdown"}`);
     }
 
     try {
       // Skip conversion if content is already HTML
-      if (!isHtml) {
+      if (!isHtml && (artifact.artifactType === "requirement" || artifact.artifactType === "tasks")) {
         const originalLength = artifact.content.length;
         contentToPush = await markdownToHtml(artifact.content);
         
         if (contentToPush && contentToPush !== artifact.content) {
-          console.error(`[push] Converted Markdown to HTML for ${artifact.filePath}`);
+          output.error(`[push] Converted Markdown to HTML for ${artifact.filePath}`);
           
           if (options.verbose) {
-            console.log(`[VERBOSE] Markdown → HTML conversion successful`);
-            console.log(`[VERBOSE]   Original size: ${originalLength} bytes`);
-            console.log(`[VERBOSE]   Converted size: ${contentToPush.length} bytes`);
-            console.log(`[VERBOSE]   Size change: ${contentToPush.length - originalLength > 0 ? "+" : ""}${contentToPush.length - originalLength} bytes`);
+            output.info(`[VERBOSE] Markdown → HTML conversion successful`);
+            output.info(`[VERBOSE]   Original size: ${originalLength} bytes`);
+            output.info(`[VERBOSE]   Converted size: ${contentToPush.length} bytes`);
+            output.info(`[VERBOSE]   Size change: ${contentToPush.length - originalLength > 0 ? "+" : ""}${contentToPush.length - originalLength} bytes`);
           }
         }
       } else {
-        console.error(`[push] Content already in HTML format for ${artifact.filePath}`);
+        output.error(`[push] Content already in HTML format for ${artifact.filePath}`);
         
         if (options.verbose) {
-          console.log(`[VERBOSE] Skipping conversion - content already in HTML format`);
+          output.info(`[VERBOSE] Skipping conversion - content already in HTML format`);
         }
       }
     } catch (error) {
       // Log conversion error but continue with original content
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.warn(`[push] Failed to convert Markdown to HTML for ${artifact.filePath}: ${errorMsg}`);
-      console.warn(`[push] Continuing with original content`);
+      output.warning(`[push] Failed to convert Markdown to HTML for ${artifact.filePath}: ${errorMsg}`);
+      output.warning(`[push] Continuing with original content`);
       
       if (options.verbose) {
-        console.log(`[VERBOSE] Conversion error details: ${errorMsg}`);
-        console.log(`[VERBOSE] Fallback: Using original content without conversion`);
+        output.info(`[VERBOSE] Conversion error details: ${errorMsg}`);
+        output.info(`[VERBOSE] Fallback: Using original content without conversion`);
       }
       
       contentToPush = artifact.content;
@@ -673,22 +702,22 @@ export class ArtifactSyncService {
     const normalizedContent = normalizeForComparison(contentToPush);
     const contentHash = this.calculateHash(contentToPush);
     
-    console.error(`[push] Content hash: ${contentHash.substring(0, 12)}... (normalized ${normalizedContent.length} chars) for ${artifact.filePath}`);
+    output.error(`[push] Content hash: ${contentHash.substring(0, 12)}... (normalized ${normalizedContent.length} chars) for ${artifact.filePath}`);
     
     if (options.verbose) {
-      console.log(`[VERBOSE] Content normalization complete`);
-      console.log(`[VERBOSE]   Original content: ${contentToPush.length} bytes`);
-      console.log(`[VERBOSE]   Normalized content: ${normalizedContent.length} bytes`);
-      console.log(`[VERBOSE]   Content hash: ${contentHash}`);
-      console.log(`[VERBOSE]   Hash (short): ${contentHash.substring(0, 12)}...`);
+      output.info(`[VERBOSE] Content normalization complete`);
+      output.info(`[VERBOSE]   Original content: ${contentToPush.length} bytes`);
+      output.info(`[VERBOSE]   Normalized content: ${normalizedContent.length} bytes`);
+      output.info(`[VERBOSE]   Content hash: ${contentHash}`);
+      output.info(`[VERBOSE]   Hash (short): ${contentHash.substring(0, 12)}...`);
     }
 
     // Check for duplicate artifacts on server
     let duplicate: ServerArtifact | null = null;
     try {
       if (options.verbose) {
-        console.log(`[VERBOSE] Starting duplicate detection...`);
-        console.log(`[VERBOSE]   Fetching server artifacts for spec: ${artifact.specName}`);
+        output.info(`[VERBOSE] Starting duplicate detection...`);
+        output.info(`[VERBOSE]   Fetching server artifacts for spec: ${artifact.specName}`);
       }
 
       const serverArtifacts = await this.fetchServerArtifacts(projectId, {
@@ -697,7 +726,7 @@ export class ArtifactSyncService {
       });
 
       if (options.verbose) {
-        console.log(`[VERBOSE]   Found ${serverArtifacts.length} server artifact(s) of type "${artifact.artifactType}"`);
+        output.info(`[VERBOSE]   Found ${serverArtifacts.length} server artifact(s) of type "${artifact.artifactType}"`);
       }
 
       duplicate = findDuplicateArtifact(
@@ -711,12 +740,12 @@ export class ArtifactSyncService {
 
       if (duplicate) {
         if (options.verbose) {
-          console.log(`[VERBOSE] Duplicate artifact found!`);
-          console.log(`[VERBOSE]   Artifact ID: ${duplicate.artifactId}`);
-          console.log(`[VERBOSE]   Artifact name: ${duplicate.artifactName}`);
-          console.log(`[VERBOSE]   Version: ${duplicate.version}`);
-          console.log(`[VERBOSE]   Last updated: ${duplicate.updatedAt.toISOString()}`);
-          console.log(`[VERBOSE]   Comparing content to determine if update is needed...`);
+          output.info(`[VERBOSE] Duplicate artifact found!`);
+          output.info(`[VERBOSE]   Artifact ID: ${duplicate.artifactId}`);
+          output.info(`[VERBOSE]   Artifact name: ${duplicate.artifactName}`);
+          output.info(`[VERBOSE]   Version: ${duplicate.version}`);
+          output.info(`[VERBOSE]   Last updated: ${duplicate.updatedAt.toISOString()}`);
+          output.info(`[VERBOSE]   Comparing content to determine if update is needed...`);
         }
 
         // Check if content is identical
@@ -724,29 +753,29 @@ export class ArtifactSyncService {
         
         if (options.verbose) {
           const duplicateHash = this.calculateHash(duplicate.content);
-          console.log(`[VERBOSE] Content comparison results:`);
-          console.log(`[VERBOSE]   Local hash:  ${contentHash}`);
-          console.log(`[VERBOSE]   Server hash: ${duplicateHash}`);
-          console.log(`[VERBOSE]   Content changed: ${contentChanged ? "YES" : "NO"}`);
+          output.info(`[VERBOSE] Content comparison results:`);
+          output.info(`[VERBOSE]   Local hash:  ${contentHash}`);
+          output.info(`[VERBOSE]   Server hash: ${duplicateHash}`);
+          output.info(`[VERBOSE]   Content changed: ${contentChanged ? "YES" : "NO"}`);
         }
         
         if (!contentChanged) {
-          // Duplicate with identical content - skip push
-          console.log(`[push] Skipping ${artifact.filePath}: identical content already exists on server (ID: ${duplicate.artifactId})`);
-          
+          output.info(`[push] Skipping ${artifact.filePath}: identical content already exists on server (ID: ${duplicate.artifactId})`);
           if (options.verbose) {
-            console.log(`[VERBOSE] Decision: SKIP - Content is identical to server version`);
-            console.log(`[VERBOSE] Returning existing artifact ID: ${duplicate.artifactId}`);
+            output.info(`[VERBOSE] Decision: SKIP - Content is identical to server version`);
+            output.info(`[VERBOSE] Returning existing artifact ID: ${duplicate.artifactId}`);
           }
-          
-          return duplicate.artifactId;
+          return {
+            artifactId: duplicate.artifactId,
+            rootId: duplicate.rootId,
+          };
         } else {
           // Duplicate with different content - update existing artifact
-          console.log(`[push] Updating existing artifact ${duplicate.artifactId} with new content for ${artifact.filePath}`);
+          output.info(`[push] Updating existing artifact ${duplicate.artifactId} with new content for ${artifact.filePath}`);
           
           if (options.verbose) {
-            console.log(`[VERBOSE] Decision: UPDATE - Content has changed`);
-            console.log(`[VERBOSE] Will use PATCH method to update artifact ${duplicate.artifactId}`);
+            output.info(`[VERBOSE] Decision: UPDATE - Content has changed`);
+            output.info(`[VERBOSE] Will use PATCH method to update artifact ${duplicate.artifactId}`);
           }
           
           // Set method to PATCH and use existing artifact ID
@@ -754,23 +783,23 @@ export class ArtifactSyncService {
           // Continue with push logic below, but use the duplicate's ID
         }
       } else {
-        console.error(`[push] No duplicate found, creating new artifact for ${artifact.filePath}`);
+        output.error(`[push] No duplicate found, creating new artifact for ${artifact.filePath}`);
         
         if (options.verbose) {
-          console.log(`[VERBOSE] Duplicate detection result: No duplicate found`);
-          console.log(`[VERBOSE] Decision: CREATE - Will create new artifact on server`);
-          console.log(`[VERBOSE] Will use POST method to create new artifact`);
+          output.info(`[VERBOSE] Duplicate detection result: No duplicate found`);
+          output.info(`[VERBOSE] Decision: CREATE - Will create new artifact on server`);
+          output.info(`[VERBOSE] Will use POST method to create new artifact`);
         }
       }
     } catch (error) {
       // If duplicate detection fails, log warning and continue with push
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.warn(`[push] Duplicate detection failed for ${artifact.filePath}: ${errorMsg}`);
-      console.warn(`[push] Continuing with push operation`);
+      output.warning(`[push] Duplicate detection failed for ${artifact.filePath}: ${errorMsg}`);
+      output.warning(`[push] Continuing with push operation`);
       
       if (options.verbose) {
-        console.log(`[VERBOSE] Duplicate detection error: ${errorMsg}`);
-        console.log(`[VERBOSE] Fallback: Proceeding with push operation (server will handle duplicates)`);
+        output.info(`[VERBOSE] Duplicate detection error: ${errorMsg}`);
+        output.info(`[VERBOSE] Fallback: Proceeding with push operation (server will handle duplicates)`);
       }
     }
 
@@ -869,7 +898,45 @@ export class ArtifactSyncService {
         break;
       }
 
-      case "flow_diagram":
+      case "flow_diagram": {
+        const mermaidType = this.inferMermaidType(contentToPush);
+        if (duplicate && method === "PATCH") {
+          endpoint = `/api/v1/designs/${duplicate.artifactId}/mermaid`;
+          method = "PATCH";
+          requestBody = {
+            mermaidDiagram: contentToPush,
+            mermaidType,
+          };
+        } else {
+          const designExists =
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(artifactName) &&
+            (await this.fetchServerArtifact(
+              projectId,
+              artifact.specName,
+              "flow_diagram",
+              artifactName
+            ));
+          if (designExists) {
+            endpoint = `/api/v1/designs/${artifactName}/mermaid`;
+            method = "PATCH";
+            requestBody = { mermaidDiagram: contentToPush, mermaidType };
+          } else {
+            endpoint = "/api/v1/designs";
+            requestBody = {
+              projectId,
+              type: "flow",
+              name: artifactName || extractTitleFromMarkdown(artifact.content) || "Flow",
+              specName: artifact.specName || "default",
+              content: "",
+              mermaidDiagram: contentToPush,
+              mermaidType,
+            };
+          }
+        }
+        break;
+      }
+
+      case "er_diagram":
         endpoint = "/api/v1/er-diagrams";
         requestBody = {
           projectId,
@@ -879,15 +946,27 @@ export class ArtifactSyncService {
         };
         break;
 
-      case "context":
-        endpoint = `/api/v1/projects/${projectId}/contexts`;
-        requestBody = {
-          title: artifactName || extractTitleFromMarkdown(artifact.content) || "Context",
-          content: contentToPush,
-          description: "",
-          isActive: true,
-        };
+      case "context": {
+        if (duplicate && method === "PATCH") {
+          endpoint = `/api/v1/projects/${projectId}/contexts/${duplicate.artifactId}`;
+          method = "PUT";
+          requestBody = {
+            title: artifactName || extractTitleFromMarkdown(artifact.content) || "Context",
+            content: contentToPush,
+            description: "",
+            isActive: true,
+          };
+        } else {
+          endpoint = `/api/v1/projects/${projectId}/contexts`;
+          requestBody = {
+            title: artifactName || extractTitleFromMarkdown(artifact.content) || "Context",
+            content: contentToPush,
+            description: "",
+            isActive: true,
+          };
+        }
         break;
+      }
 
       case "code_guideline":
         endpoint = "/api/v1/code-guidelines";
@@ -917,7 +996,8 @@ export class ArtifactSyncService {
       success: boolean;
       id?: string;
       artifactId?: string;
-      data?: { id?: string };
+      rootId?: string;
+      data?: { id?: string; rootId?: string };
       version?: number;
     }>("project", endpoint, {
       method,
@@ -932,13 +1012,15 @@ export class ArtifactSyncService {
     const raw = response.data as {
       id?: string;
       artifactId?: string;
-      data?: { id?: string };
+      rootId?: string;
+      data?: { id?: string; rootId?: string };
     };
     const idFromResponse =
       raw.id ?? raw.artifactId ?? raw.data?.id ?? null;
     const artifactId =
       idFromResponse ?? (method === "PATCH" ? artifactName : null);
-    return artifactId;
+    const rootId = raw.rootId ?? raw.data?.rootId ?? (isVersionedArtifactType(artifact.artifactType) ? artifactId ?? undefined : undefined);
+    return artifactId ? { artifactId, rootId: rootId ?? undefined } : null;
   }
 
   /**
@@ -955,7 +1037,7 @@ export class ArtifactSyncService {
     const localTasks = await this.taskFileManager.scanLocalTasks(specName);
     
     if (localTasks.length === 0) {
-      console.log(`No task files found for spec: ${specName}`);
+      output.info(`No task files found for spec: ${specName}`);
       return;
     }
 
@@ -1018,11 +1100,11 @@ export class ArtifactSyncService {
         if (existingTask) {
           // Update existing task
           await this.updateTask(projectId, task.id, mainTask);
-          console.log(`Updated task: ${task.title}`);
+          output.info(`Updated task: ${task.title}`);
         } else {
           // Create new task
           const createdTask = await this.createTask(projectId, mainTask);
-          console.log(`Created task: ${task.title}`);
+          output.info(`Created task: ${task.title}`);
           
           // Update local file with server ID if different
           if (createdTask.id !== task.id) {
@@ -1040,7 +1122,7 @@ export class ArtifactSyncService {
         // Upload task assets
         await this.taskFileManager.uploadTaskAssets(task, specName);
       } catch (error) {
-        console.error(`Failed to push task ${task.title}:`, error);
+        output.error(`Failed to push task ${task.title}: ${error instanceof Error ? (error as Error).message : String(error)}`);
         throw error;
       }
     }
@@ -1058,7 +1140,7 @@ export class ArtifactSyncService {
     const specName = artifact.specName || "default";
     
     if (options.verbose) {
-      console.log(`[VERBOSE] Pushing tasks in Kiro format for spec: ${specName}`);
+      output.info(`[VERBOSE] Pushing tasks in Kiro format for spec: ${specName}`);
     }
 
     // Read tasks.md content
@@ -1068,7 +1150,7 @@ export class ArtifactSyncService {
     const milestones = kiroFormatToServer(tasksContent);
     
     if (options.verbose) {
-      console.log(`[VERBOSE] Parsed ${milestones.length} milestone(s) from Kiro format`);
+      output.info(`[VERBOSE] Parsed ${milestones.length} milestone(s) from Kiro format`);
     }
 
     // Create API client wrapper for milestone operations
@@ -1124,7 +1206,7 @@ export class ArtifactSyncService {
         if (existingMilestone) {
           milestoneId = existingMilestone.id;
           if (options.verbose) {
-            console.log(`[VERBOSE] Using existing milestone: ${kiroMilestone.name} (ID: ${milestoneId})`);
+            output.info(`[VERBOSE] Using existing milestone: ${kiroMilestone.name} (ID: ${milestoneId})`);
           }
         } else {
           const newMilestone = await apiClient.createMilestone({
@@ -1134,7 +1216,7 @@ export class ArtifactSyncService {
           });
           milestoneId = newMilestone.id;
           if (options.verbose) {
-            console.log(`[VERBOSE] Created new milestone: ${kiroMilestone.name} (ID: ${milestoneId})`);
+            output.info(`[VERBOSE] Created new milestone: ${kiroMilestone.name} (ID: ${milestoneId})`);
           }
         }
 
@@ -1167,7 +1249,7 @@ export class ArtifactSyncService {
 
           if (duplicate) {
             if (options.verbose) {
-              console.log(`[VERBOSE] Skipping duplicate task: "${kiroTask.description.substring(0, 50)}..."`);
+              output.info(`[VERBOSE] Skipping duplicate task: "${kiroTask.description.substring(0, 50)}..."`);
             }
             continue;
           }
@@ -1197,17 +1279,17 @@ export class ArtifactSyncService {
             const responseData = response.data as Record<string, unknown>;
             const createdTask = { id: responseData.id as string };
             if (options.verbose) {
-              console.log(`[VERBOSE] Created task: "${kiroTask.description.substring(0, 50)}..." (ID: ${createdTask.id})`);
+              output.info(`[VERBOSE] Created task: "${kiroTask.description.substring(0, 50)}..." (ID: ${createdTask.id})`);
             }
             
             // Store task ID for subtask parent references
             kiroTask.id = createdTask.id;
           } else {
-            console.warn(`[push] Failed to create task: ${kiroTask.description}`);
+            output.warning(`[push] Failed to create task: ${kiroTask.description}`);
           }
         }
       } catch (error) {
-        console.error(`Failed to push milestone ${kiroMilestone.name}:`, error);
+        output.error(`Failed to push milestone ${kiroMilestone.name}: ${error instanceof Error ? (error as Error).message : String(error)}`);
         throw error;
       }
     }
@@ -1230,7 +1312,7 @@ export class ArtifactSyncService {
     options: PullOptions = {}
   ): Promise<string> {
     if (options.verbose) {
-      console.log(`[VERBOSE] Reconstructing tasks.md in Kiro format for spec: ${specName}`);
+      output.info(`[VERBOSE] Reconstructing tasks.md in Kiro format for spec: ${specName}`);
     }
 
     // Fetch milestones for this spec
@@ -1243,7 +1325,7 @@ export class ArtifactSyncService {
     const serverMilestones = asList<{ id: string; name: string; description?: string; specName?: string }>(milestoneResponse.data);
 
     if (options.verbose) {
-      console.log(`[VERBOSE] Found ${serverMilestones.length} milestone(s) for spec: ${specName}`);
+      output.info(`[VERBOSE] Found ${serverMilestones.length} milestone(s) for spec: ${specName}`);
     }
 
     // Convert to Kiro milestone format
@@ -1266,7 +1348,7 @@ export class ArtifactSyncService {
       }>(tasksResponse.data);
 
       if (options.verbose) {
-        console.log(`[VERBOSE] Found ${serverTasks.length} task(s) for milestone: ${milestone.name}`);
+        output.info(`[VERBOSE] Found ${serverTasks.length} task(s) for milestone: ${milestone.name}`);
       }
 
       // Convert tasks to Kiro format
@@ -1291,7 +1373,7 @@ export class ArtifactSyncService {
     const markdown = serverToKiroFormat(kiroMilestones);
 
     if (options.verbose) {
-      console.log(`[VERBOSE] Generated tasks.md with ${markdown.split('\n').length} lines`);
+      output.info(`[VERBOSE] Generated tasks.md with ${markdown.split('\n').length} lines`);
     }
 
     return markdown;
@@ -1448,22 +1530,23 @@ export class ArtifactSyncService {
   }
 
   /**
-   * Rename artifact file to use server ID
+   * Rename artifact file: versioned types use root_id, others use artifact_id
    */
   private async renameArtifactFile(
     artifact: LocalArtifact,
-    artifactId: string
+    artifactId: string,
+    rootId?: string
   ): Promise<void> {
     const oldPath = artifact.filePath;
     const dir = dirname(oldPath);
-    const newFileName = `${artifact.artifactType}_${artifactId}.md`;
+    const fileId = isVersionedArtifactType(artifact.artifactType) && rootId ? rootId : artifactId;
+    const newFileName = `${artifact.artifactType}_${fileId}.md`;
     const newPath = join(dir, newFileName);
 
     try {
       await fs.rename(oldPath, newPath);
     } catch (error) {
-      // If rename fails, log but don't throw (file might already be renamed)
-      console.warn(`Failed to rename file ${oldPath} to ${newPath}: ${error}`);
+      output.warning(`Failed to rename file ${oldPath} to ${newPath}: ${error}`);
     }
   }
 
@@ -1492,7 +1575,7 @@ export class ArtifactSyncService {
       ...((options.headers as Record<string, string>) || {}),
     };
 
-    console.error(`[${method}] ${url}`);
+    output.error(`[${method}] ${url}`);
 
     // Wrap fetch in retry logic for network errors
     try {
@@ -1519,7 +1602,7 @@ export class ArtifactSyncService {
         const errorData = await response.json().catch(() => ({}));
         const msg = (errorData as Record<string, unknown>)?.message ?? `HTTP ${response.status}`;
         const bodySnippet = JSON.stringify(errorData).slice(0, 200);
-        console.error(`[${method}] FAILED ${response.status} ${url}`, bodySnippet);
+        output.error(`[${method}] FAILED ${response.status} ${url} ${bodySnippet}`);
         return {
           success: false,
           error: `${String(msg)} (${url})`,
@@ -1533,7 +1616,7 @@ export class ArtifactSyncService {
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error(`[${method}] REQUEST ERROR ${url}:`, errorMsg);
+      output.error(`[${method}] REQUEST ERROR ${url}: ${errorMsg}`);
       return {
         success: false,
         error: `${errorMsg} (${url})`,
@@ -1558,23 +1641,22 @@ export class ArtifactSyncService {
         `/api/v1/requirements/?projectId=${projectId}${filters.specName ? `&specName=${encodeURIComponent(filters.specName)}` : ""}`,
         { method: "GET" }
       );
-      const list = asList<{ id: string; specName?: string; name: string; content: unknown; version: number; createdAt: string; updatedAt: string }>(response.data);
+      const list = asList<{ id: string; rootId?: string; specName?: string; name: string; content: unknown; version: number; createdAt: string; updatedAt: string }>(response.data);
       for (const req of list) {
         if (filters.specName && req.specName !== filters.specName) continue;
-        if (filters.artifactName && req.name !== filters.artifactName) continue;
-        const createdAt = req.createdAt;
-        
-        // Use extractContent to handle different content formats
+        const rootId = req.rootId ?? req.id;
+        if (filters.artifactName && req.name !== filters.artifactName && rootId !== filters.artifactName) continue;
         const content = extractContent({ content: req.content });
-        
         artifacts.push({
           artifactId: req.id,
+          rootId,
           specName: req.specName || "default",
           artifactType: "requirement",
           artifactName: req.name,
           content,
+          contentHash: computeContentHash(content),
           version: req.version,
-          createdAt: new Date(createdAt),
+          createdAt: new Date(req.createdAt),
           updatedAt: new Date(req.updatedAt),
         });
       }
@@ -1592,20 +1674,20 @@ export class ArtifactSyncService {
         endpoint,
         { method: "GET" }
       );
-      const list = asList<{ id: string; specName?: string; type: string; name: string; content: unknown; version: number; createdAt: string; updatedAt: string }>(response.data);
+      const list = asList<{ id: string; rootId?: string; specName?: string; type: string; name: string; content: unknown; version: number; createdAt: string; updatedAt: string }>(response.data);
       for (const design of list) {
         if (filters.specName && design.specName !== filters.specName) continue;
-        if (filters.artifactName && design.name !== filters.artifactName) continue;
-        
-        // Use extractContent to handle different content formats
+        const rootId = design.rootId ?? design.id;
+        if (filters.artifactName && design.name !== filters.artifactName && rootId !== filters.artifactName) continue;
         const content = extractContent({ content: design.content });
-        
         artifacts.push({
           artifactId: design.id,
+          rootId,
           specName: design.specName || "default",
           artifactType: design.type as ArtifactType,
           artifactName: design.name,
           content,
+          contentHash: computeContentHash(content),
           version: design.version,
           createdAt: new Date(design.createdAt),
           updatedAt: new Date(design.updatedAt),
@@ -1711,8 +1793,8 @@ export class ArtifactSyncService {
           } catch (conversionError) {
             // Log conversion error and use fallback: JSON stringify
             const errorMsg = conversionError instanceof Error ? conversionError.message : String(conversionError);
-            console.warn(`[fetch] Failed to convert task to markdown format for task ${task.id}: ${errorMsg}`);
-            console.warn(`[fetch] Fallback: Using JSON representation`);
+            output.warning(`[fetch] Failed to convert task to markdown format for task ${task.id}: ${errorMsg}`);
+            output.warning(`[fetch] Fallback: Using JSON representation`);
             
             // Fallback: use JSON representation of task
             markdown = JSON.stringify(task, null, 2);
@@ -1736,23 +1818,61 @@ export class ArtifactSyncService {
       const specFilter = filters.specName ? `&specName=${encodeURIComponent(filters.specName)}` : "";
       const response = await this.makeRequest<unknown>(
         "project",
+        `/api/v1/designs/?projectId=${projectId}&type=flow${specFilter}`,
+        { method: "GET" }
+      );
+      const list = asList<{
+        id: string;
+        rootId?: string;
+        specName?: string;
+        name: string;
+        mermaidDiagram?: string | null;
+        mermaidType?: string | null;
+        version?: number;
+        createdAt: string;
+        updatedAt: string;
+      }>(response.data);
+      for (const design of list) {
+        if (filters.specName && design.specName !== filters.specName) continue;
+        const rootId = design.rootId ?? design.id;
+        if (filters.artifactName && design.name !== filters.artifactName && rootId !== filters.artifactName) continue;
+        const content = design.mermaidDiagram ?? "";
+        artifacts.push({
+          artifactId: design.id,
+          rootId,
+          specName: design.specName || "default",
+          artifactType: "flow_diagram",
+          artifactName: design.name,
+          content,
+          contentHash: computeContentHash(content),
+          version: design.version || 1,
+          createdAt: new Date(design.createdAt),
+          updatedAt: new Date(design.updatedAt),
+        });
+      }
+    }
+
+    if (!filters.artifactType || filters.artifactType === "er_diagram") {
+      const specFilter = filters.specName ? `&specName=${encodeURIComponent(filters.specName)}` : "";
+      const response = await this.makeRequest<unknown>(
+        "project",
         `/api/v1/er-diagrams/?projectId=${projectId}${specFilter}`,
         { method: "GET" }
       );
-      const list = asList<{ id: string; specName?: string; name: string; content: unknown; version?: number; createdAt: string; updatedAt: string }>(response.data);
+      const list = asList<{ id: string; rootId?: string; specName?: string; name: string; content: unknown; version?: number; createdAt: string; updatedAt: string }>(response.data);
       for (const diagram of list) {
         if (filters.specName && diagram.specName !== filters.specName) continue;
-        if (filters.artifactName && diagram.name !== filters.artifactName) continue;
-        
-        // Use extractContent to handle different content formats
+        const rootId = diagram.rootId ?? diagram.id;
+        if (filters.artifactName && diagram.name !== filters.artifactName && rootId !== filters.artifactName) continue;
         const content = extractContent({ content: diagram.content });
-        
         artifacts.push({
           artifactId: diagram.id,
+          rootId,
           specName: diagram.specName || "default",
-          artifactType: "flow_diagram",
+          artifactType: "er_diagram",
           artifactName: diagram.name,
           content,
+          contentHash: computeContentHash(content),
           version: diagram.version || 1,
           createdAt: new Date(diagram.createdAt),
           updatedAt: new Date(diagram.updatedAt),
@@ -1768,17 +1888,15 @@ export class ArtifactSyncService {
       );
       const list = asList<{ id: string; title: string; content: unknown; createdAt: string; updatedAt: string }>(response.data);
       for (const ctx of list) {
-        if (filters.artifactName && ctx.title !== filters.artifactName) continue;
-        
-        // Use extractContent to handle different content formats
+        if (filters.artifactName && ctx.title !== filters.artifactName && ctx.id !== filters.artifactName) continue;
         const content = extractContent({ content: ctx.content });
-        
         artifacts.push({
           artifactId: ctx.id,
           specName: "default",
           artifactType: "context",
           artifactName: ctx.title,
           content,
+          contentHash: computeContentHash(content),
           version: 1,
           createdAt: new Date(ctx.createdAt),
           updatedAt: new Date(ctx.updatedAt),
@@ -1797,16 +1915,14 @@ export class ArtifactSyncService {
       const projectOnly = guidelines.filter((g: { scope: string }) => g.scope === "project");
       for (const g of projectOnly) {
         if (filters.artifactName && g.title !== filters.artifactName) continue;
-        
-        // Use extractContent to handle different content formats
         const content = extractContent({ content: g.content });
-        
         artifacts.push({
           artifactId: g.id,
           specName: "default",
           artifactType: "code_guideline",
           artifactName: g.title,
           content,
+          contentHash: computeContentHash(content),
           version: 1,
           createdAt: new Date(g.createdAt),
           updatedAt: new Date(g.updatedAt),
@@ -1823,16 +1939,14 @@ export class ArtifactSyncService {
       const list = asList<{ id: string; name: string; elements?: unknown; createdAt: string; updatedAt: string }>(response.data);
       for (const wf of list) {
         if (filters.artifactName && wf.name !== filters.artifactName) continue;
-        
-        // Use extractContent to handle different content formats
         const content = extractContent({ content: wf.elements });
-        
         artifacts.push({
           artifactId: wf.id,
           specName: "default",
           artifactType: "wireframe_files",
           artifactName: wf.name,
           content,
+          contentHash: computeContentHash(content),
           version: 1,
           createdAt: new Date(wf.createdAt),
           updatedAt: new Date(wf.updatedAt),
@@ -1848,20 +1962,22 @@ export class ArtifactSyncService {
   }
 
   /**
-   * Filter artifacts to only return the latest version of each artifact
-   * Groups by artifactId and returns the artifact with the highest version number
+   * Filter artifacts to only return the latest version of each artifact.
+   * Versioned types: group by rootId; others: group by artifactId.
    */
   private filterToLatestVersions(artifacts: ServerArtifact[]): ServerArtifact[] {
     const artifactMap = new Map<string, ServerArtifact>();
-    
+
     for (const artifact of artifacts) {
-      const existing = artifactMap.get(artifact.artifactId);
-      
+      const key = isVersionedArtifactType(artifact.artifactType) && artifact.rootId
+        ? artifact.rootId
+        : artifact.artifactId;
+      const existing = artifactMap.get(key);
       if (!existing || artifact.version > existing.version) {
-        artifactMap.set(artifact.artifactId, artifact);
+        artifactMap.set(key, artifact);
       }
     }
-    
+
     return Array.from(artifactMap.values());
   }
 
@@ -1900,19 +2016,27 @@ export class ArtifactSyncService {
     return computeContentHash(content);
   }
 
+  /** Infer mermaid diagram type from content for design mermaid API */
+  private inferMermaidType(content: string): string {
+    const s = (content || "").trim();
+    if (/^\s*erDiagram\s/mi.test(s) || /^\s*erDiagram$/mi.test(s)) return "entity";
+    if (/^\s*sequenceDiagram\s/mi.test(s) || /^\s*sequenceDiagram$/mi.test(s)) return "sequence";
+    if (/^\s*classDiagram\s/mi.test(s) || /^\s*classDiagram$/mi.test(s)) return "class";
+    if (/^\s*stateDiagram\s/mi.test(s) || /^\s*stateDiagram$/mi.test(s)) return "state";
+    return "flowchart";
+  }
+
   /**
-   * Get artifact file path
+   * Get artifact file path (versioned types use root_id in filename)
    */
-  private getArtifactPath(artifact: ArtifactMetadata & { artifactId?: string }): string {
+  private getArtifactPath(artifact: ArtifactMetadata & { artifactId?: string; rootId?: string }): string {
     if (artifact.artifactType === "tasks") {
-      // Tasks use individual files: tasks_<task_id>.md
       return `.quikim/artifacts/${artifact.specName}/tasks_${artifact.artifactId}.md`;
     }
-    
-    const fileName = artifact.artifactId 
-      ? `${artifact.artifactType}_${artifact.artifactId}.md`
-      : `${artifact.artifactType}_${artifact.artifactName}.md`;
-    return `.quikim/artifacts/${artifact.specName}/${fileName}`;
+    const id = isVersionedArtifactType(artifact.artifactType) && artifact.rootId
+      ? artifact.rootId
+      : (artifact.artifactId ?? artifact.artifactName);
+    return `.quikim/artifacts/${artifact.specName}/${artifact.artifactType}_${id}.md`;
   }
 
   /**
@@ -1954,8 +2078,19 @@ export class ArtifactSyncService {
         endpoint = `/api/v1/projects/${project.projectId}/artifacts/${identifier}`;
         break;
 
+      case "flow_diagram":
+        endpoint = isId
+          ? `/api/v1/designs/${identifier}`
+          : `/api/v1/designs/?projectId=${project.projectId}&type=flow&name=${encodeURIComponent(identifier)}`;
+        break;
+
+      case "er_diagram":
+        endpoint = isId
+          ? `/api/v1/er-diagrams/${identifier}`
+          : `/api/v1/er-diagrams/?projectId=${project.projectId}&name=${encodeURIComponent(identifier)}`;
+        break;
+
       case "tasks":
-        // For tasks, update milestone
         endpoint = isId
           ? `/api/v1/milestones/${identifier}`
           : `/api/v1/milestones/?projectId=${project.projectId}&name=${encodeURIComponent(identifier)}`;

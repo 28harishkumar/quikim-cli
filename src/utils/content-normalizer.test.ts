@@ -11,10 +11,35 @@ import { describe, it } from "node:test";
 import assert from "node:assert";
 import {
   stripHtmlTags,
+  stripWrappedQuotes,
   collapseWhitespace,
   normalizeForComparison,
   computeContentHash,
 } from "./content-normalizer.js";
+
+describe("stripWrappedQuotes", () => {
+  it("should strip one layer of leading/trailing double-quotes", () => {
+    const wrapped = "\"<p>Hello</p>\"";
+    const result = stripWrappedQuotes(wrapped);
+    assert.strictEqual(result, "<p>Hello</p>");
+  });
+
+  it("should leave content unchanged when not wrapped in quotes", () => {
+    const content = "<p>Hello</p>";
+    const result = stripWrappedQuotes(content);
+    assert.strictEqual(result, content);
+  });
+
+  it("should handle empty and null input", () => {
+    assert.strictEqual(stripWrappedQuotes(""), "");
+    assert.strictEqual(stripWrappedQuotes(null as unknown as string), "");
+  });
+
+  it("should not strip when only one quote at start or end", () => {
+    const content = "\"unmatched";
+    assert.strictEqual(stripWrappedQuotes(content), content);
+  });
+});
 
 describe("stripHtmlTags", () => {
   it("should remove simple HTML tags", () => {

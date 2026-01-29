@@ -1,11 +1,13 @@
 /**
  * Quikim - Progress Reporter Utility
- * 
+ *
  * Copyright (c) 2026 Quikim Inc.
- * 
+ *
  * This file is part of Quikim, licensed under the AGPL-3.0 License.
  * See LICENSE file in the project root for full license information.
  */
+
+import * as output from "./output.js";
 
 /**
  * Progress reporter for sync operations
@@ -32,7 +34,7 @@ export class ProgressReporter {
     this.current = current;
     
     if (this.verbose && message) {
-      console.log(`[${this.operation}] ${message}`);
+      output.info(`[${this.operation}] ${message}`);
     }
     
     this.displayProgress();
@@ -73,7 +75,7 @@ export class ProgressReporter {
     const seconds = (duration / 1000).toFixed(1);
     
     if (this.verbose) {
-      console.log(`[${this.operation}] Completed in ${seconds}s`);
+      output.info(`[${this.operation}] Completed in ${seconds}s`);
     }
   }
 
@@ -120,31 +122,33 @@ export interface SyncSummary {
  * Display formatted sync summary
  */
 export function displaySyncSummary(summary: SyncSummary, operation: string): void {
-  console.log(`\n${operation} Summary:`);
-  
+  output.separator();
+  output.header(`${operation} Summary`);
+
   if (summary.pushed !== undefined) {
-    console.log(`  ✓ ${summary.pushed} artifact${summary.pushed !== 1 ? "s" : ""} pushed`);
+    output.info(`  ✓ ${summary.pushed} artifact${summary.pushed !== 1 ? "s" : ""} pushed`);
   }
-  
+
   if (summary.pulled !== undefined) {
-    console.log(`  ✓ ${summary.pulled} artifact${summary.pulled !== 1 ? "s" : ""} pulled`);
+    output.info(`  ✓ ${summary.pulled} artifact${summary.pulled !== 1 ? "s" : ""} pulled`);
   }
-  
+
   if (summary.created !== undefined) {
-    console.log(`  ✓ ${summary.created} artifact${summary.created !== 1 ? "s" : ""} created`);
+    output.info(`  ✓ ${summary.created} artifact${summary.created !== 1 ? "s" : ""} created`);
   }
-  
+
   if (summary.updated !== undefined) {
-    console.log(`  ✓ ${summary.updated} artifact${summary.updated !== 1 ? "s" : ""} updated`);
+    output.info(`  ✓ ${summary.updated} artifact${summary.updated !== 1 ? "s" : ""} updated`);
   }
-  
+
   if (summary.skipped !== undefined && summary.skipped > 0) {
-    console.log(`  ⊘ ${summary.skipped} artifact${summary.skipped !== 1 ? "s" : ""} skipped (no changes)`);
+    output.info(`  ⊘ ${summary.skipped} artifact${summary.skipped !== 1 ? "s" : ""} skipped (no changes)`);
   }
-  
+
   if (summary.errors !== undefined && summary.errors > 0) {
-    console.log(`  ✗ ${summary.errors} error${summary.errors !== 1 ? "s" : ""}`);
+    output.warning(`  ✗ ${summary.errors} error${summary.errors !== 1 ? "s" : ""}`);
   }
-  
-  console.log(`\nDuration: ${ProgressReporter.formatDuration(summary.duration)}`);
+
+  output.separator();
+  output.info(`Duration: ${ProgressReporter.formatDuration(summary.duration)}`);
 }

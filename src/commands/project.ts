@@ -10,6 +10,7 @@
 import { Command } from "commander";
 import inquirer from "inquirer";
 import { configManager, createProjectConfig } from "../config/manager.js";
+import { getQuikimProjectRoot } from "../config/project-root.js";
 import { createAPIClient } from "../api/client.js";
 import { NotFoundError } from "../api/errors.js";
 import * as output from "../utils/output.js";
@@ -75,9 +76,7 @@ async function listProjectsHandler(options: {
       const prefix = isConnected ? "→ " : "  ";
       const connectedLabel = isConnected ? " (connected)" : "";
       
-      console.log(
-        `${prefix}${project.name}${connectedLabel}`
-      );
+      output.info(`${prefix}${project.name}${connectedLabel}`);
       output.tableRow("    ID", project.id);
       output.tableRow("    Status", output.formatStatus(project.status));
       output.tableRow("    Slug", project.slug);
@@ -166,8 +165,8 @@ async function connectProjectHandler(
     configManager.setCurrentProject(projectConfig);
 
     // Save to local project config (.quikim/project.json for MCP server)
-    const cwd = process.cwd();
-    const projectConfigManager = createProjectConfig(cwd);
+    const projectRoot = getQuikimProjectRoot();
+    const projectConfigManager = createProjectConfig(projectRoot);
     await projectConfigManager.write(projectConfig);
 
     spinner.succeed("Connected to project");
@@ -221,8 +220,8 @@ async function disconnectProjectHandler(): Promise<void> {
   configManager.clearCurrentProject();
 
   // Remove local project config
-  const cwd = process.cwd();
-  const projectConfigManager = createProjectConfig(cwd);
+  const projectRoot = getQuikimProjectRoot();
+  const projectConfigManager = createProjectConfig(projectRoot);
   await projectConfigManager.delete();
 
   output.success(`Disconnected from "${currentProject.name}"`);
@@ -270,7 +269,7 @@ async function projectInfoHandler(options: { json?: boolean }): Promise<void> {
       output.separator();
       output.header("Components");
       for (const component of project.components) {
-        console.log(`  - ${component.name} (${component.type})`);
+        output.info(`  - ${component.name} (${component.type})`);
       }
     }
 
@@ -278,7 +277,7 @@ async function projectInfoHandler(options: { json?: boolean }): Promise<void> {
       output.separator();
       output.header("Team");
       for (const member of project.team) {
-        console.log(`  - ${member.user.name || member.user.email} (${member.role})`);
+        output.info(`  - ${member.user.name || member.user.email} (${member.role})`);
       }
     }
   } catch (err) {
@@ -294,22 +293,22 @@ async function projectInfoHandler(options: { json?: boolean }): Promise<void> {
 async function initProjectHandler(options: { all?: boolean; force?: boolean }): Promise<void> {
   requireAuth();
 
-  const cwd = process.cwd();
-  
+  const projectRoot = getQuikimProjectRoot();
+
   output.header("Quikim Project Initialization");
   output.separator();
 
   // Step 1: Install IDE rules
   output.info("Step 1: Installing IDE rules...");
   output.separator();
-  await installIDERules(cwd, { all: options.all, force: options.force });
+  await installIDERules(projectRoot, { all: options.all, force: options.force });
   output.separator();
 
   // Step 2: Generate API structure file
   output.info("Step 2: Generating API structure cache...");
   output.separator();
   try {
-    const apiStructureFile = await generateAPIStructureFile(cwd);
+    const apiStructureFile = await generateAPIStructureFile(projectRoot);
     output.success(`API structure file created: ${apiStructureFile}`);
     output.info("This file contains all API endpoints and schemas for faster MCP operations");
   } catch (err) {
@@ -324,7 +323,7 @@ async function initProjectHandler(options: { all?: boolean; force?: boolean }): 
   output.info("Step 3: Connecting to project...");
   output.separator();
 
-  const projectConfigManager = createProjectConfig(cwd);
+  const projectConfigManager = createProjectConfig(projectRoot);
 
   // Check if already initialized
   if (await projectConfigManager.exists()) {

@@ -50,7 +50,7 @@ export abstract class BaseHandler {
     const requestId = this.generateRequestId();
 
     try {
-      const projectData = ContentExtractor.extractProjectData(codebase, projectContext);
+      const projectData = await ContentExtractor.extractProjectData(codebase, projectContext);
       const pathPattern = ContentExtractor.getPathPattern(artifactType);
       const content = ContentExtractor.extractFileContent(codebase, pathPattern);
 
@@ -91,8 +91,8 @@ export abstract class BaseHandler {
     const requestId = this.generateRequestId();
 
     try {
-      const projectData = ContentExtractor.extractProjectData(codebase, projectContext);
-      
+      const projectData = await ContentExtractor.extractProjectData(codebase, projectContext);
+
       const response = await this.aiAgent.processRequest({
         requestId,
         intent: `${intent}\n\nUser request: ${userPrompt}`,

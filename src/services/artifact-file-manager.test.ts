@@ -202,14 +202,14 @@ describe("ArtifactFileManager", () => {
     it("should throw error if artifactType is missing", () => {
       assert.throws(
         () => fileManager.generateFilename("" as ArtifactType, "test-id"),
-        /artifactType and artifactId are required/
+        /artifactType and id are required/
       );
     });
 
     it("should throw error if artifactId is missing", () => {
       assert.throws(
         () => fileManager.generateFilename("requirement", ""),
-        /artifactType and artifactId are required/
+        /artifactType and id are required/
       );
     });
   });

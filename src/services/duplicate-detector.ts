@@ -10,6 +10,7 @@
 import { normalizeForComparison, computeContentHash } from "../utils/content-normalizer.js";
 import { ServerArtifact, ArtifactType } from "../types/artifacts.js";
 import { Task } from "./tasks-converter.js";
+import * as output from "../utils/output.js";
 
 /**
  * Duplicate Detector Module
@@ -49,17 +50,19 @@ export function findDuplicateArtifact(
     return null;
   }
 
-  // Phase 1: Find artifacts matching metadata (spec_name + artifact_type + artifact_name)
+  // Phase 1: Find artifacts matching metadata (spec_name + artifact_type + name, rootId, or id)
   const metadataMatches = serverArtifacts.filter(
     (artifact) =>
       artifact.specName === specName &&
       artifact.artifactType === artifactType &&
-      artifact.artifactName === artifactName
+      (artifact.artifactName === artifactName ||
+        artifact.rootId === artifactName ||
+        artifact.artifactId === artifactName)
   );
 
   if (metadataMatches.length === 0) {
     if (options.verbose) {
-      console.log(`[DuplicateDetector] No metadata match for ${artifactType}/${specName}/${artifactName}`);
+      output.info(`[DuplicateDetector] No metadata match for ${artifactType}/${specName}/${artifactName}`);
     }
     return null;
   }
@@ -72,7 +75,7 @@ export function findDuplicateArtifact(
 
     if (localContentHash === serverContentHash) {
       if (options.verbose) {
-        console.log(
+        output.info(
           `[DuplicateDetector] Found duplicate artifact: ${artifactType}/${specName}/${artifactName} (ID: ${artifact.artifactId})`
         );
       }
@@ -86,7 +89,7 @@ export function findDuplicateArtifact(
   );
 
   if (options.verbose) {
-    console.log(
+    output.info(
       `[DuplicateDetector] Found artifact with different content: ${artifactType}/${specName}/${artifactName} (ID: ${latestVersion.artifactId})`
     );
   }
@@ -118,7 +121,7 @@ export function findDuplicateTask(
 
     if (normalizedLocal === normalizedExisting) {
       if (options.verbose) {
-        console.log(
+        output.info(
           `[DuplicateDetector] Found duplicate task: "${taskDescription.substring(0, 50)}..."`
         );
       }

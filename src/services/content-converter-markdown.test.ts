@@ -95,6 +95,15 @@ describe("ContentConverter - markdownToHtml", () => {
     assert.ok(result.includes("<hr") || result.includes("---"));
   });
 
+  it("should convert single newlines to <br> (breaks: true)", async () => {
+    const markdown = "Line one\nLine two\nLine three";
+    const result = await markdownToHtml(markdown);
+    assert.ok(result.includes("<br>"), "Single newlines should become <br> tags");
+    assert.ok(result.includes("Line one"));
+    assert.ok(result.includes("Line two"));
+    assert.ok(result.includes("Line three"));
+  });
+
   it("should handle unicode characters", async () => {
     const markdown = "# 你好世界 🌍";
     const result = await markdownToHtml(markdown);

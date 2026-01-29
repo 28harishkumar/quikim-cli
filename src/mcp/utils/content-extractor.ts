@@ -1,15 +1,18 @@
 /**
  * Quikim - Content Extraction Utilities
- * 
+ *
  * Copyright (c) 2026 Quikim Inc.
- * 
+ *
  * This file is part of Quikim, licensed under the AGPL-3.0 License.
  * See LICENSE file in the project root for full license information.
  */
 
+import { readFile } from "fs/promises";
+import { join } from "path";
 import { CodebaseContext } from "../session/types.js";
 import { ProjectContext } from "../services/project-context.js";
 import { ArtifactType, FileContent, ProjectData } from "../types/handler-types.js";
+import { getQuikimProjectRoot } from "../../config/project-root.js";
 
 export class ContentExtractor {
   /**
@@ -104,13 +107,43 @@ ${fileList}`;
   }
 
   /**
-   * Extract project data from contexts
+   * Read project.json from disk (e.g. when QUIKIM_PROJECT_DIR is set and codebase does not include it)
    */
-  static extractProjectData(codebase: CodebaseContext, projectContext: ProjectContext): ProjectData {
-    const projectId = this.extractProjectId(codebase, projectContext);
-    
+  static async readProjectFromDisk(): Promise<ProjectData | null> {
+    try {
+      const root = getQuikimProjectRoot();
+      const path = join(root, ".quikim", "project.json");
+      const raw = await readFile(path, "utf-8");
+      const data = JSON.parse(raw) as { projectId?: string; organizationId?: string; userId?: string };
+      if (data.projectId) {
+        return {
+          projectId: data.projectId,
+          organizationId: data.organizationId,
+          userId: data.userId,
+        };
+      }
+    } catch {
+      // File missing or invalid
+    }
+    return null;
+  }
+
+  /**
+   * Extract project data from contexts, with filesystem fallback when codebase has no .quikim/project.json
+   */
+  static async extractProjectData(codebase: CodebaseContext, projectContext: ProjectContext): Promise<ProjectData> {
+    let projectId = this.extractProjectId(codebase, projectContext);
+
     if (!projectId) {
-      throw new Error("Project ID not found. Make sure .quikim/project.json exists.");
+      const fromDisk = await this.readProjectFromDisk();
+      if (fromDisk) {
+        return {
+          projectId: fromDisk.projectId,
+          organizationId: fromDisk.organizationId ?? projectContext.organizationId,
+          userId: fromDisk.userId ?? projectContext.userId,
+        };
+      }
+      throw new Error("Project ID not found. Make sure .quikim/project.json exists (or set QUIKIM_PROJECT_DIR to your project root).");
     }
 
     return {

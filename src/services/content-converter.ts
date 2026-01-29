@@ -31,7 +31,7 @@ export class ContentConverter {
     // Configure marked for Markdown → HTML conversion
     marked.setOptions({
       gfm: true, // GitHub Flavored Markdown
-      breaks: false,
+      breaks: true, // Single newlines become <br> (GFM-style)
       pedantic: false,
     });
   }
@@ -73,11 +73,12 @@ export class ContentConverter {
     }
 
     try {
-      // Check if content is actually Markdown
-      if (!this.isMarkdownContent(markdown)) {
+      // Skip conversion if content is already HTML
+      if (this.isHtmlContent(markdown)) {
         return markdown;
       }
 
+      // Parse as markdown (plain text with newlines becomes <br> when breaks: true)
       const html = await marked.parse(markdown);
       return html;
     } catch (error) {

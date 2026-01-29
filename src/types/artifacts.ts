@@ -15,7 +15,23 @@ export type ArtifactType =
   | "hld"
   | "wireframe_files"
   | "flow_diagram"
+  | "er_diagram"
   | "tasks";
+
+/** Versioned artifact types: one file per root (filename uses root_id) */
+export const VERSIONED_ARTIFACT_TYPES: readonly ArtifactType[] = [
+  "requirement",
+  "hld",
+  "lld",
+  "flow_diagram",
+  "er_diagram",
+] as const;
+
+export type VersionedArtifactType = (typeof VERSIONED_ARTIFACT_TYPES)[number];
+
+export function isVersionedArtifactType(t: ArtifactType): t is VersionedArtifactType {
+  return (VERSIONED_ARTIFACT_TYPES as readonly string[]).includes(t);
+}
 
 export type SyncOperation = "push" | "pull" | "sync";
 
@@ -40,6 +56,8 @@ export interface LocalArtifact extends ArtifactMetadata {
 
 export interface ServerArtifact extends ArtifactMetadata {
   artifactId: string;
+  /** For versioned artifacts, rootId is the chain id (used in filename) */
+  rootId?: string;
   version: number;
   createdAt: Date;
   updatedAt: Date;

@@ -17,12 +17,14 @@ export interface RetryOptions {
   backoffMultiplier?: number;
   retryableErrors?: string[];
   verbose?: boolean;
+  /** When set, called for verbose log lines instead of writing to console */
+  onLog?: (message: string) => void;
 }
 
 /**
- * Default retry options
+ * Default retry options (onLog is optional)
  */
-const DEFAULT_RETRY_OPTIONS: Required<RetryOptions> = {
+const DEFAULT_RETRY_OPTIONS: Omit<Required<RetryOptions>, "onLog"> & { onLog?: (message: string) => void } = {
   maxAttempts: 3,
   initialDelayMs: 1000,
   maxDelayMs: 10000,
@@ -87,25 +89,25 @@ export async function retryWithBackoff<T>(
       
       // Check if error is retryable
       if (!isRetryableError(error, opts.retryableErrors)) {
-        if (opts.verbose) {
-          console.log(`[retry] Error is not retryable, failing immediately`);
+        if (opts.verbose && opts.onLog) {
+          opts.onLog("[retry] Error is not retryable, failing immediately");
         }
         throw error;
       }
 
       // Don't retry if this was the last attempt
       if (attempt === opts.maxAttempts) {
-        if (opts.verbose) {
-          console.log(`[retry] Max attempts (${opts.maxAttempts}) reached, failing`);
+        if (opts.verbose && opts.onLog) {
+          opts.onLog(`[retry] Max attempts (${opts.maxAttempts}) reached, failing`);
         }
         break;
       }
 
       // Log retry attempt
       const errorMsg = error instanceof Error ? error.message : String(error);
-      if (opts.verbose) {
-        console.log(`[retry] Attempt ${attempt}/${opts.maxAttempts} failed: ${errorMsg}`);
-        console.log(`[retry] Retrying in ${delay}ms...`);
+      if (opts.verbose && opts.onLog) {
+        opts.onLog(`[retry] Attempt ${attempt}/${opts.maxAttempts} failed: ${errorMsg}`);
+        opts.onLog(`[retry] Retrying in ${delay}ms...`);
       }
 
       // Wait before retrying

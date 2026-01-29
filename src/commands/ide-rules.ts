@@ -9,17 +9,18 @@
 
 import { Command } from "commander";
 import { installIDERules, checkIDERules, listSupportedIDEs } from "../utils/ide-rules.js";
+import { getQuikimProjectRoot } from "../config/project-root.js";
 
 /** Install IDE rules command handler */
 async function installRulesHandler(options: { all?: boolean; force?: boolean }): Promise<void> {
-  const cwd = process.cwd();
-  await installIDERules(cwd, { all: options.all, force: options.force });
+  const projectRoot = getQuikimProjectRoot();
+  await installIDERules(projectRoot, { all: options.all, force: options.force });
 }
 
 /** Check IDE rules command handler */
 async function checkRulesHandler(): Promise<void> {
-  const cwd = process.cwd();
-  await checkIDERules(cwd);
+  const projectRoot = getQuikimProjectRoot();
+  await checkIDERules(projectRoot);
 }
 
 /** List supported IDEs command handler */

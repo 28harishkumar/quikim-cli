@@ -10,6 +10,7 @@
 import { promises as fs } from "fs";
 import { join } from "path";
 import YAML from "yaml";
+import { getQuikimProjectRoot } from "../config/project-root.js";
 
 /**
  * Task status types
@@ -108,7 +109,7 @@ export class TaskFileManager {
   private artifactsRoot: string;
 
   constructor(artifactsRoot?: string) {
-    this.artifactsRoot = artifactsRoot || join(process.cwd(), ".quikim", "artifacts");
+    this.artifactsRoot = artifactsRoot || join(getQuikimProjectRoot(), ".quikim", "artifacts");
   }
 
   /**

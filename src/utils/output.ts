@@ -10,41 +10,43 @@
 import chalk from "chalk";
 import ora, { type Ora } from "ora";
 
+import { cliLogger } from "./logger.js";
+
 /** Output success message */
 export function success(message: string): void {
-  console.log(chalk.green("✓"), message);
+  cliLogger.info(`${chalk.green("✓")} ${message}`);
 }
 
 /** Output error message */
 export function error(message: string): void {
-  console.error(chalk.red("✗"), message);
+  cliLogger.error(`${chalk.red("✗")} ${message}`);
 }
 
 /** Output warning message */
 export function warning(message: string): void {
-  console.log(chalk.yellow("⚠"), message);
+  cliLogger.warn(`${chalk.yellow("⚠")} ${message}`);
 }
 
 /** Output info message */
 export function info(message: string): void {
-  console.log(chalk.blue("ℹ"), message);
+  cliLogger.info(`${chalk.blue("ℹ")} ${message}`);
 }
 
 /** Output a table row */
 export function tableRow(label: string, value: string): void {
-  console.log(`  ${chalk.gray(label + ":")} ${value}`);
+  cliLogger.info(`  ${chalk.gray(label + ":")} ${value}`);
 }
 
 /** Output a header */
 export function header(message: string): void {
-  console.log();
-  console.log(chalk.bold.cyan(message));
-  console.log(chalk.gray("─".repeat(message.length)));
+  cliLogger.info("");
+  cliLogger.info(chalk.bold.cyan(message));
+  cliLogger.info(chalk.gray("─".repeat(message.length)));
 }
 
 /** Output a separator line */
 export function separator(): void {
-  console.log();
+  cliLogger.info("");
 }
 
 /** Create a spinner */
@@ -84,5 +86,5 @@ export function formatStatus(status: string): string {
 
 /** Print JSON formatted output */
 export function json(data: unknown): void {
-  console.log(JSON.stringify(data, null, 2));
+  cliLogger.info(JSON.stringify(data, null, 2));
 }

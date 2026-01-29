@@ -201,8 +201,9 @@ export class Logger {
       this.logs = this.logs.slice(-this.maxLogs);
     }
     
-    // Output to console in development
-    if (process.env.NODE_ENV !== 'production') {
+    // Skip console output when using stdio MCP (e.g. Claude Desktop) to avoid corrupting protocol
+    const silent = process.env.QUIKIM_MCP_SILENT === "1" || process.env.QUIKIM_MCP_SILENT === "true";
+    if (!silent && process.env.NODE_ENV !== "production") {
       this.outputToConsole(entry);
     }
   }

@@ -35,6 +35,23 @@ export function stripHtmlTags(html: string): string {
 }
 
 /**
+ * Strips one layer of leading/trailing double-quotes if content looks double-encoded.
+ * E.g. "\"<p>...</p>\"" becomes "<p>...</p>". Used when server or storage wraps content in extra quotes.
+ * @param content - The content that may be wrapped in quotes
+ * @returns Content with outer quotes removed if present
+ */
+export function stripWrappedQuotes(content: string): string {
+  if (!content || typeof content !== "string") {
+    return "";
+  }
+  const trimmed = content.trim();
+  if (trimmed.length >= 2 && trimmed.startsWith("\"") && trimmed.endsWith("\"")) {
+    return trimmed.slice(1, -1);
+  }
+  return content;
+}
+
+/**
  * Collapses multiple whitespace characters into single spaces
  * @param text - The text to collapse whitespace in
  * @returns Text with collapsed whitespace

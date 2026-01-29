@@ -28,6 +28,7 @@ export type ArtifactType =
   | "code_guideline" 
   | "wireframe_files" 
   | "flow_diagram" 
+  | "er_diagram" 
   | "tasks";
 
 /**
@@ -118,7 +119,7 @@ export function prepareContentForPush(
       return content;
 
     case "flow_diagram":
-      // Flow diagrams expect content as string
+    case "er_diagram":
       return content;
 
     case "tasks":

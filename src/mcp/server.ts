@@ -24,6 +24,7 @@ import {
 } from './prompts/capabilities.js';
 import { mkdirSync, appendFileSync } from 'fs';
 import { join, dirname } from 'path';
+import { getQuikimProjectRoot } from '../config/project-root.js';
 
 import { SessionManager, sessionManager } from './session/manager.js';
 // Lazy import to avoid circular dependency: server.ts -> workflow-tools.ts -> integration/index.ts -> server.ts
@@ -352,7 +353,7 @@ export class MCPCursorProtocolServer {
 
       // DEBUG: Write to workspace file
       try {
-        const logPath = join(process.cwd(), '.quikim', 'mcp-debug.log');
+        const logPath = join(getQuikimProjectRoot(), '.quikim', 'mcp-debug.log');
         mkdirSync(dirname(logPath), { recursive: true });
         appendFileSync(logPath, `\n=== ${new Date().toISOString()} ===\n`);
         appendFileSync(logPath, `Tool: ${name}\n`);
@@ -397,19 +398,19 @@ export class MCPCursorProtocolServer {
       };
 
       const userPrompt = args.user_prompt as string;
-      const data = args.data as any; // Extract data field for direct execution
+      const data = args.data as Record<string, unknown> | undefined;
 
-      // Log what we're extracting
+      // Debug logging (suppressed when QUIKIM_MCP_SILENT=1 to avoid corrupting stdio)
       if (data) {
-        console.log('[MCP Server] Data field detected:', {
+        logger.debug("[MCP Server] Data field detected", {
           hasEndpoint: !!data.endpoint,
           hasMethod: !!data.method,
           endpoint: data.endpoint,
           method: data.method,
-          dataKeys: Object.keys(data)
+          dataKeys: Object.keys(data),
         });
       } else {
-        console.log('[MCP Server] No data field in args');
+        logger.debug("[MCP Server] No data field in args");
       }
 
       // Resolve project context from codebase
@@ -418,13 +419,13 @@ export class MCPCursorProtocolServer {
       );
       const projectContext: ProjectContext = {
         ...resolvedContext,
-        ...((args.project_context as any) || {}),
+        ...((args.project_context as Record<string, unknown>) || {}),
       };
 
-      console.log('[MCP Server] Calling handler:', {
+      logger.debug("[MCP Server] Calling handler", {
         toolName: name,
         hasData: !!data,
-        projectId: projectContext.projectId
+        projectId: projectContext.projectId,
       });
 
       // Route to appropriate handler

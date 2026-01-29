@@ -150,10 +150,11 @@ export class WireframeHandler extends BaseHandler {
               elements: [],
             };
 
-            // Save to local .quikim directory
+            // Save to local .quikim directory (respects QUIKIM_PROJECT_DIR)
             const fs = await import("fs/promises");
             const path = await import("path");
-            const quikimDir = path.join(process.cwd(), ".quikim");
+            const { getQuikimProjectRoot } = await import("../../config/project-root.js");
+            const quikimDir = path.join(getQuikimProjectRoot(), ".quikim");
             const wireframesDir = path.join(quikimDir, "wireframes");
             
             await fs.mkdir(wireframesDir, { recursive: true });

@@ -15,11 +15,13 @@ import {
   ArtifactMetadata,
   LocalArtifact,
   ArtifactType,
+  isVersionedArtifactType,
 } from "../types/artifacts.js";
+import { getQuikimProjectRoot } from "../config/project-root.js";
 
-/** Walk up from cwd to find a directory containing .quikim/artifacts */
+/** Walk up from project root to find a directory containing .quikim/artifacts */
 function resolveArtifactsRoot(): string {
-  let dir = process.cwd();
+  let dir = getQuikimProjectRoot();
   while (true) {
     const candidate = join(dir, ".quikim", "artifacts");
     if (existsSync(candidate)) {
@@ -29,7 +31,7 @@ function resolveArtifactsRoot(): string {
     if (parent === dir) break;
     dir = parent;
   }
-  return join(process.cwd(), ".quikim", "artifacts");
+  return join(getQuikimProjectRoot(), ".quikim", "artifacts");
 }
 
 export class ArtifactFileManager {
@@ -133,14 +135,11 @@ export class ArtifactFileManager {
 
   /**
    * Write artifact file to local filesystem with atomic write and backup
-   * Uses artifactId if available, otherwise uses artifactName
+   * Versioned types (requirement, hld, lld, flow_diagram): use rootId for filename.
+   * Non-versioned: use artifactId or artifactName.
    */
-  async writeArtifactFile(artifact: ArtifactMetadata & { artifactId?: string }): Promise<void> {
-    // Use artifactId for filename if available, otherwise use artifactName
-    const fileName = artifact.artifactId 
-      ? `${artifact.artifactType}_${artifact.artifactId}.md`
-      : `${artifact.artifactType}_${artifact.artifactName}.md`;
-    
+  async writeArtifactFile(artifact: ArtifactMetadata & { artifactId?: string; rootId?: string }): Promise<void> {
+    const fileName = this.getArtifactFileName(artifact);
     const filePath = join(this.artifactsDir, artifact.specName, fileName);
     const dirPath = join(this.artifactsDir, artifact.specName);
 
@@ -194,47 +193,67 @@ export class ArtifactFileManager {
 
   /**
    * Parse artifact filename: <type>_<name_or_id>.md
-   * Supports both name-based and ID-based filenames
+   * Matches known types from the start (longest first) so "code_guideline_id.md" parses correctly.
    */
   private parseArtifactFilename(
     filename: string
   ): { type: ArtifactType; name: string } | null {
-    const match = filename.match(/^(.+?)_(.+)\.md$/);
-    if (!match) return null;
+    if (!filename.endsWith(".md")) return null;
 
-    const [, typeStr, nameOrId] = match;
+    const base = filename.slice(0, -3);
     const validTypes: ArtifactType[] = [
+      "wireframe_files",
+      "code_guideline",
+      "flow_diagram",
+      "er_diagram",
       "requirement",
       "context",
-      "code_guideline",
       "lld",
       "hld",
-      "wireframe_files",
-      "flow_diagram",
       "tasks",
     ];
 
-    // "flow" is alias for flow_diagram (e.g. flow_<uuid>.md)
-    const type = (typeStr === "flow" ? "flow_diagram" : typeStr) as ArtifactType;
-    if (!validTypes.includes(type)) {
-      return null;
+    for (const t of validTypes) {
+      const prefix = t + "_";
+      if (base.startsWith(prefix) && base.length > prefix.length) {
+        return { type: t, name: base.slice(prefix.length) };
+      }
     }
 
-    return {
-      type,
-      name: nameOrId,
-    };
+    if (base.startsWith("flow_") && base.length > 5) {
+      return { type: "flow_diagram", name: base.slice(5) };
+    }
+
+    return null;
   }
 
   /**
-   * Get artifact file path
+   * Get filename for artifact: versioned types use root_id, others use artifact_id/name
    */
-  private getArtifactFilePath(artifact: ArtifactMetadata): string {
-    return join(
-      this.artifactsDir,
-      artifact.specName,
-      `${artifact.artifactType}_${artifact.artifactName}.md`
-    );
+  getArtifactFileName(artifact: ArtifactMetadata & { artifactId?: string; rootId?: string }): string {
+    if (artifact.artifactType === "tasks") {
+      return artifact.artifactId
+        ? `tasks_${artifact.artifactId}.md`
+        : `tasks_${artifact.artifactName}.md`;
+    }
+    if (isVersionedArtifactType(artifact.artifactType) && artifact.rootId) {
+      return `${artifact.artifactType}_${artifact.rootId}.md`;
+    }
+    if (artifact.artifactId) {
+      return `${artifact.artifactType}_${artifact.artifactId}.md`;
+    }
+    return `${artifact.artifactType}_${artifact.artifactName}.md`;
+  }
+
+  /**
+   * Get artifact file path (uses rootId for versioned types when present)
+   */
+  private getArtifactFilePath(artifact: ArtifactMetadata & { rootId?: string }): string {
+    const name =
+      isVersionedArtifactType(artifact.artifactType) && (artifact as { rootId?: string }).rootId
+        ? (artifact as { rootId: string }).rootId
+        : artifact.artifactName;
+    return join(this.artifactsDir, artifact.specName, `${artifact.artifactType}_${name}.md`);
   }
 
   /**
@@ -288,21 +307,21 @@ export class ArtifactFileManager {
   }
 
   /**
-   * Generate filename following naming conventions
+   * Generate filename: versioned types use root_id, rest use artifact_id
    * @param artifactType - Type of artifact
-   * @param artifactId - Artifact ID (or name if ID not available)
-   * @returns Filename in format: <artifact_type>_<artifact_id>.md
+   * @param id - rootId for versioned types, artifactId/name for others
+   * @param options - useRootId: true for versioned artifact filename
    */
-  generateFilename(artifactType: ArtifactType, artifactId: string): string {
-    // Validate inputs
-    if (!artifactType || !artifactId) {
-      throw new Error("artifactType and artifactId are required");
+  generateFilename(
+    artifactType: ArtifactType,
+    id: string,
+    _options?: { useRootId?: boolean }
+  ): string {
+    if (!artifactType || !id) {
+      throw new Error("artifactType and id are required");
     }
-
-    // Sanitize artifactId to prevent path traversal
-    const sanitizedId = artifactId.replace(/[^a-zA-Z0-9_-]/g, "_");
-
-    return `${artifactType}_${sanitizedId}.md`;
+    const sanitized = id.replace(/[^a-zA-Z0-9_-]/g, "_");
+    return `${artifactType}_${sanitized}.md`;
   }
 
   /**
@@ -329,10 +348,10 @@ export class ArtifactFileManager {
       "hld",
       "wireframe_files",
       "flow_diagram",
+      "er_diagram",
       "tasks",
     ];
 
-    // "flow" is alias for flow_diagram
     const type = (typeStr === "flow" ? "flow_diagram" : typeStr) as ArtifactType;
     if (!validTypes.includes(type)) {
       return null;
