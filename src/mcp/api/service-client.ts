@@ -395,7 +395,8 @@ export class ServiceAwareAPIClient {
   }
 
   /**
-   * Create/update wireframe. Uses organizations path when organizationId provided.
+   * Create wireframe. Server expects WireframeUpdateSchema: name (1-100), viewport (width 320-7680, height 240-4320), elements (array).
+   * For org projects we always send this shape; content is ignored (wireframes are canvas JSON, not markdown).
    */
   async syncWireframe(
     projectId: string,
@@ -406,14 +407,34 @@ export class ServiceAwareAPIClient {
     const path = organizationId
       ? `/api/v1/organizations/${organizationId}/projects/${projectId}/wireframes`
       : `/api/v1/projects/${projectId}/wireframes`;
-    const body = organizationId
-      ? {
-          name: metadata?.name || 'Wireframe from MCP',
-          viewport: { width: 1280, height: 720, scale: 1 },
-          elements: [],
+    const defaultName = (metadata?.name as string) || 'Wireframe from MCP';
+    const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
+    let name = defaultName.slice(0, 100) || 'Wireframe from MCP';
+    let viewport = { width: 1280, height: 720, scale: 1 as number };
+    let elements: unknown[] = [];
+    if (organizationId && content.trim()) {
+      try {
+        const parsed = JSON.parse(content) as Record<string, unknown>;
+        if (typeof parsed.name === 'string' && parsed.name.length >= 1) {
+          name = parsed.name.slice(0, 100);
         }
+        if (parsed.viewport && typeof parsed.viewport === 'object') {
+          const v = parsed.viewport as Record<string, unknown>;
+          const w = typeof v.width === 'number' ? clamp(v.width, 320, 7680) : 1280;
+          const h = typeof v.height === 'number' ? clamp(v.height, 240, 4320) : 720;
+          viewport = { width: w, height: h, scale: typeof v.scale === 'number' ? v.scale : 1 };
+        }
+        if (Array.isArray(parsed.elements)) {
+          elements = parsed.elements;
+        }
+      } catch {
+        // Use defaults when content is not valid JSON
+      }
+    }
+    const body = organizationId
+      ? { name, viewport, elements }
       : {
-          name: metadata?.name || 'Wireframe from MCP',
+          name,
           content,
           componentType: metadata?.componentType || 'website',
         };

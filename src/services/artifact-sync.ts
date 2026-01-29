@@ -140,7 +140,7 @@ export class ArtifactSyncService {
               await this.pushTasksWithTaskFileManager(project.projectId, artifact);
             }
           } else {
-            output.error(`[push] ${artifact.artifactType} ${artifact.filePath}`);
+            output.info(`[push] ${artifact.artifactType} ${artifact.filePath}`);
             const pushResult = await this.pushSingleArtifact(projectContext, artifact, options);
             if (pushResult) {
               const { artifactId, rootId } = pushResult;
@@ -392,7 +392,7 @@ export class ArtifactSyncService {
                 contentToWrite = htmlToMarkdown(artifact.content);
                 
                 if (contentToWrite && contentToWrite !== artifact.content) {
-                  output.error(`[pull] Converted HTML to Markdown for ${this.getArtifactPath(artifact)}`);
+                  output.info(`[pull] Converted HTML to Markdown for ${this.getArtifactPath(artifact)}`);
                   
                   if (options.verbose) {
                     output.info(`[VERBOSE] HTML → Markdown conversion successful`);
@@ -407,7 +407,7 @@ export class ArtifactSyncService {
                   }
                 }
               } else {
-                output.error(`[pull] Content already in Markdown/plain text format for ${this.getArtifactPath(artifact)}`);
+                output.info(`[pull] Content already in Markdown/plain text format for ${this.getArtifactPath(artifact)}`);
                 
                 if (options.verbose) {
                   output.info(`[VERBOSE] Skipping conversion - content already in Markdown/plain text format`);
@@ -668,7 +668,7 @@ export class ArtifactSyncService {
         contentToPush = await markdownToHtml(artifact.content);
         
         if (contentToPush && contentToPush !== artifact.content) {
-          output.error(`[push] Converted Markdown to HTML for ${artifact.filePath}`);
+          output.info(`[push] Converted Markdown to HTML for ${artifact.filePath}`);
           
           if (options.verbose) {
             output.info(`[VERBOSE] Markdown → HTML conversion successful`);
@@ -678,7 +678,7 @@ export class ArtifactSyncService {
           }
         }
       } else {
-        output.error(`[push] Content already in HTML format for ${artifact.filePath}`);
+        output.info(`[push] Content already in HTML format for ${artifact.filePath}`);
         
         if (options.verbose) {
           output.info(`[VERBOSE] Skipping conversion - content already in HTML format`);
@@ -702,7 +702,7 @@ export class ArtifactSyncService {
     const normalizedContent = normalizeForComparison(contentToPush);
     const contentHash = this.calculateHash(contentToPush);
     
-    output.error(`[push] Content hash: ${contentHash.substring(0, 12)}... (normalized ${normalizedContent.length} chars) for ${artifact.filePath}`);
+    output.info(`[push] Content hash: ${contentHash.substring(0, 12)}... (normalized ${normalizedContent.length} chars) for ${artifact.filePath}`);
     
     if (options.verbose) {
       output.info(`[VERBOSE] Content normalization complete`);
@@ -783,7 +783,7 @@ export class ArtifactSyncService {
           // Continue with push logic below, but use the duplicate's ID
         }
       } else {
-        output.error(`[push] No duplicate found, creating new artifact for ${artifact.filePath}`);
+        output.info(`[push] No duplicate found, creating new artifact for ${artifact.filePath}`);
         
         if (options.verbose) {
           output.info(`[VERBOSE] Duplicate detection result: No duplicate found`);
@@ -1575,7 +1575,7 @@ export class ArtifactSyncService {
       ...((options.headers as Record<string, string>) || {}),
     };
 
-    output.error(`[${method}] ${url}`);
+    output.info(`[${method}] ${url}`);
 
     // Wrap fetch in retry logic for network errors
     try {

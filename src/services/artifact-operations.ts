@@ -53,14 +53,30 @@ export async function getPushContentFromLocal(
   mcpType: MCPArtifactType,
   artifactName?: string
 ): Promise<string | null> {
+  const result = await getPushContentAndNameFromLocal(fileManager, specName, mcpType, artifactName);
+  return result?.content ?? null;
+}
+
+/**
+ * Get content and artifact name from local filesystem for push.
+ * Returns first matching artifact so MCP can write local-first then sync in background.
+ */
+export async function getPushContentAndNameFromLocal(
+  fileManager: ArtifactFileManager,
+  specName: string,
+  mcpType: MCPArtifactType,
+  artifactName?: string
+): Promise<{ content: string; artifactName: string } | null> {
   const cliType = mcpToCLIArtifactType(mcpType);
   if (artifactName) {
-    return fileManager.readArtifactFile(specName, cliType, artifactName);
+    const content = await fileManager.readArtifactFile(specName, cliType, artifactName);
+    return content != null ? { content, artifactName } : null;
   }
   const filters: ArtifactFilters = { specName, artifactType: cliType };
   const local = await fileManager.scanLocalArtifacts(filters);
   if (local.length === 0) return null;
-  return local[0].content;
+  const first = local[0];
+  return { content: first.content, artifactName: first.artifactName };
 }
 
 /**

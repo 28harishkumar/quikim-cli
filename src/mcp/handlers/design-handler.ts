@@ -17,14 +17,16 @@ export class DesignHandler extends BaseHandler {
   async handlePushHLD(
     codebase: CodebaseContext,
     userPrompt: string,
-    projectContext: ProjectContext
+    projectContext: ProjectContext,
+    data?: unknown
   ): Promise<HandlerResponse> {
     return this.handlePushOperation(
-      "push_hld",
+      "generate_hld",
       "hld",
       codebase,
       userPrompt,
-      projectContext
+      projectContext,
+      data
     );
   }
 
@@ -49,14 +51,16 @@ export class DesignHandler extends BaseHandler {
   async handlePushLLD(
     codebase: CodebaseContext,
     userPrompt: string,
-    projectContext: ProjectContext
+    projectContext: ProjectContext,
+    data?: unknown
   ): Promise<HandlerResponse> {
     return this.handlePushOperation(
-      "push_lld",
+      "generate_lld",
       "lld",
       codebase,
       userPrompt,
-      projectContext
+      projectContext,
+      data
     );
   }
 

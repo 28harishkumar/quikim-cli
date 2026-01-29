@@ -17,14 +17,16 @@ export class DiagramHandler extends BaseHandler {
   async handlePushERDiagram(
     codebase: CodebaseContext,
     userPrompt: string,
-    projectContext: ProjectContext
+    projectContext: ProjectContext,
+    data?: unknown
   ): Promise<HandlerResponse> {
     return this.handlePushOperation(
       "er_diagram_push",
       "er_diagram",
       codebase,
       userPrompt,
-      projectContext
+      projectContext,
+      data
     );
   }
 
@@ -49,14 +51,16 @@ export class DiagramHandler extends BaseHandler {
   async handlePushMermaid(
     codebase: CodebaseContext,
     userPrompt: string,
-    projectContext: ProjectContext
+    projectContext: ProjectContext,
+    data?: unknown
   ): Promise<HandlerResponse> {
     return this.handlePushOperation(
-      "push_mermaid",
+      "generate_mermaid",
       "mermaid",
       codebase,
       userPrompt,
-      projectContext
+      projectContext,
+      data
     );
   }
 

@@ -117,6 +117,44 @@ export class ContentExtractor {
     return null;
   }
 
+  /**
+   * Extract file content and artifact name from first matching file.
+   * Used for local-first push: save with this name, then sync to server in background.
+   * @param codebase - Codebase context with files
+   * @param artifactType - Artifact type (requirements, hld, etc.)
+   * @returns { content, artifactName } or null if no matching file
+   */
+  static extractFileContentAndName(
+    codebase: CodebaseContext,
+    artifactType: ArtifactType
+  ): { content: string; artifactName: string } | null {
+    const pathPattern = this.getPathPattern(artifactType);
+    const file = codebase.files.find(f => pathPattern.test(f.path));
+    if (!file || !("content" in file)) return null;
+    const content = this.extractStringContent(file as FileContent);
+    const fileName = file.path.split("/").pop() ?? "";
+    const base = fileName.replace(/\.md$/, "");
+    const prefix = this.getFilePrefixForType(artifactType);
+    const artifactName = base.startsWith(prefix) ? base.slice(prefix.length) : base || "main";
+    return { content, artifactName };
+  }
+
+  /** File prefix per artifact type (e.g. requirement_ -> requirement_) */
+  private static getFilePrefixForType(artifactType: ArtifactType): string {
+    const filePrefixByType: Record<ArtifactType, string> = {
+      requirements: "requirement_",
+      hld: "hld_",
+      lld: "lld_",
+      tasks: "tasks_",
+      wireframes: "wireframe_files_",
+      er_diagram: "er_diagram_",
+      mermaid: "flow_diagram_",
+      context: "context_",
+      code_guideline: "code_guideline_",
+    };
+    return filePrefixByType[artifactType] ?? "";
+  }
+
   /** Expected file prefix per tool type (mermaid -> flow_diagram, wireframes -> wireframe_files) */
   static getExpectedPathHint(artifactType: ArtifactType): string {
     const filePrefixByType: Record<ArtifactType, string> = {

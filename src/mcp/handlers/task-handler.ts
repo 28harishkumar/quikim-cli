@@ -16,14 +16,16 @@ export class TaskHandler extends BaseHandler {
   async handlePush(
     codebase: CodebaseContext,
     userPrompt: string,
-    projectContext: ProjectContext
+    projectContext: ProjectContext,
+    data?: unknown
   ): Promise<HandlerResponse> {
     return this.handlePushOperation(
-      "push_tasks",
+      "generate_tasks",
       "tasks",
       codebase,
       userPrompt,
-      projectContext
+      projectContext,
+      data
     );
   }
 

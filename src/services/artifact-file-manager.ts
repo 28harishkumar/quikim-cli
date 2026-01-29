@@ -178,17 +178,40 @@ export class ArtifactFileManager {
     artifactType: ArtifactType,
     artifactName: string
   ): Promise<string | null> {
-    const filePath = join(
-      this.artifactsDir,
-      specName,
-      `${artifactType}_${artifactName}.md`
-    );
-
+    const filePath = this.getArtifactFilePathForName(specName, artifactType, artifactName);
     try {
       return await fs.readFile(filePath, "utf-8");
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Delete artifact file by spec, type, and name. No-op if file does not exist.
+   * Used when renaming to server ID (remove old filename).
+   */
+  async deleteArtifactFile(
+    specName: string,
+    artifactType: ArtifactType,
+    artifactName: string
+  ): Promise<void> {
+    const filePath = this.getArtifactFilePathForName(specName, artifactType, artifactName);
+    this.validateFilePath(filePath);
+    try {
+      await fs.unlink(filePath);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw err;
+      }
+    }
+  }
+
+  private getArtifactFilePathForName(
+    specName: string,
+    artifactType: ArtifactType,
+    artifactName: string
+  ): string {
+    return join(this.artifactsDir, specName, `${artifactType}_${artifactName}.md`);
   }
 
   /**

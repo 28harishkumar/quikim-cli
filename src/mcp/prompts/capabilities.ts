@@ -39,10 +39,10 @@ export const QUIKIM_CAPABILITIES: QuikimCapability[] = [
     outputs: [".quikim/artifacts/<spec>/requirement_<id>.md"],
   },
   {
-    name: "Push Requirements",
+    name: "Generate Requirements",
     description: "Sync local requirements to the Quikim platform",
     category: "requirements",
-    toolName: "push_requirements",
+    toolName: "generate_requirements",
     usage: "Use after creating or updating requirements locally",
     examples: ["Save requirements to server", "Sync my requirements"],
     prerequisites: ["requirement_<id>.md must exist under .quikim/artifacts/<spec>/"],
@@ -64,10 +64,10 @@ export const QUIKIM_CAPABILITIES: QuikimCapability[] = [
     outputs: [".quikim/artifacts/<spec>/hld_<id>.md"],
   },
   {
-    name: "Push HLD",
+    name: "Generate HLD",
     description: "Sync local HLD to the Quikim platform",
     category: "design",
-    toolName: "push_hld",
+    toolName: "generate_hld",
     usage: "Use after creating or updating HLD locally",
     examples: ["Save HLD to server"],
     prerequisites: ["hld_<id>.md must exist under .quikim/artifacts/<spec>/"],
@@ -90,10 +90,10 @@ export const QUIKIM_CAPABILITIES: QuikimCapability[] = [
     outputs: [".quikim/artifacts/<spec>/lld_<id>.md"],
   },
   {
-    name: "Push LLD",
+    name: "Generate LLD",
     description: "Sync local LLD files to the Quikim platform",
     category: "design",
-    toolName: "push_lld",
+    toolName: "generate_lld",
     usage: "Use after creating or updating LLD locally",
     examples: ["Save LLD to server", "Push auth service LLD"],
     prerequisites: ["lld_<id>.md files must exist under .quikim/artifacts/<spec>/"],
@@ -111,13 +111,13 @@ export const QUIKIM_CAPABILITIES: QuikimCapability[] = [
     outputs: [".quikim/artifacts/<spec>/wireframe_files_<id>.md"],
   },
   {
-    name: "Push Wireframes",
-    description: "Push wireframes to server. File MUST be wireframe_files_<id>.md (not wireframe_).",
+    name: "Generate Wireframes",
+    description: "Create wireframe on server. Server expects canvas JSON (name, viewport, elements) or creates empty. Path: wireframe_files_<id>.md.",
     category: "design",
-    toolName: "push_wireframes",
-    usage: "Path: .quikim/artifacts/<spec>/wireframe_files_<id>.md",
-    examples: ["Save wireframes to Penpot"],
-    prerequisites: ["wireframe_files_<id>.md under .quikim/artifacts/<spec>/"],
+    toolName: "generate_wireframes",
+    usage: "Path: .quikim/artifacts/<spec>/wireframe_files_<id>.md. Optional: pass name. Content: JSON { name, viewport, elements } or leave empty.",
+    examples: ["Save wireframes to server"],
+    prerequisites: ["wireframe_files_<id>.md under .quikim/artifacts/<spec>/ (content optional)"],
   },
 
   // Design - ER Diagram
@@ -133,12 +133,12 @@ export const QUIKIM_CAPABILITIES: QuikimCapability[] = [
   },
   {
     name: "Push ER Diagram",
-    description: "Sync ER diagram to server",
+    description: "Push ER diagram to server. Content must be RAW mermaid erDiagram syntax only (no ```mermaid wrapper, no JSON).",
     category: "design",
     toolName: "er_diagram_push",
-    usage: "Use after creating ER diagram locally",
+    usage: "Path: .quikim/artifacts/<spec>/er_diagram_<id>.md. Put only raw mermaid diagram code in content.",
     examples: ["Save ER diagram to server"],
-    prerequisites: ["er_diagram_<id>.md must exist under .quikim/artifacts/<spec>/"],
+    prerequisites: ["er_diagram_<id>.md under .quikim/artifacts/<spec>/"],
   },
 
   // Design - Flow/Mermaid (artifact type is flow_diagram, not mermaid)
@@ -152,11 +152,11 @@ export const QUIKIM_CAPABILITIES: QuikimCapability[] = [
     outputs: [".quikim/artifacts/<spec>/flow_diagram_<id>.md"],
   },
   {
-    name: "Push Mermaid",
-    description: "Push flow/mermaid diagrams to server. File MUST be flow_diagram_<id>.md (not mermaid_).",
+    name: "Generate Mermaid",
+    description: "Push mermaid/flow diagram to server. Content must be RAW mermaid syntax only (no ```mermaid wrapper, no JSON).",
     category: "design",
-    toolName: "push_mermaid",
-    usage: "Use after creating diagrams locally. Path: .quikim/artifacts/<spec>/flow_diagram_<id>.md",
+    toolName: "generate_mermaid",
+    usage: "Path: .quikim/artifacts/<spec>/flow_diagram_<id>.md. Put only raw diagram code (flowchart, sequenceDiagram, etc.) in content.",
     examples: ["Save diagrams to server"],
     prerequisites: ["flow_diagram_<id>.md under .quikim/artifacts/<spec>/"],
   },
@@ -173,13 +173,13 @@ export const QUIKIM_CAPABILITIES: QuikimCapability[] = [
     outputs: [".quikim/artifacts/<spec>/tasks_<id>.md"],
   },
   {
-    name: "Push Tasks",
-    description: "Sync tasks to server (and optionally to Jira/Linear)",
+    name: "Generate Tasks",
+    description: "Sync tasks to server. Task file format: YAML frontmatter (--- id, specName, status, ... ---) then # Title, ## Description, ## Subtasks (- [ ] or [x] text), ## Checklist, ## Comments, ## Attachments.",
     category: "tasks",
-    toolName: "push_tasks",
-    usage: "Use after creating or updating tasks locally",
+    toolName: "generate_tasks",
+    usage: "Path: .quikim/artifacts/<spec>/tasks_<id>.md. File must have valid YAML frontmatter and ## sections. Put only task content in file.",
     examples: ["Save tasks to server"],
-    prerequisites: ["tasks_<id>.md must exist under .quikim/artifacts/<spec>/"],
+    prerequisites: ["tasks_<id>.md under .quikim/artifacts/<spec>/ with correct format"],
   },
 
   // Code
@@ -200,10 +200,10 @@ export const QUIKIM_CAPABILITIES: QuikimCapability[] = [
 
   // Context
   {
-    name: "Push Context",
+    name: "Generate Context",
     description: "Push project context artifact to server",
     category: "sync",
-    toolName: "push_context",
+    toolName: "generate_context",
     usage: "File at .quikim/artifacts/<spec>/context_<id>.md",
     examples: ["Save context to server"],
     prerequisites: ["context_<id>.md under .quikim/artifacts/<spec>/"],
@@ -220,10 +220,10 @@ export const QUIKIM_CAPABILITIES: QuikimCapability[] = [
 
   // Code Guidelines
   {
-    name: "Push Code Guideline",
+    name: "Generate Code Guideline",
     description: "Push code guideline to server",
     category: "sync",
-    toolName: "push_code_guideline",
+    toolName: "generate_code_guideline",
     usage: "File at .quikim/artifacts/<spec>/code_guideline_<id>.md",
     examples: ["Save code guideline to server"],
     prerequisites: ["code_guideline_<id>.md under .quikim/artifacts/<spec>/"],
@@ -358,6 +358,28 @@ The Quikim MCP Server provides tools for managing project artifacts throughout t
 All artifacts are stored under \`.quikim/artifacts/<spec name>/<artifact file>\`. Artifact files are named \`<artifact_type>_<artifact_id>.md\` (or \`<artifact_type>_<root_id>.md\` for versioned types: requirement, hld, lld, er_diagram, flow_diagram, wireframe_files).
 
 To use a custom spec name (e.g. \`my-feature\`), pass \`project_context: { specName: "my-feature" }\` in tool calls; otherwise the spec is inferred from artifact file paths or defaults to \`"default"\`.
+
+## Push behavior (all generate_* tools)
+
+- **Local-first, non-blocking**: Content is saved to local files first (e.g. \`.quikim/artifacts/<spec>/<type>_<id>.md\`). Server sync runs in the background; the LLM gets an immediate success and can move on.
+- **Requirements and tasks**: Provide **markdown** in the content field (e.g. Kiro task format for tasks). We save that markdown locally and convert to HTML for server upload (same as CLI).
+
+## Content Types (what goes in the content field)
+
+- **Requirements**: Markdown. We save markdown locally and convert to HTML for server.
+- **Tasks**: Markdown (Kiro/task file format). We save markdown locally and convert to HTML for server.
+- **Mermaid / ER diagrams**: Raw mermaid syntax only (no \`\`\`mermaid wrapper, no JSON).
+- **Context, code_guideline, HLD, LLD**: Plain text or markdown in the content field.
+- **Wireframes**: Canvas JSON (\`name\`, \`viewport\`, \`elements\`) or empty; path \`wireframe_files_<id>.md\`.
+
+You can pass optional \`name\` and \`title\` in tool arguments for display names.
+
+## Task file format (generate_tasks)
+
+Task files \`.quikim/artifacts/<spec>/tasks_<id>.md\` must use:
+1. **YAML frontmatter** between \`---\` lines: \`id\`, \`specName\`, \`milestoneId\` (optional), \`status\`, \`priority\` (optional), \`assignee\`, \`dueDate\`, \`tags\`, \`createdAt\`, \`updatedAt\`
+2. **Body**: \`# Title\`, then \`## Description\`, \`## Subtasks\` (lines \`  - [ ] or [x] description\`), \`## Checklist\`, \`## Comments\`, \`## Attachments\`
+Put only the task content in the file; do not wrap in JSON.
 `;
 
   return content;
@@ -369,13 +391,13 @@ function generateDesignToolsContent(): string {
 
 ## High-Level Design (HLD)
 - Defines overall architecture, technology stack, and system structure
-- Tool: \`pull_hld\` / \`push_hld\`
+- Tool: \`pull_hld\` / \`generate_hld\`
 - File: \`.quikim/artifacts/<spec>/hld_<id>.md\`
 
 ## Low-Level Design (LLD)
 - Detailed specifications for individual components
 - Includes: interfaces, data models, method specifications, sequence diagrams
-- Tool: \`pull_lld\` / \`push_lld\`
+- Tool: \`pull_lld\` / \`generate_lld\`
 - Files: \`.quikim/artifacts/<spec>/lld_<id>.md\`
 - Component Types: service, module, feature, api, ui, database
 
@@ -386,7 +408,7 @@ function generateDesignToolsContent(): string {
 
 ## Wireframes
 - UI mockups and component layouts
-- Tool: \`pull_wireframe\` / \`push_wireframes\`
+- Tool: \`pull_wireframe\` / \`generate_wireframes\`
 - Integrates with Penpot for visual editing
 
 ## ER Diagrams
@@ -396,8 +418,11 @@ function generateDesignToolsContent(): string {
 
 ## Mermaid Diagrams
 - Various diagram types: flowchart, sequence, class, state, gantt
-- Tool: \`pull_mermaid\` / \`push_mermaid\`
-- Can be embedded in HLD or standalone files
+- Tool: \`pull_mermaid\` / \`generate_mermaid\`
+- **Content**: Put only raw mermaid syntax in the content field (no \`\`\`mermaid wrapper, no JSON). Server rejects invalid syntax.
+
+## ER Diagrams
+- **Content**: Put only raw mermaid \`erDiagram\` syntax in the content field (no code fences, no JSON).
 
 `;
 
@@ -516,7 +541,7 @@ sequenceDiagram
 \`\`\`
 
 ### Step 3: Push to Server
-Use \`push_lld\` to sync to Quikim platform.
+Use \`generate_lld\` to sync to Quikim platform.
 
 ## Component Types
 

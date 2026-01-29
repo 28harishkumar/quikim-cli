@@ -18,13 +18,16 @@ import { HandlerResponse, ArtifactType, ToolName } from "../types/handler-types.
 import { logger } from "../utils/logger.js";
 import { ArtifactFileManager } from "../../services/artifact-file-manager.js";
 import {
-  getPushContentFromLocal,
+  getPushContentAndNameFromLocal,
   ensureLocalArtifactAfterPush,
   readLocalArtifactsForPull,
   mcpToCLIArtifactType,
   type MCPArtifactType,
 } from "../../services/artifact-operations.js";
+import { isVersionedArtifactType } from "../../types/artifacts.js";
 import { extractFetchedArtifacts } from "../utils/fetch-result-parser.js";
+import { normalizeMermaidContent } from "../utils/content-normalizer.js";
+import { markdownToHtml, isHtmlContent } from "../../services/content-converter.js";
 
 export abstract class BaseHandler {
   protected apiService: APIService;
@@ -42,6 +45,68 @@ export abstract class BaseHandler {
   }
 
   /**
+   * Extract artifactId and rootId from sync API response.
+   * Backend returns { success, data: { id, rootId, ... } }; client may wrap again so result.data is one or two levels of .data.
+   */
+  private extractArtifactIdsFromResponse(responseData: unknown): {
+    artifactId: string | undefined;
+    rootId: string | undefined;
+  } {
+    const raw =
+      responseData != null && typeof responseData === "object"
+        ? (responseData as Record<string, unknown>)
+        : null;
+    if (!raw) return { artifactId: undefined, rootId: undefined };
+    // One level: result.data = { success, data: entity } (backend body)
+    const one = raw.data;
+    const oneEntity =
+      one != null &&
+      typeof one === "object" &&
+      ((one as Record<string, unknown>).id != null ||
+        (one as Record<string, unknown>).artifactId != null);
+    if (oneEntity) {
+      const entity = one as Record<string, unknown>;
+      return {
+        artifactId: (entity.id ?? entity.artifactId) as string | undefined,
+        rootId: (entity.rootId ?? entity.root_id) as string | undefined,
+      };
+    }
+    // Two levels: result.data = { success, data: { success, data: entity } } (client wrapped backend body)
+    const two = one != null && typeof one === "object" ? (one as Record<string, unknown>).data : undefined;
+    const twoEntity =
+      two != null &&
+      typeof two === "object" &&
+      ((two as Record<string, unknown>).id != null ||
+        (two as Record<string, unknown>).artifactId != null);
+    if (twoEntity) {
+      const entity = two as Record<string, unknown>;
+      return {
+        artifactId: (entity.id ?? entity.artifactId) as string | undefined,
+        rootId: (entity.rootId ?? entity.root_id) as string | undefined,
+      };
+    }
+    // Top level entity
+    const artifactId = (raw.id ?? raw.artifactId) as string | undefined;
+    const rootId = (raw.rootId ?? raw.root_id) as string | undefined;
+    return { artifactId, rootId };
+  }
+
+  /**
+   * Build metadata (name, title) from tool args for server sync
+   */
+  private buildPushMetadata(data?: unknown): Record<string, unknown> | undefined {
+    if (!data || typeof data !== "object") return undefined;
+    const d = data as Record<string, unknown>;
+    const name = d.name as string | undefined;
+    const title = d.title as string | undefined;
+    if (!name && !title) return undefined;
+    const out: Record<string, unknown> = {};
+    if (name) out.name = name;
+    if (title) out.title = title;
+    return Object.keys(out).length ? out : undefined;
+  }
+
+  /**
    * Generate unique request ID
    */
   protected generateRequestId(): string {
@@ -49,14 +114,16 @@ export abstract class BaseHandler {
   }
 
   /**
-   * Get content for push: codebase first, then local file. Creates local file if missing after push.
+   * Push: save to local first (markdown for tasks/requirements), then sync to server in background (non-blocking).
+   * Requirements and tasks: local = markdown (Kiro format); server = HTML (converted like CLI).
    */
   protected async handlePushOperation(
     toolName: ToolName,
     artifactType: ArtifactType,
     codebase: CodebaseContext,
     _userPrompt: string,
-    projectContext: ProjectContext
+    projectContext: ProjectContext,
+    data?: unknown
   ): Promise<HandlerResponse> {
     const requestId = this.generateRequestId();
 
@@ -69,57 +136,94 @@ export abstract class BaseHandler {
         "default";
       projectData.specName = specName;
 
-      let content: string | null = ContentExtractor.extractFileContent(
-        codebase,
-        ContentExtractor.getPathPattern(artifactType)
-      );
-      if (!content) {
-        content = await getPushContentFromLocal(
+      let content: string;
+      let artifactName: string;
+
+      const fromCodebase = ContentExtractor.extractFileContentAndName(codebase, artifactType);
+      if (fromCodebase) {
+        content = fromCodebase.content;
+        artifactName = fromCodebase.artifactName;
+      } else {
+        const fromLocal = await getPushContentAndNameFromLocal(
           this.fileManager,
           specName,
           artifactType as MCPArtifactType
         );
+        if (!fromLocal) {
+          const pathHint = ContentExtractor.getExpectedPathHint(artifactType);
+          throw new Error(
+            `No content. Add a file matching ${pathHint} to codebase or create it locally.`
+          );
+        }
+        content = fromLocal.content;
+        artifactName = fromLocal.artifactName;
       }
 
-      if (!content) {
-        const pathHint = ContentExtractor.getExpectedPathHint(artifactType);
-        throw new Error(
-          `No content. Add a file matching ${pathHint} to codebase or create it locally.`
-        );
+      if (artifactType === "mermaid" || artifactType === "er_diagram") {
+        content = normalizeMermaidContent(content);
       }
 
-      logger.info(`[${toolName}] Pushing ${artifactType}, length: ${content.length}`);
+      const contentToSave = content;
+      let contentForServer = content;
+      if (artifactType === "requirements" || artifactType === "tasks") {
+        if (!isHtmlContent(content)) {
+          try {
+            contentForServer = await markdownToHtml(content);
+          } catch (convErr) {
+            logger.logError(`[${toolName}] Markdown to HTML conversion failed; sending as-is`, convErr as Error);
+          }
+        }
+      }
 
-      const result = await this.apiService.syncArtifact(
-        artifactType,
-        content,
-        projectData
+      const cliType = mcpToCLIArtifactType(artifactType as MCPArtifactType);
+      const initialArtifactName = artifactName;
+      await ensureLocalArtifactAfterPush(
+        this.fileManager,
+        specName,
+        artifactType as MCPArtifactType,
+        artifactName,
+        contentToSave,
+        undefined
       );
+      const localPath = `.quikim/artifacts/${specName}/${cliType}_${artifactName}.md`;
+      logger.info(`[${toolName}] Saved locally at ${localPath}; syncing to server in background`);
 
-      const data = result.data as { id?: string; artifactId?: string; rootId?: string; data?: { id?: string; rootId?: string } } | undefined;
-      const artifactId = data?.id ?? data?.artifactId ?? data?.data?.id;
-      const rootId = data?.rootId ?? data?.data?.rootId;
-
-      if (result.success && artifactId) {
-        try {
-          await ensureLocalArtifactAfterPush(
+      const metadata = this.buildPushMetadata(data);
+      this.apiService
+        .syncArtifact(artifactType, contentForServer, projectData, metadata)
+        .then((result) => {
+          if (!result.success || !result.data) return;
+          const { artifactId, rootId } = this.extractArtifactIdsFromResponse(result.data);
+          if (!artifactId) return;
+          if (isVersionedArtifactType(cliType) && !rootId) return;
+          const nameForFile = isVersionedArtifactType(cliType) ? rootId : artifactId;
+          ensureLocalArtifactAfterPush(
             this.fileManager,
             specName,
             artifactType as MCPArtifactType,
             artifactId,
-            content,
-            rootId
-          );
-          logger.info(`[${toolName}] Ensured local file .quikim/artifacts/${specName}/${artifactType}_*.md`);
-        } catch (writeErr) {
-          logger.logError(`[${toolName}] Failed to write local file after push`, writeErr as Error);
-        }
-      }
+            contentToSave,
+            isVersionedArtifactType(cliType) ? rootId : undefined
+          ).then(() => {
+            if (nameForFile !== initialArtifactName) {
+              return this.fileManager
+                .deleteArtifactFile(specName, cliType, initialArtifactName)
+                .then(() => {
+                  logger.info(
+                    `[${toolName}] Renamed to convention: ${cliType}_${nameForFile}.md`
+                  );
+                });
+            }
+          });
+        })
+        .catch((err) => {
+          logger.logError(`[${toolName}] Background sync failed`, err as Error);
+        });
 
-      return ResponseFormatter.formatAPIResult(
+      return ResponseFormatter.formatSuccess(
         requestId,
-        result,
-        `${artifactType} sync`
+        "Saved locally. Syncing to server in background; filename will update to server ID when sync completes.",
+        { localPath, artifactType, artifactName }
       );
     } catch (error) {
       logger.logError(`[${toolName}] Error`, error);

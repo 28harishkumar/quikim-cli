@@ -78,3 +78,15 @@ export const PROJECT_CONTEXT_SCHEMA = {
     },
   },
 };
+
+/** Optional name/title for artifacts; LLM can set these separately from content */
+export const ARTIFACT_NAME_TITLE_SCHEMA = {
+  name: {
+    type: "string" as const,
+    description: "Optional display name for the artifact (e.g. diagram title, wireframe name).",
+  },
+  title: {
+    type: "string" as const,
+    description: "Optional title (used for context, code_guideline, requirements where applicable).",
+  },
+};

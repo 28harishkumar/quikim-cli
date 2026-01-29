@@ -16,14 +16,16 @@ export class ContextHandler extends BaseHandler {
   async handlePush(
     codebase: CodebaseContext,
     userPrompt: string,
-    projectContext: ProjectContext
+    projectContext: ProjectContext,
+    data?: unknown
   ): Promise<HandlerResponse> {
     return this.handlePushOperation(
-      "push_context",
+      "generate_context",
       "context",
       codebase,
       userPrompt,
-      projectContext
+      projectContext,
+      data
     );
   }
 

@@ -19,14 +19,16 @@ export class WireframeHandler extends BaseHandler {
   async handlePush(
     codebase: CodebaseContext,
     userPrompt: string,
-    projectContext: ProjectContext
+    projectContext: ProjectContext,
+    data?: unknown
   ): Promise<HandlerResponse> {
     return this.handlePushOperation(
-      "push_wireframes",
+      "generate_wireframes",
       "wireframes",
       codebase,
       userPrompt,
-      projectContext
+      projectContext,
+      data
     );
   }
 

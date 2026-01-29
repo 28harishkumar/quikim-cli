@@ -53,9 +53,9 @@ export class SimplifiedToolHandlers {
     codebase: CodebaseContext,
     userPrompt: string,
     projectContext: ProjectContext,
-    _data?: unknown
+    data?: unknown
   ): Promise<HandlerResponse> {
-    return this.requirementsHandler.handlePush(codebase, userPrompt, projectContext);
+    return this.requirementsHandler.handlePush(codebase, userPrompt, projectContext, data);
   }
 
   async handlePullRequirements(
@@ -73,9 +73,9 @@ export class SimplifiedToolHandlers {
     codebase: CodebaseContext,
     userPrompt: string,
     projectContext: ProjectContext,
-    _data?: unknown
+    data?: unknown
   ): Promise<HandlerResponse> {
-    return this.designHandler.handlePushHLD(codebase, userPrompt, projectContext);
+    return this.designHandler.handlePushHLD(codebase, userPrompt, projectContext, data);
   }
 
   async handlePullHLD(
@@ -102,9 +102,9 @@ export class SimplifiedToolHandlers {
     codebase: CodebaseContext,
     userPrompt: string,
     projectContext: ProjectContext,
-    _data?: unknown
+    data?: unknown
   ): Promise<HandlerResponse> {
-    return this.designHandler.handlePushLLD(codebase, userPrompt, projectContext);
+    return this.designHandler.handlePushLLD(codebase, userPrompt, projectContext, data);
   }
 
   // ==================== Wireframe Handlers ====================
@@ -122,9 +122,9 @@ export class SimplifiedToolHandlers {
     codebase: CodebaseContext,
     userPrompt: string,
     projectContext: ProjectContext,
-    _data?: unknown
+    data?: unknown
   ): Promise<HandlerResponse> {
-    return this.wireframeHandler.handlePush(codebase, userPrompt, projectContext);
+    return this.wireframeHandler.handlePush(codebase, userPrompt, projectContext, data);
   }
 
   async handleSyncWireframeFromPenpot(
@@ -169,9 +169,9 @@ export class SimplifiedToolHandlers {
     codebase: CodebaseContext,
     userPrompt: string,
     projectContext: ProjectContext,
-    _data?: unknown
+    data?: unknown
   ): Promise<HandlerResponse> {
-    return this.diagramHandler.handlePushERDiagram(codebase, userPrompt, projectContext);
+    return this.diagramHandler.handlePushERDiagram(codebase, userPrompt, projectContext, data);
   }
 
   // ==================== Mermaid Diagram Handlers ====================
@@ -189,9 +189,9 @@ export class SimplifiedToolHandlers {
     codebase: CodebaseContext,
     userPrompt: string,
     projectContext: ProjectContext,
-    _data?: unknown
+    data?: unknown
   ): Promise<HandlerResponse> {
-    return this.diagramHandler.handlePushMermaid(codebase, userPrompt, projectContext);
+    return this.diagramHandler.handlePushMermaid(codebase, userPrompt, projectContext, data);
   }
 
   // ==================== Task Handlers ====================
@@ -200,9 +200,9 @@ export class SimplifiedToolHandlers {
     codebase: CodebaseContext,
     userPrompt: string,
     projectContext: ProjectContext,
-    _data?: unknown
+    data?: unknown
   ): Promise<HandlerResponse> {
-    return this.taskHandler.handlePush(codebase, userPrompt, projectContext);
+    return this.taskHandler.handlePush(codebase, userPrompt, projectContext, data);
   }
 
   async handlePullTasks(
@@ -238,9 +238,9 @@ export class SimplifiedToolHandlers {
     codebase: CodebaseContext,
     userPrompt: string,
     projectContext: ProjectContext,
-    _data?: unknown
+    data?: unknown
   ): Promise<HandlerResponse> {
-    return this.contextHandler.handlePush(codebase, userPrompt, projectContext);
+    return this.contextHandler.handlePush(codebase, userPrompt, projectContext, data);
   }
 
   async handlePullContext(
@@ -256,9 +256,9 @@ export class SimplifiedToolHandlers {
     codebase: CodebaseContext,
     userPrompt: string,
     projectContext: ProjectContext,
-    _data?: unknown
+    data?: unknown
   ): Promise<HandlerResponse> {
-    return this.codeGuidelineHandler.handlePush(codebase, userPrompt, projectContext);
+    return this.codeGuidelineHandler.handlePush(codebase, userPrompt, projectContext, data);
   }
 
   async handlePullCodeGuideline(

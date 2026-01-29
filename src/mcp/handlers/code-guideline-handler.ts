@@ -16,14 +16,16 @@ export class CodeGuidelineHandler extends BaseHandler {
   async handlePush(
     codebase: CodebaseContext,
     userPrompt: string,
-    projectContext: ProjectContext
+    projectContext: ProjectContext,
+    data?: unknown
   ): Promise<HandlerResponse> {
     return this.handlePushOperation(
-      "push_code_guideline",
+      "generate_code_guideline",
       "code_guideline",
       codebase,
       userPrompt,
-      projectContext
+      projectContext,
+      data
     );
   }
 

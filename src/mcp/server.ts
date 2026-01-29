@@ -31,7 +31,7 @@ import { SessionManager, sessionManager } from './session/manager.js';
 // import { WorkflowEngineTools } from './handlers/workflow-tools.js';
 import { logger } from './utils/logger.js';
 import { errorHandler, ErrorContext } from './utils/error-handler.js';
-import { PROTOCOL_CONFIG, PROJECT_CONTEXT_SCHEMA } from './utils/constants.js';
+import { PROTOCOL_CONFIG, PROJECT_CONTEXT_SCHEMA, ARTIFACT_NAME_TITLE_SCHEMA } from './utils/constants.js';
 import { CodebaseContext } from './session/types.js';
 import { ToolHandlers } from './handlers/index.js';
 import { ServiceAwareAPIClient } from './api/service-client.js';
@@ -118,21 +118,20 @@ export class MCPCursorProtocolServer {
       // Get existing tools
       const existingTools = [
         {
-          name: "push_requirements",
+          name: "generate_requirements",
           description:
-            "Upload requirements to server. REQUIRED: codebase.files array must contain a file with path matching '.quikim/artifacts/<spec name>/requirement_<artifact_id>.md' and content property with markdown string. Example: {codebase: {files: [{path: '.quikim/artifacts/default/requirement_main.md', content: '<html content here>'}]}, user_prompt: 'string'}",
+            "Save requirements locally first (markdown), then sync to server in background (non-blocking). Provide markdown in content; we save it locally and convert to HTML for server. Path: .quikim/artifacts/<spec>/requirement_<id>.md. Optional: name/title.",
           inputSchema: {
             type: "object",
             properties: {
               codebase: {
                 type: "object",
                 description:
-                  "Object with 'files' array. Each file must have 'path' and 'content'. Path must match: .quikim/artifacts/<spec>/requirement_<id>.md",
+                  "Object with 'files' array. Each file must have 'path' and 'content'. Path: .quikim/artifacts/<spec>/requirement_<id>.md. content = markdown (saved locally; we convert to HTML for server).",
               },
-              user_prompt: {
-                type: "string",
-                description: "Original user request",
-              },
+              user_prompt: { type: "string", description: "Original user request" },
+              name: ARTIFACT_NAME_TITLE_SCHEMA.name,
+              title: ARTIFACT_NAME_TITLE_SCHEMA.title,
               project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["codebase", "user_prompt"],
@@ -162,14 +161,16 @@ export class MCPCursorProtocolServer {
           },
         } as Tool,
         {
-          name: "push_hld",
+          name: "generate_hld",
           description:
-            "Update high-level designs at server from local designs",
+            "Save HLD locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/hld_<id>.md. Optional: name/title.",
           inputSchema: {
             type: "object",
             properties: {
-              codebase: { type: "object" },
+              codebase: { type: "object", description: "Files array. Path: .quikim/artifacts/<spec>/hld_<id>.md." },
               user_prompt: { type: "string" },
+              name: ARTIFACT_NAME_TITLE_SCHEMA.name,
+              title: ARTIFACT_NAME_TITLE_SCHEMA.title,
               project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["codebase", "user_prompt"],
@@ -202,30 +203,38 @@ export class MCPCursorProtocolServer {
           },
         } as Tool,
         {
-          name: "push_wireframes",
+          name: "generate_wireframes",
           description:
-            "Push wireframes to server. File MUST be at .quikim/artifacts/<spec>/wireframe_files_<id>.md (not wireframe_).",
+            "Save wireframe locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/wireframe_files_<id>.md. Server expects canvas JSON or creates empty. Optional: name.",
           inputSchema: {
             type: "object",
             properties: {
               codebase: {
                 type: "object",
-                description: "Files array. Path must match: .quikim/artifacts/<spec>/wireframe_files_<id>.md",
+                description:
+                  "Files array. Path: .quikim/artifacts/<spec>/wireframe_files_<id>.md. Content: optional JSON { name, viewport: { width, height }, elements }.",
               },
               user_prompt: { type: "string" },
+              name: ARTIFACT_NAME_TITLE_SCHEMA.name,
               project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["codebase", "user_prompt"],
           },
         } as Tool,
         {
-          name: "push_tasks",
-          description: "Update tasks at server from local tasks",
+          name: "generate_tasks",
+          description:
+            "Save tasks locally first (markdown, Kiro/task format), then sync to server in background (non-blocking). Provide markdown in content; we save it locally and convert to HTML for server. Path: .quikim/artifacts/<spec>/tasks_<id>.md. File format: YAML frontmatter (--- id, specName, status, ... ---) then # Title, ## Description, ## Subtasks (- [ ] or [x] text), ## Checklist, ## Comments, ## Attachments.",
           inputSchema: {
             type: "object",
             properties: {
-              codebase: { type: "object" },
+              codebase: {
+                type: "object",
+                description:
+                  "Files array. Path: .quikim/artifacts/<spec>/tasks_<id>.md. content = markdown (Kiro/task format; saved locally; we convert to HTML for server).",
+              },
               user_prompt: { type: "string" },
+              name: ARTIFACT_NAME_TITLE_SCHEMA.name,
               project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["codebase", "user_prompt"],
@@ -273,12 +282,18 @@ export class MCPCursorProtocolServer {
         } as Tool,
         {
           name: "er_diagram_push",
-          description: "Push local ER diagram to server",
+          description:
+            "Save ER diagram locally first, then sync to server in background (non-blocking). Content: raw mermaid erDiagram only. Path: .quikim/artifacts/<spec>/er_diagram_<id>.md.",
           inputSchema: {
             type: "object",
             properties: {
-              codebase: { type: "object" },
+              codebase: {
+                type: "object",
+                description:
+                  "Files array. Path: .quikim/artifacts/<spec>/er_diagram_<id>.md. content = raw mermaid erDiagram only.",
+              },
               user_prompt: { type: "string" },
+              name: ARTIFACT_NAME_TITLE_SCHEMA.name,
               project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["codebase", "user_prompt"],
@@ -311,17 +326,19 @@ export class MCPCursorProtocolServer {
           },
         } as Tool,
         {
-          name: "push_mermaid",
+          name: "generate_mermaid",
           description:
-            "Push flow/mermaid diagrams to server. File MUST be at .quikim/artifacts/<spec>/flow_diagram_<id>.md (artifact type is flow_diagram, not mermaid).",
+            "Save mermaid diagram locally first, then sync to server in background (non-blocking). Content: raw mermaid only (no code fences). Path: .quikim/artifacts/<spec>/flow_diagram_<id>.md.",
           inputSchema: {
             type: "object",
             properties: {
               codebase: {
                 type: "object",
-                description: "Files array. Path must match: .quikim/artifacts/<spec>/flow_diagram_<id>.md",
+                description:
+                  "Files array. Path: .quikim/artifacts/<spec>/flow_diagram_<id>.md. content = raw mermaid only (no code fences).",
               },
               user_prompt: { type: "string" },
+              name: ARTIFACT_NAME_TITLE_SCHEMA.name,
               project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["codebase", "user_prompt"],
@@ -341,27 +358,32 @@ export class MCPCursorProtocolServer {
           },
         } as Tool,
         {
-          name: "push_lld",
-          description: "Push local Low-Level Design (LLD) files to server. Syncs component-specific detailed designs.",
+          name: "generate_lld",
+          description:
+            "Save LLD locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/lld_<id>.md. Optional: name/title; user_prompt can specify component name.",
           inputSchema: {
             type: "object",
             properties: {
-              codebase: { type: "object" },
+              codebase: { type: "object", description: "Files array. Path: .quikim/artifacts/<spec>/lld_<id>.md." },
               user_prompt: { type: "string", description: "Optionally specify component name to push specific LLD" },
+              name: ARTIFACT_NAME_TITLE_SCHEMA.name,
+              title: ARTIFACT_NAME_TITLE_SCHEMA.title,
               project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["codebase", "user_prompt"],
           },
         } as Tool,
         {
-          name: "push_context",
+          name: "generate_context",
           description:
-            "Push context artifact to server. File at .quikim/artifacts/<spec>/context_<id>.md",
+            "Save context locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/context_<id>.md. Optional: name/title.",
           inputSchema: {
             type: "object",
             properties: {
-              codebase: { type: "object" },
+              codebase: { type: "object", description: "Files array. Path: .quikim/artifacts/<spec>/context_<id>.md. content = plain text only." },
               user_prompt: { type: "string" },
+              name: ARTIFACT_NAME_TITLE_SCHEMA.name,
+              title: ARTIFACT_NAME_TITLE_SCHEMA.title,
               project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["codebase", "user_prompt"],
@@ -382,14 +404,16 @@ export class MCPCursorProtocolServer {
           },
         } as Tool,
         {
-          name: "push_code_guideline",
+          name: "generate_code_guideline",
           description:
-            "Push code guideline to server. File at .quikim/artifacts/<spec>/code_guideline_<id>.md",
+            "Save code guideline locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/code_guideline_<id>.md. Optional: name/title.",
           inputSchema: {
             type: "object",
             properties: {
-              codebase: { type: "object" },
+              codebase: { type: "object", description: "Files array. Path: .quikim/artifacts/<spec>/code_guideline_<id>.md. content = plain text/markdown only." },
               user_prompt: { type: "string" },
+              name: ARTIFACT_NAME_TITLE_SCHEMA.name,
+              title: ARTIFACT_NAME_TITLE_SCHEMA.title,
               project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["codebase", "user_prompt"],
@@ -472,7 +496,13 @@ export class MCPCursorProtocolServer {
       };
 
       const userPrompt = args.user_prompt as string;
-      const data = args.data as Record<string, unknown> | undefined;
+      const dataFromArgs = args.data as Record<string, unknown> | undefined;
+      const data: Record<string, unknown> | undefined = {
+        ...(dataFromArgs || {}),
+        ...(args.name != null ? { name: args.name } : {}),
+        ...(args.title != null ? { title: args.title } : {}),
+      };
+      const dataToPass = Object.keys(data).length ? data : dataFromArgs;
 
       // Debug logging (suppressed when QUIKIM_MCP_SILENT=1 to avoid corrupting stdio)
       if (data) {
@@ -505,145 +535,145 @@ export class MCPCursorProtocolServer {
 
       // Route to appropriate handler
       switch (name) {
-        case "push_requirements":
+        case "generate_requirements":
           return await this.toolHandlers.handlePushRequirements(
             codebase,
             userPrompt,
             projectContext,
-            data  // Pass data for direct execution
+            dataToPass
           );
         case "pull_requirements":
           return await this.toolHandlers.handlePullRequirements(
             codebase,
             userPrompt,
             projectContext,
-            data
+            dataToPass
           );
-        case "push_hld":
+        case "generate_hld":
           return await this.toolHandlers.handlePushHLD(
             codebase,
             userPrompt,
             projectContext,
-            data
+            dataToPass
           );
         case "pull_hld":
           return await this.toolHandlers.handlePullHLD(
             codebase,
             userPrompt,
             projectContext,
-            data
+            dataToPass
           );
         case "pull_wireframe":
           return await this.toolHandlers.handlePullWireframe(
             codebase,
             userPrompt,
             projectContext,
-            data
+            dataToPass
           );
-        case "push_wireframes":
+        case "generate_wireframes":
           return await this.toolHandlers.handlePushWireframes(
             codebase,
             userPrompt,
             projectContext,
-            data
+            dataToPass
           );
-        case "push_tasks":
+        case "generate_tasks":
           return await this.toolHandlers.handlePushTasks(
             codebase,
             userPrompt,
             projectContext,
-            data
+            dataToPass
           );
         case "pull_tasks":
           return await this.toolHandlers.handlePullTasks(
             codebase,
             userPrompt,
             projectContext,
-            data
+            dataToPass
           );
         case "update_code":
           return await this.toolHandlers.handleUpdateCode(
             codebase,
             userPrompt,
             projectContext,
-            data
+            dataToPass
           );
         case "er_diagram_pull":
           return await this.toolHandlers.handleERDiagramPull(
             codebase,
             userPrompt,
             projectContext,
-            data
+            dataToPass
           );
         case "er_diagram_push":
           return await this.toolHandlers.handleERDiagramPush(
             codebase,
             userPrompt,
             projectContext,
-            data
+            dataToPass
           );
         case "pull_rules":
           return await this.toolHandlers.handlePullRules(
             codebase,
             userPrompt,
             projectContext,
-            data
+            dataToPass
           );
         case "pull_mermaid":
           return await this.toolHandlers.handlePullMermaid(
             codebase,
             userPrompt,
             projectContext,
-            data
+            dataToPass
           );
-        case "push_mermaid":
+        case "generate_mermaid":
           return await this.toolHandlers.handlePushMermaid(
             codebase,
             userPrompt,
             projectContext,
-            data
+            dataToPass
           );
         case "pull_lld":
           return await this.toolHandlers.handlePullLLD(
             codebase,
             userPrompt,
             projectContext,
-            data
+            dataToPass
           );
-        case "push_lld":
+        case "generate_lld":
           return await this.toolHandlers.handlePushLLD(
             codebase,
             userPrompt,
             projectContext,
-            data
+            dataToPass
           );
-        case "push_context":
+        case "generate_context":
           return await this.toolHandlers.handlePushContext(
             codebase,
             userPrompt,
             projectContext,
-            data
+            dataToPass
           );
         case "pull_context":
           return await this.toolHandlers.handlePullContext(
             codebase,
             userPrompt,
             projectContext,
-            data
+            dataToPass
           );
-        case "push_code_guideline":
+        case "generate_code_guideline":
           return await this.toolHandlers.handlePushCodeGuideline(
             codebase,
             userPrompt,
             projectContext,
-            data
+            dataToPass
           );
         case "pull_code_guideline":
           return await this.toolHandlers.handlePullCodeGuideline(
             codebase,
             userPrompt,
             projectContext,
-            data
+            dataToPass
           );
         // Workflow engine tools
         case "detect_change":
