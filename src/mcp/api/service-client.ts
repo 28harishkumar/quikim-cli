@@ -305,6 +305,15 @@ export class ServiceAwareAPIClient {
   }
 
   /**
+   * Fetch mermaid/flow diagrams for a project
+   */
+  async fetchMermaid(projectId: string): Promise<unknown> {
+    return this.request('project', `/api/v1/designs/?projectId=${projectId}&type=flow`, {
+      method: 'GET',
+    });
+  }
+
+  /**
    * Create/update LLD
    */
   async syncLLD(projectId: string, content: string, componentName: string, metadata?: Record<string, unknown>): Promise<unknown> {
@@ -386,17 +395,128 @@ export class ServiceAwareAPIClient {
   }
 
   /**
-   * Create/update wireframe
+   * Create/update wireframe. Uses organizations path when organizationId provided.
    */
-  async syncWireframe(projectId: string, content: string, metadata?: Record<string, unknown>): Promise<unknown> {
-    return this.request('project', `/api/v1/projects/${projectId}/wireframes`, {
+  async syncWireframe(
+    projectId: string,
+    content: string,
+    metadata?: Record<string, unknown>,
+    organizationId?: string
+  ): Promise<unknown> {
+    const path = organizationId
+      ? `/api/v1/organizations/${organizationId}/projects/${projectId}/wireframes`
+      : `/api/v1/projects/${projectId}/wireframes`;
+    const body = organizationId
+      ? {
+          name: metadata?.name || 'Wireframe from MCP',
+          viewport: { width: 1280, height: 720, scale: 1 },
+          elements: [],
+        }
+      : {
+          name: metadata?.name || 'Wireframe from MCP',
+          content,
+          componentType: metadata?.componentType || 'website',
+        };
+    const res = await this.request('project', path, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+    return res.data;
+  }
+
+  /**
+   * Sync mermaid/flow diagram (artifact type flow_diagram)
+   */
+  async syncMermaid(
+    projectId: string,
+    content: string,
+    metadata?: Record<string, unknown>,
+    specName?: string
+  ): Promise<unknown> {
+    const mermaidType = this.inferMermaidType(content);
+    const res = await this.request('project', '/api/v1/designs', {
       method: 'POST',
       body: JSON.stringify({
-        name: metadata?.name || 'Wireframe from MCP',
-        content,
-        componentType: metadata?.componentType || 'website',
+        projectId,
+        type: 'flow',
+        name: metadata?.name || 'Flow',
+        specName: specName || 'default',
+        content: '',
+        mermaidDiagram: content,
+        mermaidType,
       }),
     });
+    return res.data;
+  }
+
+  private inferMermaidType(content: string): string {
+    const s = (content || '').trim();
+    if (/^\s*erDiagram\s/mi.test(s)) return 'entity';
+    if (/^\s*sequenceDiagram\s/mi.test(s)) return 'sequence';
+    if (/^\s*classDiagram\s/mi.test(s)) return 'class';
+    if (/^\s*stateDiagram\s/mi.test(s)) return 'state';
+    return 'flowchart';
+  }
+
+  /**
+   * Fetch contexts for a project
+   */
+  async fetchContexts(projectId: string): Promise<unknown> {
+    const res = await this.request('project', `/api/v1/projects/${projectId}/contexts`, {
+      method: 'GET',
+    });
+    return res.data;
+  }
+
+  /**
+   * Create/update context
+   */
+  async syncContext(
+    projectId: string,
+    content: string,
+    metadata?: Record<string, unknown>
+  ): Promise<unknown> {
+    const res = await this.request('project', `/api/v1/projects/${projectId}/contexts`, {
+      method: 'POST',
+      body: JSON.stringify({
+        title: metadata?.title || metadata?.name || 'Context',
+        content,
+        description: metadata?.description || '',
+        isActive: true,
+      }),
+    });
+    return res.data;
+  }
+
+  /**
+   * Fetch code guidelines for a project
+   */
+  async fetchCodeGuidelines(projectId: string): Promise<unknown> {
+    const res = await this.request('project', `/api/v1/projects/${projectId}/code-guidelines`, {
+      method: 'GET',
+    });
+    return res.data;
+  }
+
+  /**
+   * Create/update code guideline
+   */
+  async syncCodeGuideline(
+    projectId: string,
+    content: string,
+    metadata?: Record<string, unknown>
+  ): Promise<unknown> {
+    const res = await this.request('project', '/api/v1/code-guidelines', {
+      method: 'POST',
+      body: JSON.stringify({
+        scope: 'project',
+        projectId,
+        title: metadata?.title || metadata?.name || 'Guideline',
+        content,
+        description: metadata?.description || '',
+      }),
+    });
+    return res.data;
   }
 
   // ==================== Health Check ====================

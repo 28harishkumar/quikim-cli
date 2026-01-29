@@ -91,7 +91,23 @@ export class ToolHandlers {
     return this.handlers.handleUpdateCode(codebase, userPrompt, projectContext, data);
   }
 
-  async handlePullRules(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
+  async handlePullRules(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: Record<string, unknown>) {
     return this.handlers.handlePullRules(codebase, userPrompt, projectContext, data);
+  }
+
+  async handlePushContext(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: Record<string, unknown>) {
+    return this.handlers.handlePushContext(codebase, userPrompt, projectContext, data);
+  }
+
+  async handlePullContext(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: Record<string, unknown>) {
+    return this.handlers.handlePullContext(codebase, userPrompt, projectContext, data);
+  }
+
+  async handlePushCodeGuideline(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: Record<string, unknown>) {
+    return this.handlers.handlePushCodeGuideline(codebase, userPrompt, projectContext, data);
+  }
+
+  async handlePullCodeGuideline(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: Record<string, unknown>) {
+    return this.handlers.handlePullCodeGuideline(codebase, userPrompt, projectContext, data);
   }
 }

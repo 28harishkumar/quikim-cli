@@ -65,12 +65,38 @@ export class APIService {
           result = await this.apiClient.syncWireframe(
             projectData.projectId,
             content,
-            metadata
+            metadata,
+            projectData.organizationId
           );
           break;
 
         case "er_diagram":
           result = await this.apiClient.syncERDiagram(
+            projectData.projectId,
+            content,
+            metadata
+          );
+          break;
+
+        case "mermaid":
+          result = await this.apiClient.syncMermaid(
+            projectData.projectId,
+            content,
+            metadata,
+            projectData.specName
+          );
+          break;
+
+        case "context":
+          result = await this.apiClient.syncContext(
+            projectData.projectId,
+            content,
+            metadata
+          );
+          break;
+
+        case "code_guideline":
+          result = await this.apiClient.syncCodeGuideline(
             projectData.projectId,
             content,
             metadata
@@ -130,6 +156,18 @@ export class APIService {
 
         case "er_diagram":
           result = await this.apiClient.fetchERDiagram(projectData.projectId);
+          break;
+
+        case "mermaid":
+          result = await this.apiClient.fetchMermaid(projectData.projectId);
+          break;
+
+        case "context":
+          result = await this.apiClient.fetchContexts(projectData.projectId);
+          break;
+
+        case "code_guideline":
+          result = await this.apiClient.fetchCodeGuidelines(projectData.projectId);
           break;
 
         default:

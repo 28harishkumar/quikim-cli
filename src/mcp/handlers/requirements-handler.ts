@@ -36,6 +36,7 @@ export class RequirementsHandler extends BaseHandler {
     return this.handlePullOperation(
       "pull_requirements",
       "Fetch requirements from server",
+      "requirements",
       codebase,
       userPrompt,
       projectContext,

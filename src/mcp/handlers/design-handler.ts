@@ -37,6 +37,7 @@ export class DesignHandler extends BaseHandler {
     return this.handlePullOperation(
       "pull_hld",
       "Fetch HLD from server",
+      "hld",
       codebase,
       userPrompt,
       projectContext,
@@ -68,6 +69,7 @@ export class DesignHandler extends BaseHandler {
     return this.handlePullOperation(
       "pull_lld",
       "Fetch LLD from server",
+      "lld",
       codebase,
       userPrompt,
       projectContext,

@@ -1,15 +1,19 @@
 /**
  * Project Context Resolver
- * Extracts project ID and organization context from codebase or MCP session
+ * Extracts project ID, spec name, and organization context from codebase or MCP session
  */
 
-import { CodebaseContext } from '../session/types.js';
-import { logger } from '../utils/logger.js';
+import { CodebaseContext } from "../session/types.js";
+import { logger } from "../utils/logger.js";
+import { ContentExtractor } from "../utils/content-extractor.js";
+import { FileContent } from "../types/handler-types.js";
 
 export interface ProjectContext {
   projectId?: string;
   organizationId?: string;
   userId?: string;
+  /** Spec name under .quikim/artifacts/<specName>/ */
+  specName?: string;
   latestVersion?: number;
   // Code generation settings
   framework?: string;
@@ -36,24 +40,23 @@ export class ProjectContextResolver {
 
     if (projectFile) {
       try {
-        // Extract content - handle different formats from Cursor
-        let contentStr: string = '';
-        const content = (projectFile as any).content;
-        
-        if (typeof content === 'string') {
-          contentStr = content;
-        } else if (Array.isArray(content)) {
-          // Cursor sends content as array of {text, type} objects
-          contentStr = content.map((block: any) => block.text || '').join('\n');
-        } else if (content && typeof content === 'object' && 'text' in content) {
-          contentStr = content.text;
-        }
-        
-        const projectData = JSON.parse(contentStr);
+        const contentStr = ContentExtractor.extractStringContent(projectFile as FileContent);
+        const projectData = JSON.parse(contentStr) as {
+          projectId?: string;
+          organizationId?: string;
+          userId?: string;
+          specName?: string;
+          latestVersion?: number;
+        };
+        const specName =
+          projectData.specName ??
+          ContentExtractor.getSpecNameFromCodebase(codebase) ??
+          "default";
         return {
           projectId: projectData.projectId,
           organizationId: projectData.organizationId,
           userId: projectData.userId,
+          specName,
           latestVersion: projectData.latestVersion,
         };
       } catch (error) {
@@ -61,19 +64,11 @@ export class ProjectContextResolver {
       }
     }
 
-    // Extract version from .quikim/v*/ paths
-    const versionDirs = codebase.files
-      .map((f) => {
-        const match = f.path.match(/\.quikim\/v(\d+)\//);
-        return match ? parseInt(match[1], 10) : null;
-      })
-      .filter((v): v is number => v !== null);
-
-    const latestVersion =
-      versionDirs.length > 0 ? Math.max(...versionDirs) : undefined;
+    // Resolve spec name from .quikim/artifacts/<spec>/ paths
+    const specName = ContentExtractor.getSpecNameFromCodebase(codebase) ?? "default";
 
     return {
-      latestVersion,
+      specName,
     };
   }
 
@@ -91,17 +86,10 @@ export class ProjectContextResolver {
   }
 
   /**
-   * Get latest version number from codebase
+   * Get default spec name from codebase (first artifact path or "default")
    */
-  getLatestVersion(codebase: CodebaseContext): number {
-    const versionDirs = codebase.files
-      .map((f) => {
-        const match = f.path.match(/\.quikim\/v(\d+)\//);
-        return match ? parseInt(match[1], 10) : null;
-      })
-      .filter((v): v is number => v !== null);
-
-    return versionDirs.length > 0 ? Math.max(...versionDirs) : 0;
+  getDefaultSpecName(codebase: CodebaseContext): string {
+    return ContentExtractor.getSpecNameFromCodebase(codebase) ?? "default";
   }
 }
 

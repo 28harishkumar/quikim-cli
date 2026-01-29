@@ -36,7 +36,7 @@ export const QUIKIM_CAPABILITIES: QuikimCapability[] = [
       "Sync requirements from server",
       "Update project requirements",
     ],
-    outputs: [".quikim/v*/requirements.md"],
+    outputs: [".quikim/artifacts/<spec>/requirement_<id>.md"],
   },
   {
     name: "Push Requirements",
@@ -45,7 +45,7 @@ export const QUIKIM_CAPABILITIES: QuikimCapability[] = [
     toolName: "push_requirements",
     usage: "Use after creating or updating requirements locally",
     examples: ["Save requirements to server", "Sync my requirements"],
-    prerequisites: ["requirements.md must exist"],
+    prerequisites: ["requirement_<id>.md must exist under .quikim/artifacts/<spec>/"],
   },
 
   // Design - HLD
@@ -60,8 +60,8 @@ export const QUIKIM_CAPABILITIES: QuikimCapability[] = [
       "Generate HLD for my project",
       "Sync HLD from server",
     ],
-    prerequisites: ["requirements.md must exist"],
-    outputs: [".quikim/v*/hld.md"],
+    prerequisites: ["requirement_*.md under .quikim/artifacts/<spec>/"],
+    outputs: [".quikim/artifacts/<spec>/hld_<id>.md"],
   },
   {
     name: "Push HLD",
@@ -70,7 +70,7 @@ export const QUIKIM_CAPABILITIES: QuikimCapability[] = [
     toolName: "push_hld",
     usage: "Use after creating or updating HLD locally",
     examples: ["Save HLD to server"],
-    prerequisites: ["hld.md must exist"],
+    prerequisites: ["hld_<id>.md must exist under .quikim/artifacts/<spec>/"],
   },
 
   // Design - LLD
@@ -86,8 +86,8 @@ export const QUIKIM_CAPABILITIES: QuikimCapability[] = [
       "Pull LLD for user management API",
       "Create detailed design for notification service",
     ],
-    prerequisites: ["requirements.md must exist", "hld.md recommended"],
-    outputs: [".quikim/v*/lld/{component-name}.md"],
+    prerequisites: ["requirement_*.md under .quikim/artifacts/<spec>/", "hld_*.md recommended"],
+    outputs: [".quikim/artifacts/<spec>/lld_<id>.md"],
   },
   {
     name: "Push LLD",
@@ -96,28 +96,28 @@ export const QUIKIM_CAPABILITIES: QuikimCapability[] = [
     toolName: "push_lld",
     usage: "Use after creating or updating LLD locally",
     examples: ["Save LLD to server", "Push auth service LLD"],
-    prerequisites: ["lld/*.md files must exist"],
+    prerequisites: ["lld_<id>.md files must exist under .quikim/artifacts/<spec>/"],
   },
 
-  // Design - Wireframes
+  // Design - Wireframes (artifact type is wireframe_files, not wireframe)
   {
     name: "Pull Wireframe",
-    description: "Fetch or generate wireframes for UI components",
+    description: "Fetch or generate wireframes for UI components. File type: wireframe_files.",
     category: "design",
     toolName: "pull_wireframe",
-    usage: "Use to create UI wireframes based on requirements and HLD",
+    usage: "Use to create UI wireframes. Files are wireframe_files_<id>.md",
     examples: ["Create wireframes", "Generate UI mockups"],
-    prerequisites: ["requirements.md must exist"],
-    outputs: [".quikim/v*/wireframes.md"],
+    prerequisites: ["requirement_*.md under .quikim/artifacts/<spec>/"],
+    outputs: [".quikim/artifacts/<spec>/wireframe_files_<id>.md"],
   },
   {
     name: "Push Wireframes",
-    description: "Sync wireframes to server and Penpot",
+    description: "Push wireframes to server. File MUST be wireframe_files_<id>.md (not wireframe_).",
     category: "design",
     toolName: "push_wireframes",
-    usage: "Use after creating wireframes locally",
+    usage: "Path: .quikim/artifacts/<spec>/wireframe_files_<id>.md",
     examples: ["Save wireframes to Penpot"],
-    prerequisites: ["wireframes.md must exist"],
+    prerequisites: ["wireframe_files_<id>.md under .quikim/artifacts/<spec>/"],
   },
 
   // Design - ER Diagram
@@ -128,8 +128,8 @@ export const QUIKIM_CAPABILITIES: QuikimCapability[] = [
     toolName: "er_diagram_pull",
     usage: "Use to create database schema visualization",
     examples: ["Create ER diagram", "Generate database schema"],
-    prerequisites: ["requirements.md must exist", "hld.md recommended"],
-    outputs: [".quikim/v*/er-diagram.md"],
+    prerequisites: ["requirement_*.md under .quikim/artifacts/<spec>/", "hld_*.md recommended"],
+    outputs: [".quikim/artifacts/<spec>/er_diagram_<id>.md"],
   },
   {
     name: "Push ER Diagram",
@@ -138,27 +138,27 @@ export const QUIKIM_CAPABILITIES: QuikimCapability[] = [
     toolName: "er_diagram_push",
     usage: "Use after creating ER diagram locally",
     examples: ["Save ER diagram to server"],
-    prerequisites: ["er-diagram.md must exist"],
+    prerequisites: ["er_diagram_<id>.md must exist under .quikim/artifacts/<spec>/"],
   },
 
-  // Design - Mermaid
+  // Design - Flow/Mermaid (artifact type is flow_diagram, not mermaid)
   {
     name: "Pull Mermaid",
-    description: "Fetch mermaid diagrams (flowchart, sequence, class, state, gantt, etc.)",
+    description: "Fetch flow/mermaid diagrams (flowchart, sequence, class, state, gantt). File type: flow_diagram.",
     category: "design",
     toolName: "pull_mermaid",
-    usage: "Use to sync or create architectural diagrams",
+    usage: "Use to sync or create architectural diagrams. Files are flow_diagram_<id>.md",
     examples: ["Pull mermaid diagrams", "Get flowcharts from server"],
-    outputs: [".quikim/v*/diagrams/*.md"],
+    outputs: [".quikim/artifacts/<spec>/flow_diagram_<id>.md"],
   },
   {
     name: "Push Mermaid",
-    description: "Sync local mermaid diagrams to server",
+    description: "Push flow/mermaid diagrams to server. File MUST be flow_diagram_<id>.md (not mermaid_).",
     category: "design",
     toolName: "push_mermaid",
-    usage: "Use after creating diagrams locally",
+    usage: "Use after creating diagrams locally. Path: .quikim/artifacts/<spec>/flow_diagram_<id>.md",
     examples: ["Save diagrams to server"],
-    prerequisites: ["diagrams/*.md or mermaid blocks in HLD/ER files"],
+    prerequisites: ["flow_diagram_<id>.md under .quikim/artifacts/<spec>/"],
   },
 
   // Tasks
@@ -169,8 +169,8 @@ export const QUIKIM_CAPABILITIES: QuikimCapability[] = [
     toolName: "pull_tasks",
     usage: "Use to create or sync task breakdown",
     examples: ["Create tasks", "Generate milestones", "Sync tasks from Jira"],
-    prerequisites: ["requirements.md and hld.md recommended"],
-    outputs: [".quikim/v*/tasks.md"],
+    prerequisites: ["requirement_*.md and hld_*.md under .quikim/artifacts/<spec>/ recommended"],
+    outputs: [".quikim/artifacts/<spec>/tasks_<id>.md"],
   },
   {
     name: "Push Tasks",
@@ -179,7 +179,7 @@ export const QUIKIM_CAPABILITIES: QuikimCapability[] = [
     toolName: "push_tasks",
     usage: "Use after creating or updating tasks locally",
     examples: ["Save tasks to server"],
-    prerequisites: ["tasks.md must exist"],
+    prerequisites: ["tasks_<id>.md must exist under .quikim/artifacts/<spec>/"],
   },
 
   // Code
@@ -194,8 +194,48 @@ export const QUIKIM_CAPABILITIES: QuikimCapability[] = [
       "Write the payment processing code",
       "Create user registration API",
     ],
-    prerequisites: ["requirements.md, hld.md, tasks.md should exist"],
-    outputs: ["Source code files", "Updated tasks.md"],
+    prerequisites: ["requirement_*.md, hld_*.md, tasks_*.md under .quikim/artifacts/<spec>/ should exist"],
+    outputs: ["Source code files", "Updated tasks_<id>.md under .quikim/artifacts/<spec>/"],
+  },
+
+  // Context
+  {
+    name: "Push Context",
+    description: "Push project context artifact to server",
+    category: "sync",
+    toolName: "push_context",
+    usage: "File at .quikim/artifacts/<spec>/context_<id>.md",
+    examples: ["Save context to server"],
+    prerequisites: ["context_<id>.md under .quikim/artifacts/<spec>/"],
+  },
+  {
+    name: "Pull Context",
+    description: "Read context from local files or fetch from API (data.force=true)",
+    category: "sync",
+    toolName: "pull_context",
+    usage: "Read from .quikim/artifacts/<spec>/context_*.md or fetch from API",
+    examples: ["Sync context from server"],
+    outputs: [".quikim/artifacts/<spec>/context_<id>.md"],
+  },
+
+  // Code Guidelines
+  {
+    name: "Push Code Guideline",
+    description: "Push code guideline to server",
+    category: "sync",
+    toolName: "push_code_guideline",
+    usage: "File at .quikim/artifacts/<spec>/code_guideline_<id>.md",
+    examples: ["Save code guideline to server"],
+    prerequisites: ["code_guideline_<id>.md under .quikim/artifacts/<spec>/"],
+  },
+  {
+    name: "Pull Code Guideline",
+    description: "Read code guidelines from local files or fetch from API (data.force=true)",
+    category: "sync",
+    toolName: "pull_code_guideline",
+    usage: "Read from .quikim/artifacts/<spec>/code_guideline_*.md or fetch from API",
+    examples: ["Sync code guidelines from server"],
+    outputs: [".quikim/artifacts/<spec>/code_guideline_<id>.md"],
   },
 
   // Sync
@@ -315,7 +355,9 @@ The Quikim MCP Server provides tools for managing project artifacts throughout t
 
 ## File Structure
 
-All artifacts are stored in \`.quikim/v{version}/\` directories with versioning support.
+All artifacts are stored under \`.quikim/artifacts/<spec name>/<artifact file>\`. Artifact files are named \`<artifact_type>_<artifact_id>.md\` (or \`<artifact_type>_<root_id>.md\` for versioned types: requirement, hld, lld, er_diagram, flow_diagram, wireframe_files).
+
+To use a custom spec name (e.g. \`my-feature\`), pass \`project_context: { specName: "my-feature" }\` in tool calls; otherwise the spec is inferred from artifact file paths or defaults to \`"default"\`.
 `;
 
   return content;
@@ -328,13 +370,13 @@ function generateDesignToolsContent(): string {
 ## High-Level Design (HLD)
 - Defines overall architecture, technology stack, and system structure
 - Tool: \`pull_hld\` / \`push_hld\`
-- File: \`.quikim/v*/hld.md\`
+- File: \`.quikim/artifacts/<spec>/hld_<id>.md\`
 
 ## Low-Level Design (LLD)
 - Detailed specifications for individual components
 - Includes: interfaces, data models, method specifications, sequence diagrams
 - Tool: \`pull_lld\` / \`push_lld\`
-- Files: \`.quikim/v*/lld/{component-name}.md\`
+- Files: \`.quikim/artifacts/<spec>/lld_<id>.md\`
 - Component Types: service, module, feature, api, ui, database
 
 ### LLD Usage Examples
@@ -408,9 +450,9 @@ Requirements → HLD → LLD (optional) → Wireframes → ER Diagram → Tasks 
 - Receives: code guidelines, sample snippets, relevant context
 - Updates task status as work progresses
 
-## Version Management
-- All artifacts stored in \`.quikim/v{version}/\`
-- New version created when artifacts are updated
+## Directory Structure
+- All artifacts stored in \`.quikim/artifacts/<spec name>/<artifact_type>_<id>.md\`
+- Versioned artifact types use root id in filename: requirement, hld, lld, er_diagram, flow_diagram, wireframe_files
 - Push tools sync to Quikim platform for team collaboration
 `;
 }
@@ -486,7 +528,7 @@ Use \`push_lld\` to sync to Quikim platform.
 - **database**: Data layer and repositories
 
 ## File Location
-\`.quikim/v{version}/lld/${toKebabCase(name)}.md\`
+\`.quikim/artifacts/<spec>/lld_<id>.md\` (e.g. \`lld_${toKebabCase(name)}.md\`)
 `;
 }
 

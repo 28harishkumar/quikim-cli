@@ -25,6 +25,7 @@ export const VERSIONED_ARTIFACT_TYPES: readonly ArtifactType[] = [
   "lld",
   "flow_diagram",
   "er_diagram",
+  "wireframe_files",
 ] as const;
 
 export type VersionedArtifactType = (typeof VERSIONED_ARTIFACT_TYPES)[number];

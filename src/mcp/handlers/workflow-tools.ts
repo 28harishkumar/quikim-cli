@@ -234,67 +234,6 @@ export class WorkflowEngineTools {
         }
       },
       {
-        name: "join_collaboration_session",
-        description: "Join a real-time collaboration session",
-        inputSchema: {
-          type: "object",
-          properties: {
-            projectId: {
-              type: "string",
-              description: "Project ID"
-            },
-            artifactType: {
-              type: "string",
-              enum: ["requirements", "design", "wireframes", "code", "tests"],
-              description: "Type of artifact"
-            },
-            artifactId: {
-              type: "string",
-              description: "ID of the artifact"
-            },
-            user: {
-              type: "object",
-              properties: {
-                id: { type: "string" },
-                name: { type: "string" },
-                email: { type: "string" },
-                avatar: { type: "string" }
-              },
-              required: ["id", "name"],
-              description: "User information"
-            }
-          },
-          required: ["projectId", "artifactType", "artifactId", "user"]
-        }
-      },
-      {
-        name: "leave_collaboration_session",
-        description: "Leave a real-time collaboration session",
-        inputSchema: {
-          type: "object",
-          properties: {
-            projectId: {
-              type: "string",
-              description: "Project ID"
-            },
-            artifactType: {
-              type: "string",
-              enum: ["requirements", "design", "wireframes", "code", "tests"],
-              description: "Type of artifact"
-            },
-            artifactId: {
-              type: "string",
-              description: "ID of the artifact"
-            },
-            userId: {
-              type: "string",
-              description: "User ID"
-            }
-          },
-          required: ["projectId", "artifactType", "artifactId", "userId"]
-        }
-      },
-      {
         name: "generate_code_from_requirements",
         description: "Generate code from requirements using AI",
         inputSchema: {
@@ -438,12 +377,6 @@ export class WorkflowEngineTools {
 
         case "sync_from_ide":
           return await WorkflowEngineTools.handleSyncFromIDE(args, components);
-
-        case "join_collaboration_session":
-          return await WorkflowEngineTools.handleJoinCollaborationSession(args, components);
-
-        case "leave_collaboration_session":
-          return await WorkflowEngineTools.handleLeaveCollaborationSession(args, components);
 
         case "generate_code_from_requirements":
           return await WorkflowEngineTools.handleGenerateCodeFromRequirements(args, components);
@@ -597,42 +530,6 @@ export class WorkflowEngineTools {
       content: [{
         type: "text",
         text: `Sync from IDE ${status.status === "synced" ? "completed successfully" : `failed: ${status.errorMessage || status.conflictReason || "Unknown error"}`}`
-      }]
-    };
-  }
-
-  private static async handleJoinCollaborationSession(args: any, components: any): Promise<any> {
-    const session = await components.realTimeCollaboration.joinSession(
-      args.projectId,
-      args.artifactType,
-      args.artifactId,
-      {
-        ...args.user,
-        status: "online",
-        lastSeen: new Date()
-      }
-    );
-
-    return {
-      content: [{
-        type: "text",
-        text: `Joined collaboration session successfully. Session ID: ${session.id}\nParticipants: ${session.participants.length}`
-      }]
-    };
-  }
-
-  private static async handleLeaveCollaborationSession(args: any, components: any): Promise<any> {
-    await components.realTimeCollaboration.leaveSession(
-      args.projectId,
-      args.artifactType,
-      args.artifactId,
-      args.userId
-    );
-
-    return {
-      content: [{
-        type: "text",
-        text: `Left collaboration session successfully`
       }]
     };
   }

@@ -65,6 +65,48 @@ export class ContentExtractor {
   }
 
   /**
+   * Get spec name from an artifact file path.
+   * Path format: .quikim/artifacts/<spec name>/<artifact file>
+   * @param filePath - Path like .quikim/artifacts/my-spec/requirement_main.md
+   * @returns Spec name or null if path does not match
+   */
+  static getSpecNameFromPath(filePath: string): string | null {
+    if (!filePath.startsWith(".quikim/artifacts/")) return null;
+    const parts = filePath.split("/");
+    if (parts.length >= 3 && parts[0] === ".quikim" && parts[1] === "artifacts") {
+      return parts[2];
+    }
+    return null;
+  }
+
+  /**
+   * Get spec name from first artifact path in codebase.
+   * Path format: .quikim/artifacts/<spec name>/<artifact file>
+   */
+  static getSpecNameFromCodebase(codebase: CodebaseContext): string | null {
+    const match = codebase.files.find((f) => f.path.startsWith(".quikim/artifacts/"));
+    if (!match) return null;
+    return this.getSpecNameFromPath(match.path);
+  }
+
+  /**
+   * Get spec name from the first file matching the given artifact type.
+   * Use this when pushing so the spec comes from the file being pushed.
+   * @param codebase - Codebase context with files
+   * @param artifactType - Artifact type (requirements, hld, etc.)
+   * @returns Spec name from matching file path, or null
+   */
+  static getSpecNameFromMatchingFile(
+    codebase: CodebaseContext,
+    artifactType: ArtifactType
+  ): string | null {
+    const pattern = this.getPathPattern(artifactType);
+    const match = codebase.files.find((f) => pattern.test(f.path));
+    if (!match) return null;
+    return this.getSpecNameFromPath(match.path);
+  }
+
+  /**
    * Extract file content by path pattern
    */
   static extractFileContent(codebase: CodebaseContext, pathPattern: RegExp): string | null {
@@ -75,21 +117,44 @@ export class ContentExtractor {
     return null;
   }
 
+  /** Expected file prefix per tool type (mermaid -> flow_diagram, wireframes -> wireframe_files) */
+  static getExpectedPathHint(artifactType: ArtifactType): string {
+    const filePrefixByType: Record<ArtifactType, string> = {
+      requirements: "requirement_",
+      hld: "hld_",
+      lld: "lld_",
+      tasks: "tasks_",
+      wireframes: "wireframe_files_",
+      er_diagram: "er_diagram_",
+      mermaid: "flow_diagram_",
+      context: "context_",
+      code_guideline: "code_guideline_",
+    };
+    const prefix = filePrefixByType[artifactType];
+    return `.quikim/artifacts/<spec>/${prefix}<id>.md`;
+  }
+
   /**
-   * Get path pattern for artifact type
+   * Get path pattern for artifact type.
+   * Directory: .quikim/artifacts/<spec name>/<artifact file>
+   * File: <artifact_type>_<artifact_id>.md or <artifact_type>_<root_id>.md for versioned.
    */
   static getPathPattern(artifactType: ArtifactType): RegExp {
-    const patterns: Record<ArtifactType, RegExp> = {
-      requirements: /\.quikim\/v\d+\/requirements\.md$/,
-      hld: /\.quikim\/v\d+\/hld\.md$/,
-      lld: /\.quikim\/v\d+\/lld\/.*\.md$/,
-      tasks: /\.quikim\/v\d+\/tasks\.md$/,
-      wireframes: /\.quikim\/v\d+\/wireframes\.md$/,
-      er_diagram: /\.quikim\/v\d+\/er-diagram\.md$/,
-      mermaid: /\.quikim\/v\d+\/mermaid\/.*\.mmd$/,
+    const filePrefixByType: Record<ArtifactType, string> = {
+      requirements: "requirement_",
+      hld: "hld_",
+      lld: "lld_",
+      tasks: "tasks_",
+      wireframes: "wireframe_files_",
+      er_diagram: "er_diagram_",
+      mermaid: "flow_diagram_",
+      context: "context_",
+      code_guideline: "code_guideline_",
     };
-
-    return patterns[artifactType];
+    const prefix = filePrefixByType[artifactType];
+    return new RegExp(
+      `^\\.quikim/artifacts/[^/]+/${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[^/]+\\.md$`
+    );
   }
 
   /**
@@ -134,6 +199,8 @@ ${fileList}`;
   static async extractProjectData(codebase: CodebaseContext, projectContext: ProjectContext): Promise<ProjectData> {
     let projectId = this.extractProjectId(codebase, projectContext);
 
+    const specName = projectContext.specName ?? this.getSpecNameFromCodebase(codebase) ?? "default";
+
     if (!projectId) {
       const fromDisk = await this.readProjectFromDisk();
       if (fromDisk) {
@@ -141,6 +208,7 @@ ${fileList}`;
           projectId: fromDisk.projectId,
           organizationId: fromDisk.organizationId ?? projectContext.organizationId,
           userId: fromDisk.userId ?? projectContext.userId,
+          specName,
         };
       }
       throw new Error("Project ID not found. Make sure .quikim/project.json exists (or set QUIKIM_PROJECT_DIR to your project root).");
@@ -150,6 +218,7 @@ ${fileList}`;
       projectId,
       organizationId: projectContext.organizationId,
       userId: projectContext.userId,
+      specName,
     };
   }
 }

@@ -37,6 +37,7 @@ export class DiagramHandler extends BaseHandler {
     return this.handlePullOperation(
       "er_diagram_pull",
       "Fetch ER diagram from server",
+      "er_diagram",
       codebase,
       userPrompt,
       projectContext,
@@ -68,6 +69,7 @@ export class DiagramHandler extends BaseHandler {
     return this.handlePullOperation(
       "pull_mermaid",
       "Fetch mermaid diagrams from server",
+      "mermaid",
       codebase,
       userPrompt,
       projectContext,

@@ -64,3 +64,17 @@ export const ERROR_SEVERITY = {
   HIGH: 'high',
   CRITICAL: 'critical',
 } as const;
+
+/** Shared project_context schema for MCP tools so the client can pass custom spec name */
+export const PROJECT_CONTEXT_SCHEMA = {
+  type: "object" as const,
+  description:
+    "Optional. Pass specName to use a custom spec; artifacts live under .quikim/artifacts/<specName>/.",
+  properties: {
+    specName: {
+      type: "string" as const,
+      description:
+        "Custom spec name (e.g. my-feature). Artifacts are stored under .quikim/artifacts/<specName>/.",
+    },
+  },
+};

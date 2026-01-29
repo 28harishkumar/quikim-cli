@@ -7,16 +7,18 @@
  * See LICENSE file in the project root for full license information.
  */
 
-export type ArtifactType = 
-  | "requirements" 
-  | "hld" 
-  | "lld" 
-  | "tasks" 
-  | "wireframes" 
-  | "er_diagram" 
-  | "mermaid";
+export type ArtifactType =
+  | "requirements"
+  | "hld"
+  | "lld"
+  | "tasks"
+  | "wireframes"
+  | "er_diagram"
+  | "mermaid"
+  | "context"
+  | "code_guideline";
 
-export type ToolName = 
+export type ToolName =
   | "push_requirements"
   | "pull_requirements"
   | "push_hld"
@@ -34,6 +36,10 @@ export type ToolName =
   | "er_diagram_pull"
   | "push_mermaid"
   | "pull_mermaid"
+  | "push_context"
+  | "pull_context"
+  | "push_code_guideline"
+  | "pull_code_guideline"
   | "update_code"
   | "pull_rules";
 
@@ -59,4 +65,5 @@ export interface ProjectData {
   projectId: string;
   organizationId?: string;
   userId?: string;
+  specName?: string;
 }

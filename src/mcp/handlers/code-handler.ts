@@ -22,10 +22,12 @@ export class CodeHandler extends BaseHandler {
     return this.handlePullOperation(
       "update_code",
       "Implement code changes based on requirements and HLD",
+      "requirements",
       codebase,
       userPrompt,
       projectContext,
-      data
+      data,
+      { useApiOnly: true }
     );
   }
 
@@ -38,6 +40,7 @@ export class CodeHandler extends BaseHandler {
     return this.handlePullOperation(
       "pull_rules",
       "Update local Quikim cursor rules files",
+      "requirements",
       codebase,
       userPrompt,
       projectContext,

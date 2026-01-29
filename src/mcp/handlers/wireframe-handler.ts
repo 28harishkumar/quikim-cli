@@ -39,6 +39,7 @@ export class WireframeHandler extends BaseHandler {
     return this.handlePullOperation(
       "pull_wireframe",
       "Fetch wireframes from server",
+      "wireframes",
       codebase,
       userPrompt,
       projectContext,
@@ -55,6 +56,7 @@ export class WireframeHandler extends BaseHandler {
     return this.handlePullOperation(
       "sync_wireframe_from_penpot",
       "Sync wireframes from Penpot back to Quikim",
+      "wireframes",
       codebase,
       userPrompt,
       projectContext,
@@ -71,6 +73,7 @@ export class WireframeHandler extends BaseHandler {
     return this.handlePullOperation(
       "generate_code_from_wireframe",
       "Convert wireframe to React component code",
+      "wireframes",
       codebase,
       userPrompt,
       projectContext,
@@ -87,6 +90,7 @@ export class WireframeHandler extends BaseHandler {
     return this.handlePullOperation(
       "list_penpot_syncs",
       "List all Penpot sync states for project",
+      "wireframes",
       codebase,
       userPrompt,
       projectContext,
@@ -150,12 +154,13 @@ export class WireframeHandler extends BaseHandler {
               elements: [],
             };
 
-            // Save to local .quikim directory (respects QUIKIM_PROJECT_DIR)
+            // Save to .quikim/artifacts/<spec>/wireframes/ (respects QUIKIM_PROJECT_DIR)
             const fs = await import("fs/promises");
             const path = await import("path");
             const { getQuikimProjectRoot } = await import("../../config/project-root.js");
-            const quikimDir = path.join(getQuikimProjectRoot(), ".quikim");
-            const wireframesDir = path.join(quikimDir, "wireframes");
+            const specName = projectContext.specName ?? "default";
+            const artifactsDir = path.join(getQuikimProjectRoot(), ".quikim", "artifacts", specName);
+            const wireframesDir = path.join(artifactsDir, "wireframes");
             
             await fs.mkdir(wireframesDir, { recursive: true });
             const wireframeFile = path.join(wireframesDir, `${wireframeData.name.toLowerCase().replace(/\s+/g, "-")}.json`);

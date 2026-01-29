@@ -19,6 +19,8 @@ import { WireframeHandler } from "./wireframe-handler.js";
 import { TaskHandler } from "./task-handler.js";
 import { DiagramHandler } from "./diagram-handler.js";
 import { CodeHandler } from "./code-handler.js";
+import { ContextHandler } from "./context-handler.js";
+import { CodeGuidelineHandler } from "./code-guideline-handler.js";
 
 /**
  * Simplified Tool Handlers
@@ -31,6 +33,8 @@ export class SimplifiedToolHandlers {
   private taskHandler: TaskHandler;
   private diagramHandler: DiagramHandler;
   private codeHandler: CodeHandler;
+  private contextHandler: ContextHandler;
+  private codeGuidelineHandler: CodeGuidelineHandler;
 
   constructor(apiClient: ServiceAwareAPIClient) {
     this.requirementsHandler = new RequirementsHandler(apiClient);
@@ -39,6 +43,8 @@ export class SimplifiedToolHandlers {
     this.taskHandler = new TaskHandler(apiClient);
     this.diagramHandler = new DiagramHandler(apiClient);
     this.codeHandler = new CodeHandler(apiClient);
+    this.contextHandler = new ContextHandler(apiClient);
+    this.codeGuidelineHandler = new CodeGuidelineHandler(apiClient);
   }
 
   // ==================== Requirement Handlers ====================
@@ -226,5 +232,41 @@ export class SimplifiedToolHandlers {
     data?: unknown
   ): Promise<HandlerResponse> {
     return this.codeHandler.handlePullRules(codebase, userPrompt, projectContext, data);
+  }
+
+  async handlePushContext(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    _data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.contextHandler.handlePush(codebase, userPrompt, projectContext);
+  }
+
+  async handlePullContext(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.contextHandler.handlePull(codebase, userPrompt, projectContext, data);
+  }
+
+  async handlePushCodeGuideline(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    _data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.codeGuidelineHandler.handlePush(codebase, userPrompt, projectContext);
+  }
+
+  async handlePullCodeGuideline(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.codeGuidelineHandler.handlePull(codebase, userPrompt, projectContext, data);
   }
 }

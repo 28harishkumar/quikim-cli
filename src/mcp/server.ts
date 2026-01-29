@@ -31,7 +31,7 @@ import { SessionManager, sessionManager } from './session/manager.js';
 // import { WorkflowEngineTools } from './handlers/workflow-tools.js';
 import { logger } from './utils/logger.js';
 import { errorHandler, ErrorContext } from './utils/error-handler.js';
-import { PROTOCOL_CONFIG } from './utils/constants.js';
+import { PROTOCOL_CONFIG, PROJECT_CONTEXT_SCHEMA } from './utils/constants.js';
 import { CodebaseContext } from './session/types.js';
 import { ToolHandlers } from './handlers/index.js';
 import { ServiceAwareAPIClient } from './api/service-client.js';
@@ -120,19 +120,20 @@ export class MCPCursorProtocolServer {
         {
           name: "push_requirements",
           description:
-            "Upload requirements to server. REQUIRED: codebase.files array must contain a file with path matching '.quikim/v*/requirements.md' and content property with markdown string. Example: {codebase: {files: [{path: '.quikim/v1/requirements.md', content: '# Requirements\\n\\n...'}]}, user_prompt: 'string'}",
+            "Upload requirements to server. REQUIRED: codebase.files array must contain a file with path matching '.quikim/artifacts/<spec name>/requirement_<artifact_id>.md' and content property with markdown string. Example: {codebase: {files: [{path: '.quikim/artifacts/default/requirement_main.md', content: '<html content here>'}]}, user_prompt: 'string'}",
           inputSchema: {
             type: "object",
             properties: {
-              codebase: { 
+              codebase: {
                 type: "object",
-                description: "Object with 'files' array. Each file must have 'path' and 'content' properties. Path must match pattern: .quikim/v*/requirements.md"
+                description:
+                  "Object with 'files' array. Each file must have 'path' and 'content'. Path must match: .quikim/artifacts/<spec>/requirement_<id>.md",
               },
-              user_prompt: { 
+              user_prompt: {
                 type: "string",
-                description: "Original user request"
+                description: "Original user request",
               },
-              project_context: { type: "object" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["codebase", "user_prompt"],
           },
@@ -140,13 +141,22 @@ export class MCPCursorProtocolServer {
         {
           name: "pull_requirements",
           description:
-            "Fetch all requirements from server and return files or instructions",
+            "Read requirements from local .quikim/artifacts/<spec>/ files. Pass data.force=true to fetch from API then write to local.",
           inputSchema: {
             type: "object",
             properties: {
               codebase: { type: "object" },
               user_prompt: { type: "string" },
-              project_context: { type: "object" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
+              data: {
+                type: "object",
+                properties: {
+                  force: {
+                    type: "boolean",
+                    description: "If true, fetch from API then write to local; otherwise read from local files",
+                  },
+                },
+              },
             },
             required: ["user_prompt"],
           },
@@ -160,7 +170,7 @@ export class MCPCursorProtocolServer {
             properties: {
               codebase: { type: "object" },
               user_prompt: { type: "string" },
-              project_context: { type: "object" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["codebase", "user_prompt"],
           },
@@ -173,7 +183,7 @@ export class MCPCursorProtocolServer {
             properties: {
               codebase: { type: "object" },
               user_prompt: { type: "string" },
-              project_context: { type: "object" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["user_prompt"],
           },
@@ -186,20 +196,24 @@ export class MCPCursorProtocolServer {
             properties: {
               codebase: { type: "object" },
               user_prompt: { type: "string" },
-              project_context: { type: "object" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["user_prompt"],
           },
         } as Tool,
         {
           name: "push_wireframes",
-          description: "Update server wireframes from local",
+          description:
+            "Push wireframes to server. File MUST be at .quikim/artifacts/<spec>/wireframe_files_<id>.md (not wireframe_).",
           inputSchema: {
             type: "object",
             properties: {
-              codebase: { type: "object" },
+              codebase: {
+                type: "object",
+                description: "Files array. Path must match: .quikim/artifacts/<spec>/wireframe_files_<id>.md",
+              },
               user_prompt: { type: "string" },
-              project_context: { type: "object" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["codebase", "user_prompt"],
           },
@@ -212,7 +226,7 @@ export class MCPCursorProtocolServer {
             properties: {
               codebase: { type: "object" },
               user_prompt: { type: "string" },
-              project_context: { type: "object" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["codebase", "user_prompt"],
           },
@@ -225,7 +239,7 @@ export class MCPCursorProtocolServer {
             properties: {
               codebase: { type: "object" },
               user_prompt: { type: "string" },
-              project_context: { type: "object" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["user_prompt"],
           },
@@ -239,7 +253,7 @@ export class MCPCursorProtocolServer {
             properties: {
               codebase: { type: "object" },
               user_prompt: { type: "string" },
-              project_context: { type: "object" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["codebase", "user_prompt"],
           },
@@ -252,7 +266,7 @@ export class MCPCursorProtocolServer {
             properties: {
               codebase: { type: "object" },
               user_prompt: { type: "string" },
-              project_context: { type: "object" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["user_prompt"],
           },
@@ -265,7 +279,7 @@ export class MCPCursorProtocolServer {
             properties: {
               codebase: { type: "object" },
               user_prompt: { type: "string" },
-              project_context: { type: "object" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["codebase", "user_prompt"],
           },
@@ -278,7 +292,7 @@ export class MCPCursorProtocolServer {
             properties: {
               codebase: { type: "object" },
               user_prompt: { type: "string" },
-              project_context: { type: "object" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["user_prompt"],
           },
@@ -291,20 +305,24 @@ export class MCPCursorProtocolServer {
             properties: {
               codebase: { type: "object" },
               user_prompt: { type: "string" },
-              project_context: { type: "object" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["user_prompt"],
           },
         } as Tool,
         {
           name: "push_mermaid",
-          description: "Push local mermaid diagrams to server (syncs all diagram types)",
+          description:
+            "Push flow/mermaid diagrams to server. File MUST be at .quikim/artifacts/<spec>/flow_diagram_<id>.md (artifact type is flow_diagram, not mermaid).",
           inputSchema: {
             type: "object",
             properties: {
-              codebase: { type: "object" },
+              codebase: {
+                type: "object",
+                description: "Files array. Path must match: .quikim/artifacts/<spec>/flow_diagram_<id>.md",
+              },
               user_prompt: { type: "string" },
-              project_context: { type: "object" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["codebase", "user_prompt"],
           },
@@ -317,7 +335,7 @@ export class MCPCursorProtocolServer {
             properties: {
               codebase: { type: "object" },
               user_prompt: { type: "string", description: "Include component name, e.g., 'pull_lld for auth service' or 'LLD for payment module'" },
-              project_context: { type: "object" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["user_prompt"],
           },
@@ -330,9 +348,65 @@ export class MCPCursorProtocolServer {
             properties: {
               codebase: { type: "object" },
               user_prompt: { type: "string", description: "Optionally specify component name to push specific LLD" },
-              project_context: { type: "object" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["codebase", "user_prompt"],
+          },
+        } as Tool,
+        {
+          name: "push_context",
+          description:
+            "Push context artifact to server. File at .quikim/artifacts/<spec>/context_<id>.md",
+          inputSchema: {
+            type: "object",
+            properties: {
+              codebase: { type: "object" },
+              user_prompt: { type: "string" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
+            },
+            required: ["codebase", "user_prompt"],
+          },
+        } as Tool,
+        {
+          name: "pull_context",
+          description: "Read context from local files or fetch from API (data.force=true)",
+          inputSchema: {
+            type: "object",
+            properties: {
+              codebase: { type: "object" },
+              user_prompt: { type: "string" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
+              data: { type: "object", properties: { force: { type: "boolean" } } },
+            },
+            required: ["user_prompt"],
+          },
+        } as Tool,
+        {
+          name: "push_code_guideline",
+          description:
+            "Push code guideline to server. File at .quikim/artifacts/<spec>/code_guideline_<id>.md",
+          inputSchema: {
+            type: "object",
+            properties: {
+              codebase: { type: "object" },
+              user_prompt: { type: "string" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
+            },
+            required: ["codebase", "user_prompt"],
+          },
+        } as Tool,
+        {
+          name: "pull_code_guideline",
+          description: "Read code guidelines from local files or fetch from API (data.force=true)",
+          inputSchema: {
+            type: "object",
+            properties: {
+              codebase: { type: "object" },
+              user_prompt: { type: "string" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
+              data: { type: "object", properties: { force: { type: "boolean" } } },
+            },
+            required: ["user_prompt"],
           },
         } as Tool,
       ];
@@ -426,6 +500,7 @@ export class MCPCursorProtocolServer {
         toolName: name,
         hasData: !!data,
         projectId: projectContext.projectId,
+        specName: projectContext.specName,
       });
 
       // Route to appropriate handler
@@ -542,7 +617,34 @@ export class MCPCursorProtocolServer {
             projectContext,
             data
           );
-        
+        case "push_context":
+          return await this.toolHandlers.handlePushContext(
+            codebase,
+            userPrompt,
+            projectContext,
+            data
+          );
+        case "pull_context":
+          return await this.toolHandlers.handlePullContext(
+            codebase,
+            userPrompt,
+            projectContext,
+            data
+          );
+        case "push_code_guideline":
+          return await this.toolHandlers.handlePushCodeGuideline(
+            codebase,
+            userPrompt,
+            projectContext,
+            data
+          );
+        case "pull_code_guideline":
+          return await this.toolHandlers.handlePullCodeGuideline(
+            codebase,
+            userPrompt,
+            projectContext,
+            data
+          );
         // Workflow engine tools
         case "detect_change":
         case "analyze_impact":
@@ -552,8 +654,6 @@ export class MCPCursorProtocolServer {
         case "release_lock":
         case "sync_to_ide":
         case "sync_from_ide":
-        case "join_collaboration_session":
-        case "leave_collaboration_session":
         case "generate_code_from_requirements":
         case "generate_code_from_design":
           // Lazy import to avoid circular dependency
