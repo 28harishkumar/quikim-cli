@@ -31,7 +31,6 @@ import {
   isVersionedArtifactType,
 } from "../types/artifacts.js";
 import { extractTitleFromMarkdown } from "../utils/markdown-parser.js";
-import { markdownToHtml, htmlToMarkdown, isHtmlContent } from "./content-converter.js";
 import { normalizeForComparison, computeContentHash } from "../utils/content-normalizer.js";
 import { findDuplicateArtifact, hasContentChanged, findDuplicateTask as detectDuplicateTask } from "./duplicate-detector.js";
 import { MetadataManager } from "./metadata-manager.js";
@@ -377,60 +376,10 @@ export class ArtifactSyncService {
               await this.fileManager.writeArtifactFile(artifact);
             }
           } else {
-            // Convert HTML content to Markdown before writing
-            let contentToWrite = artifact.content;
-            const isHtml = isHtmlContent(artifact.content);
-            
-            if (options.verbose) {
-              output.info(`[VERBOSE] Content format detection: ${isHtml ? "HTML" : "Markdown/Plain text"}`);
-            }
-
-            try {
-              // Only convert if content is HTML
-              if (isHtml) {
-                const originalLength = artifact.content.length;
-                contentToWrite = htmlToMarkdown(artifact.content);
-                
-                if (contentToWrite && contentToWrite !== artifact.content) {
-                  output.info(`[pull] Converted HTML to Markdown for ${this.getArtifactPath(artifact)}`);
-                  
-                  if (options.verbose) {
-                    output.info(`[VERBOSE] HTML → Markdown conversion successful`);
-                    output.info(`[VERBOSE]   Original size: ${originalLength} bytes`);
-                    output.info(`[VERBOSE]   Converted size: ${contentToWrite.length} bytes`);
-                    output.info(`[VERBOSE]   Size change: ${contentToWrite.length - originalLength > 0 ? "+" : ""}${contentToWrite.length - originalLength} bytes`);
-                  }
-                } else {
-                  // Content didn't change, might already be plain text
-                  if (options.verbose) {
-                    output.info(`[VERBOSE] No conversion needed - content unchanged`);
-                  }
-                }
-              } else {
-                output.info(`[pull] Content already in Markdown/plain text format for ${this.getArtifactPath(artifact)}`);
-                
-                if (options.verbose) {
-                  output.info(`[VERBOSE] Skipping conversion - content already in Markdown/plain text format`);
-                }
-              }
-            } catch (conversionError) {
-              // Log conversion error but continue with original content
-              const errorMsg = conversionError instanceof Error ? conversionError.message : String(conversionError);
-              output.warning(`[pull] Failed to convert HTML to Markdown for ${this.getArtifactPath(artifact)}: ${errorMsg}`);
-              output.warning(`[pull] Fallback: Using original content without conversion`);
-              
-              if (options.verbose) {
-                output.info(`[VERBOSE] Conversion error details: ${errorMsg}`);
-                output.info(`[VERBOSE] Fallback: Writing original content as-is`);
-              }
-              
-              // Fallback: use original content
-              contentToWrite = artifact.content;
-            }
-
+            // Requirements: server returns markdown; write as-is (no conversion)
             await this.fileManager.writeArtifactFile({
               ...artifact,
-              content: contentToWrite,
+              content: artifact.content,
               rootId: artifact.rootId,
             });
           }
@@ -653,50 +602,8 @@ export class ArtifactSyncService {
       output.info(`[VERBOSE]   Content size: ${artifact.content.length} bytes`);
     }
 
-    // Convert Markdown content to HTML before pushing
-    let contentToPush = artifact.content;
-    const isHtml = isHtmlContent(artifact.content);
-    
-    if (options.verbose) {
-      output.info(`[VERBOSE] Content format detection: ${isHtml ? "HTML" : "Markdown"}`);
-    }
-
-    try {
-      // Skip conversion if content is already HTML
-      if (!isHtml && (artifact.artifactType === "requirement" || artifact.artifactType === "tasks")) {
-        const originalLength = artifact.content.length;
-        contentToPush = await markdownToHtml(artifact.content);
-        
-        if (contentToPush && contentToPush !== artifact.content) {
-          output.info(`[push] Converted Markdown to HTML for ${artifact.filePath}`);
-          
-          if (options.verbose) {
-            output.info(`[VERBOSE] Markdown → HTML conversion successful`);
-            output.info(`[VERBOSE]   Original size: ${originalLength} bytes`);
-            output.info(`[VERBOSE]   Converted size: ${contentToPush.length} bytes`);
-            output.info(`[VERBOSE]   Size change: ${contentToPush.length - originalLength > 0 ? "+" : ""}${contentToPush.length - originalLength} bytes`);
-          }
-        }
-      } else {
-        output.info(`[push] Content already in HTML format for ${artifact.filePath}`);
-        
-        if (options.verbose) {
-          output.info(`[VERBOSE] Skipping conversion - content already in HTML format`);
-        }
-      }
-    } catch (error) {
-      // Log conversion error but continue with original content
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      output.warning(`[push] Failed to convert Markdown to HTML for ${artifact.filePath}: ${errorMsg}`);
-      output.warning(`[push] Continuing with original content`);
-      
-      if (options.verbose) {
-        output.info(`[VERBOSE] Conversion error details: ${errorMsg}`);
-        output.info(`[VERBOSE] Fallback: Using original content without conversion`);
-      }
-      
-      contentToPush = artifact.content;
-    }
+    // Requirements and tasks: send markdown as-is to server (no conversion)
+    const contentToPush = artifact.content;
 
     // Normalize content for duplicate checking and hash calculation
     const normalizedContent = normalizeForComparison(contentToPush);

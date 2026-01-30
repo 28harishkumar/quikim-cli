@@ -92,17 +92,14 @@ export function prepareContentForPush(
   content: string,
   artifactType: ArtifactType
 ): string | { content: string; format: string } {
-  // For most artifact types, send content as string
-  // The artifact-sync service will handle Markdown to HTML conversion
-  
+  // Send content as string; requirements and tasks send markdown as-is (no conversion).
+
   switch (artifactType) {
     case "requirement":
     case "hld":
     case "lld":
     case "context":
     case "code_guideline":
-      // These types expect content as string
-      // Conversion to HTML is handled by the sync service
       return content;
 
     case "wireframe_files":

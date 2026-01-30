@@ -27,7 +27,6 @@ import {
 import { isVersionedArtifactType } from "../../types/artifacts.js";
 import { extractFetchedArtifacts } from "../utils/fetch-result-parser.js";
 import { normalizeMermaidContent } from "../utils/content-normalizer.js";
-import { markdownToHtml, isHtmlContent } from "../../services/content-converter.js";
 
 export abstract class BaseHandler {
   protected apiService: APIService;
@@ -115,7 +114,7 @@ export abstract class BaseHandler {
 
   /**
    * Push: save to local first (markdown for tasks/requirements), then sync to server in background (non-blocking).
-   * Requirements and tasks: local = markdown (Kiro format); server = HTML (converted like CLI).
+   * Requirements and tasks: send markdown directly to server (no conversion).
    */
   protected async handlePushOperation(
     toolName: ToolName,
@@ -164,17 +163,6 @@ export abstract class BaseHandler {
       }
 
       const contentToSave = content;
-      let contentForServer = content;
-      if (artifactType === "requirements" || artifactType === "tasks") {
-        if (!isHtmlContent(content)) {
-          try {
-            contentForServer = await markdownToHtml(content);
-          } catch (convErr) {
-            logger.logError(`[${toolName}] Markdown to HTML conversion failed; sending as-is`, convErr as Error);
-          }
-        }
-      }
-
       const cliType = mcpToCLIArtifactType(artifactType as MCPArtifactType);
       const initialArtifactName = artifactName;
       await ensureLocalArtifactAfterPush(
@@ -190,7 +178,7 @@ export abstract class BaseHandler {
 
       const metadata = this.buildPushMetadata(data);
       this.apiService
-        .syncArtifact(artifactType, contentForServer, projectData, metadata)
+        .syncArtifact(artifactType, content, projectData, metadata)
         .then((result) => {
           if (!result.success || !result.data) return;
           const { artifactId, rootId } = this.extractArtifactIdsFromResponse(result.data);

@@ -120,14 +120,14 @@ export class MCPCursorProtocolServer {
         {
           name: "generate_requirements",
           description:
-            "Save requirements locally first (markdown), then sync to server in background (non-blocking). Provide markdown in content; we save it locally and convert to HTML for server. Path: .quikim/artifacts/<spec>/requirement_<id>.md. Optional: name/title.",
+            "Save requirements locally first (markdown), then sync to server in background (non-blocking). Provide markdown in content; we save and send markdown to server as-is. Path: .quikim/artifacts/<spec>/requirement_<id>.md. Optional: name/title.",
           inputSchema: {
             type: "object",
             properties: {
               codebase: {
                 type: "object",
                 description:
-                  "Object with 'files' array. Each file must have 'path' and 'content'. Path: .quikim/artifacts/<spec>/requirement_<id>.md. content = markdown (saved locally; we convert to HTML for server).",
+                  "Object with 'files' array. Each file must have 'path' and 'content'. Path: .quikim/artifacts/<spec>/requirement_<id>.md. content = markdown (saved and sent to server as markdown).",
               },
               user_prompt: { type: "string", description: "Original user request" },
               name: ARTIFACT_NAME_TITLE_SCHEMA.name,
@@ -224,14 +224,14 @@ export class MCPCursorProtocolServer {
         {
           name: "generate_tasks",
           description:
-            "Save tasks locally first (markdown, Kiro/task format), then sync to server in background (non-blocking). Provide markdown in content; we save it locally and convert to HTML for server. Path: .quikim/artifacts/<spec>/tasks_<id>.md. File format: YAML frontmatter (--- id, specName, status, ... ---) then # Title, ## Description, ## Subtasks (- [ ] or [x] text), ## Checklist, ## Comments, ## Attachments.",
+            "Save tasks locally first (markdown, Kiro/task format), then sync to server in background (non-blocking). Provide markdown in content; we save and send markdown to server as-is. Path: .quikim/artifacts/<spec>/tasks_<id>.md. File format: YAML frontmatter (--- id, specName, status, ... ---) then # Title, ## Description, ## Subtasks (- [ ] or [x] text), ## Checklist, ## Comments, ## Attachments.",
           inputSchema: {
             type: "object",
             properties: {
               codebase: {
                 type: "object",
                 description:
-                  "Files array. Path: .quikim/artifacts/<spec>/tasks_<id>.md. content = markdown (Kiro/task format; saved locally; we convert to HTML for server).",
+                  "Files array. Path: .quikim/artifacts/<spec>/tasks_<id>.md. content = markdown (Kiro/task format; saved and sent to server as markdown).",
               },
               user_prompt: { type: "string" },
               name: ARTIFACT_NAME_TITLE_SCHEMA.name,

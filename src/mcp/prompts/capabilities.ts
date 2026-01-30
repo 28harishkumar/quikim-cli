@@ -362,12 +362,12 @@ To use a custom spec name (e.g. \`my-feature\`), pass \`project_context: { specN
 ## Push behavior (all generate_* tools)
 
 - **Local-first, non-blocking**: Content is saved to local files first (e.g. \`.quikim/artifacts/<spec>/<type>_<id>.md\`). Server sync runs in the background; the LLM gets an immediate success and can move on.
-- **Requirements and tasks**: Provide **markdown** in the content field (e.g. Kiro task format for tasks). We save that markdown locally and convert to HTML for server upload (same as CLI).
+- **Requirements and tasks**: Provide **markdown** in the content field (e.g. Kiro task format for tasks). We save and send markdown to server.
 
 ## Content Types (what goes in the content field)
 
-- **Requirements**: Markdown. We save markdown locally and convert to HTML for server.
-- **Tasks**: Markdown (Kiro/task file format). We save markdown locally and convert to HTML for server.
+- **Requirements**: Markdown. We save and send markdown to server as-is.
+- **Tasks**: Markdown (Kiro/task file format). We save and send markdown to server as-is.
 - **Mermaid / ER diagrams**: Raw mermaid syntax only (no \`\`\`mermaid wrapper, no JSON).
 - **Context, code_guideline, HLD, LLD**: Plain text or markdown in the content field.
 - **Wireframes**: Canvas JSON (\`name\`, \`viewport\`, \`elements\`) or empty; path \`wireframe_files_<id>.md\`.
