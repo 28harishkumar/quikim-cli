@@ -1543,17 +1543,24 @@ export class ArtifactSyncService {
 
     // Fetch from appropriate endpoints based on artifact type
     if (!filters.artifactType || filters.artifactType === "requirement") {
-      const response = await this.makeRequest<unknown>(
+      const response = await this.makeRequest<{ data?: unknown[]; pagination?: unknown }>(
         "project",
         `/api/v1/requirements/?projectId=${projectId}${filters.specName ? `&specName=${encodeURIComponent(filters.specName)}` : ""}`,
         { method: "GET" }
       );
-      const list = asList<{ id: string; rootId?: string; specName?: string; name: string; content: unknown; version: number; createdAt: string; updatedAt: string }>(response.data);
+      const list = asList<{ id: string; rootId?: string; specName?: string; name: string; version: number; createdAt: string; updatedAt: string }>(response.data);
       for (const req of list) {
         if (filters.specName && req.specName !== filters.specName) continue;
         const rootId = req.rootId ?? req.id;
         if (filters.artifactName && req.name !== filters.artifactName && rootId !== filters.artifactName) continue;
-        const content = extractContent({ content: req.content });
+        const fullRes = await this.makeRequest<{ data?: { content: unknown } }>(
+          "project",
+          `/api/v1/requirements/${req.id}`,
+          { method: "GET" }
+        );
+        const body = fullRes.data as { data?: { content: unknown } } | undefined;
+        const full = body?.data;
+        const content = extractContent({ content: full?.content });
         artifacts.push({
           artifactId: req.id,
           rootId,

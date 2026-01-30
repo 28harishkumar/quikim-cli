@@ -178,19 +178,24 @@ export class QuikimAPIClient {
   // ==================== Artifact Fetching ====================
 
   /**
-   * Fetch requirements for a project
+   * Fetch requirements for a project.
+   * List API returns items without content; fetches full requirement (with content) for the first item when present.
    */
   async fetchRequirements(projectId: string): Promise<Requirements | null> {
     try {
-      // GET /api/v1/requirements/?projectId=xxx
-      const response = await this.request<{ success: boolean; data: any[] }>(
-        `/api/v1/requirements/?projectId=${projectId}`,
+      const response = await this.request<{ success: boolean; data: unknown[]; pagination?: unknown }>(
+        `/api/v1/requirements/?projectId=${projectId}&limit=1`,
         { method: "GET" },
       );
-      
-      // Return the latest version (first item since they're sorted desc by version)
-      const requirements = response.data?.data || [];
-      return requirements.length > 0 ? requirements[0] : null;
+      const list = Array.isArray(response.data) ? response.data : (response.data as { data?: unknown[] })?.data ?? [];
+      if (list.length === 0) return null;
+      const first = list[0] as { id: string };
+      const fullResponse = await this.request<{ success: boolean; data: Requirements }>(
+        `/api/v1/requirements/${first.id}`,
+        { method: "GET" },
+      );
+      const body = fullResponse.data as { data?: Requirements };
+      return body?.data ?? null;
     } catch (error) {
       if (error instanceof NotFoundError) {
         return null;

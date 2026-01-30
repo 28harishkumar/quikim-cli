@@ -242,12 +242,30 @@ export class ServiceAwareAPIClient {
   // ==================== Requirements (Project Service) ====================
 
   /**
-   * Fetch requirements for a project
+   * Fetch requirements for a project.
+   * List API returns items without content; fetches full requirement (with content) for each item.
    */
-  async fetchRequirements(projectId: string): Promise<unknown> {
-    return this.request('project', `/api/v1/requirements/?projectId=${projectId}`, {
-      method: 'GET',
-    });
+  async fetchRequirements(projectId: string, specName?: string): Promise<unknown> {
+    const listRes = await this.request<{ data?: { id: string }[]; pagination?: unknown }>(
+      'project',
+      `/api/v1/requirements/?projectId=${projectId}${specName ? `&specName=${encodeURIComponent(specName)}` : ''}&limit=100`,
+      { method: 'GET' }
+    );
+    const body = listRes.data as { data?: { id: string }[] } | undefined;
+    const list = Array.isArray(body) ? body : (body?.data ?? []);
+    if (list.length === 0) return { success: true, data: [] };
+    const fullList: unknown[] = [];
+    for (const item of list) {
+      const fullRes = await this.request<{ data?: unknown }>(
+        'project',
+        `/api/v1/requirements/${item.id}`,
+        { method: 'GET' }
+      );
+      const fullBody = fullRes.data as { data?: unknown } | undefined;
+      const full = fullBody?.data ?? fullRes.data;
+      if (full) fullList.push(full);
+    }
+    return { success: true, data: fullList };
   }
 
   /**
