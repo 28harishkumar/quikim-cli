@@ -1,7 +1,7 @@
 /**
  * Quikim - Task File Manager
  * 
- * Copyright (c) 2026 Quikim Inc.
+ * Copyright (c) 2026 Quikim Pvt. Ltd.
  * 
  * This file is part of Quikim, licensed under the AGPL-3.0 License.
  * See LICENSE file in the project root for full license information.
@@ -81,6 +81,8 @@ export interface Task {
   checklist?: ChecklistItem[];
   comments?: Comment[];
   attachments?: Attachment[];
+  /** Versioned prompt (AI/LLM prompt for this task); latest only when syncing. */
+  prompt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -181,6 +183,11 @@ export class TaskFileManager {
         markdown += `- [${attachment.filename}](${relativePath})\n`;
       }
       markdown += `\n`;
+    }
+
+    // Add prompt (versioned on server; local file stores latest only)
+    if (task.prompt) {
+      markdown += `## Prompt\n\n${task.prompt}\n\n`;
     }
 
     return markdown.trim() + "\n";
@@ -318,6 +325,10 @@ export class TaskFileManager {
       }
     }
 
+    // Extract prompt (versioned on server; local file stores latest only)
+    const promptMatch = content.match(/##\s+Prompt\n\n([\s\S]*?)(?=\n##|$)/);
+    const prompt = promptMatch ? promptMatch[1].trim() : undefined;
+
     return {
       id: metadata.id,
       specName: metadata.specName,
@@ -333,6 +344,7 @@ export class TaskFileManager {
       checklist,
       comments,
       attachments,
+      prompt,
       createdAt: metadata.createdAt,
       updatedAt: metadata.updatedAt,
     };

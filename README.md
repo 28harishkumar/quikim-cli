@@ -346,4 +346,4 @@ a commercial license is available.
 
 Contact: admin@quikim.com
 
-Copyright (c) 2026 Quikim Inc.
+Copyright (c) 2026 Quikim Pvt. Ltd.

@@ -4,7 +4,7 @@
  * This module exposes MCP server capabilities through the MCP prompts protocol.
  * LLMs can discover available tools and their usage without needing cursor rules.
  * 
- * Copyright (c) 2026 Quikim Inc.
+ * Copyright (c) 2026 Quikim Pvt. Ltd.
  * 
  * This file is part of Quikim, licensed under the AGPL-3.0 License.
  * See LICENSE file in the project root for full license information.

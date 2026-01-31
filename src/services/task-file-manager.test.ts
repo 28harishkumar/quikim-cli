@@ -1,7 +1,7 @@
 /**
  * Quikim - Task File Manager Tests
  * 
- * Copyright (c) 2026 Quikim Inc.
+ * Copyright (c) 2026 Quikim Pvt. Ltd.
  * 
  * This file is part of Quikim, licensed under the AGPL-3.0 License.
  * See LICENSE file in the project root for full license information.

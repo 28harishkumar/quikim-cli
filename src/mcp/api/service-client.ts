@@ -2,7 +2,7 @@
  * Quikim - Service-Aware API Client
  * Routes requests to appropriate microservices (user-service, project-service)
  * 
- * Copyright (c) 2026 Quikim Inc.
+ * Copyright (c) 2026 Quikim Pvt. Ltd.
  * 
  * This file is part of Quikim, licensed under the AGPL-3.0 License.
  * See LICENSE file in the project root for full license information.
@@ -372,6 +372,50 @@ export class ServiceAwareAPIClient {
         priority: metadata?.priority || 'medium',
         type: metadata?.type || 'feature',
       }),
+    });
+  }
+
+  /**
+   * Get task prompt version history (list without full content).
+   */
+  async getTaskPromptVersionHistory(taskId: string): Promise<unknown> {
+    return this.request('project', `/api/v1/tasks/${taskId}/prompts/version-history`, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get a single task prompt with full content.
+   */
+  async getTaskPrompt(taskId: string, promptId: string): Promise<unknown> {
+    return this.request('project', `/api/v1/tasks/${taskId}/prompts/${promptId}`, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Create a new task prompt version.
+   */
+  async createTaskPrompt(
+    taskId: string,
+    data: { content: string; changeSummary?: string; changeType?: string }
+  ): Promise<unknown> {
+    return this.request('project', `/api/v1/tasks/${taskId}/prompts`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Restore a task prompt version (creates new version from source content).
+   */
+  async restoreTaskPrompt(
+    taskId: string,
+    data: { sourcePromptId: string; changeSummary?: string; changeType?: string }
+  ): Promise<unknown> {
+    return this.request('project', `/api/v1/tasks/${taskId}/prompts/restore`, {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   }
 

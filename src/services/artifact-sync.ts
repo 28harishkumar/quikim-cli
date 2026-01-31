@@ -1,7 +1,7 @@
 /**
  * Quikim - Artifact Sync Service
  * 
- * Copyright (c) 2026 Quikim Inc.
+ * Copyright (c) 2026 Quikim Pvt. Ltd.
  * 
  * This file is part of Quikim, licensed under the AGPL-3.0 License.
  * See LICENSE file in the project root for full license information.
@@ -1021,6 +1021,11 @@ export class ArtifactSyncService {
           }
         }
 
+        // Push task prompt if present (creates new version on server)
+        if (task.prompt && task.prompt.trim()) {
+          await this.pushTaskPrompt(task.id, task.prompt);
+        }
+
         // Push subtasks
         for (const subtask of subtasks) {
           await this.createOrUpdateSubtask(projectId, subtask);
@@ -1300,20 +1305,21 @@ export class ArtifactSyncService {
       if (!response.success || !response.data) {
         return null;
       }
-      const data = response.data as any;
+      const data = response.data as Record<string, unknown> & { latestPrompt?: { content?: string } };
       return {
-        id: data.id,
-        specName: data.specName || "default",
-        milestoneId: data.milestoneId,
-        title: data.title,
-        description: data.description,
-        status: data.status,
-        priority: data.priority,
-        assignee: data.assignee,
-        dueDate: data.dueDate,
-        tags: data.tags,
-        createdAt: data.createdAt,
-        updatedAt: data.updatedAt,
+        id: data.id as string,
+        specName: (data.specName as string) || "default",
+        milestoneId: data.milestoneId as string | undefined,
+        title: data.title as string,
+        description: data.description as string,
+        status: data.status as Task["status"],
+        priority: data.priority as Task["priority"],
+        assignee: data.assignee as string | undefined,
+        dueDate: data.dueDate as string | undefined,
+        tags: data.tags as string[] | undefined,
+        prompt: data.latestPrompt?.content,
+        createdAt: data.createdAt as string,
+        updatedAt: data.updatedAt as string,
       };
     } catch (error) {
       return null;
@@ -1364,6 +1370,16 @@ export class ArtifactSyncService {
       createdAt: serverTask.createdAt || new Date().toISOString(),
       updatedAt: serverTask.updatedAt || new Date().toISOString(),
     };
+  }
+
+  /**
+   * Push task prompt (create new version on server).
+   */
+  private async pushTaskPrompt(taskId: string, content: string): Promise<void> {
+    await this.makeRequest<{ success: boolean }>("project", `/api/v1/tasks/${taskId}/prompts`, {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    });
   }
 
   /**
