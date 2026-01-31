@@ -151,6 +151,7 @@ export class ContentExtractor {
       mermaid: "flow_diagram_",
       context: "context_",
       code_guideline: "code_guideline_",
+      tests: "tests_",
     };
     return filePrefixByType[artifactType] ?? "";
   }
@@ -167,6 +168,7 @@ export class ContentExtractor {
       mermaid: "flow_diagram_",
       context: "context_",
       code_guideline: "code_guideline_",
+      tests: "tests_",
     };
     const prefix = filePrefixByType[artifactType];
     return `.quikim/artifacts/<spec>/${prefix}<id>.md`;
@@ -188,6 +190,7 @@ export class ContentExtractor {
       mermaid: "flow_diagram_",
       context: "context_",
       code_guideline: "code_guideline_",
+      tests: "tests_",
     };
     const prefix = filePrefixByType[artifactType];
     return new RegExp(

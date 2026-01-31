@@ -15,7 +15,7 @@ import {
   isVersionedArtifactType,
 } from "../types/artifacts.js";
 
-/** MCP/tool artifact type names (requirements, wireframes, mermaid, context, code_guideline) */
+/** MCP/tool artifact type names (requirements, wireframes, mermaid, context, code_guideline, tests) */
 export type MCPArtifactType =
   | "requirements"
   | "hld"
@@ -25,7 +25,8 @@ export type MCPArtifactType =
   | "er_diagram"
   | "mermaid"
   | "context"
-  | "code_guideline";
+  | "code_guideline"
+  | "tests";
 
 const MCP_TO_CLI_TYPE: Record<MCPArtifactType, CLIArtifactType> = {
   requirements: "requirement",
@@ -37,6 +38,7 @@ const MCP_TO_CLI_TYPE: Record<MCPArtifactType, CLIArtifactType> = {
   mermaid: "flow_diagram",
   context: "context",
   code_guideline: "code_guideline",
+  tests: "tests",
 };
 
 export function mcpToCLIArtifactType(mcpType: MCPArtifactType): CLIArtifactType {

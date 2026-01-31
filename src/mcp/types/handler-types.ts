@@ -16,11 +16,14 @@ export type ArtifactType =
   | "er_diagram"
   | "mermaid"
   | "context"
-  | "code_guideline";
+  | "code_guideline"
+  | "tests";
 
 export type ToolName =
   | "generate_requirements"
   | "pull_requirements"
+  | "generate_tests"
+  | "pull_tests"
   | "generate_hld"
   | "pull_hld"
   | "generate_lld"

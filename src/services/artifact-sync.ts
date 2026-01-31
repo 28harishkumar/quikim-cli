@@ -767,6 +767,61 @@ export class ArtifactSyncService {
         break;
       }
 
+      case "tests": {
+        let parsed: { description?: string; sampleInputOutput?: unknown; inputDescription?: unknown; outputDescription?: unknown };
+        try {
+          parsed = typeof contentToPush === "string" ? JSON.parse(contentToPush) : contentToPush as typeof parsed;
+        } catch {
+          parsed = { description: String(contentToPush), sampleInputOutput: {}, inputDescription: {}, outputDescription: {} };
+        }
+        if (duplicate && method === "PATCH") {
+          endpoint = `/api/v1/tests/${duplicate.artifactId}`;
+          requestBody = {
+            name: artifact.artifactName,
+            specName: artifact.specName || "default",
+            description: parsed.description ?? "",
+            sampleInputOutput: parsed.sampleInputOutput ?? {},
+            inputDescription: parsed.inputDescription ?? {},
+            outputDescription: parsed.outputDescription ?? {},
+          };
+        } else {
+          const testExists =
+            reqIdFromName &&
+            (await this.fetchServerArtifact(
+              projectId,
+              artifact.specName,
+              "tests",
+              artifactName
+            ));
+          if (testExists) {
+            method = "PATCH";
+            endpoint = `/api/v1/tests/${artifactName}`;
+            requestBody = {
+              name: artifact.artifactName,
+              specName: artifact.specName || "default",
+              description: parsed.description ?? "",
+              sampleInputOutput: parsed.sampleInputOutput ?? {},
+              inputDescription: parsed.inputDescription ?? {},
+              outputDescription: parsed.outputDescription ?? {},
+            };
+          } else {
+            endpoint = "/api/v1/tests";
+            requestBody = {
+              projectId,
+              name: artifact.artifactName,
+              specName: artifact.specName || "default",
+              description: parsed.description ?? "",
+              sampleInputOutput: parsed.sampleInputOutput ?? {},
+              inputDescription: parsed.inputDescription ?? {},
+              outputDescription: parsed.outputDescription ?? {},
+              changeSummary: `Synced from CLI - spec: ${artifact.specName}`,
+              changeType: "minor",
+            };
+          }
+        }
+        break;
+      }
+
       case "hld":
       case "lld": {
         // Use duplicate detection result if available
@@ -1592,6 +1647,44 @@ export class ArtifactSyncService {
       }
     }
 
+    if (!filters.artifactType || filters.artifactType === "tests") {
+      const response = await this.makeRequest<{ data?: unknown[]; pagination?: unknown }>(
+        "project",
+        `/api/v1/tests/?projectId=${projectId}${filters.specName ? `&specName=${encodeURIComponent(filters.specName)}` : ""}`,
+        { method: "GET" }
+      );
+      const list = asList<{ id: string; rootId?: string; specName?: string; name: string; version: number; tags?: string[]; createdAt: string; updatedAt: string }>(response.data);
+      for (const t of list) {
+        if (filters.specName && t.specName !== filters.specName) continue;
+        const rootId = t.rootId ?? t.id;
+        if (filters.artifactName && t.name !== filters.artifactName && rootId !== filters.artifactName) continue;
+        const fullRes = await this.makeRequest<{ data?: { description?: string; sampleInputOutput?: unknown; inputDescription?: unknown; outputDescription?: unknown } }>(
+          "project",
+          `/api/v1/tests/${t.id}`,
+          { method: "GET" }
+        );
+        const full = (fullRes.data as { data?: { description?: string; sampleInputOutput?: unknown; inputDescription?: unknown; outputDescription?: unknown } })?.data;
+        const content = JSON.stringify({
+          description: full?.description ?? "",
+          sampleInputOutput: full?.sampleInputOutput ?? {},
+          inputDescription: full?.inputDescription ?? {},
+          outputDescription: full?.outputDescription ?? {},
+        });
+        artifacts.push({
+          artifactId: t.id,
+          rootId,
+          specName: t.specName || "default",
+          artifactType: "tests",
+          artifactName: t.name,
+          content,
+          contentHash: computeContentHash(content),
+          version: t.version,
+          createdAt: new Date(t.createdAt),
+          updatedAt: new Date(t.updatedAt),
+        });
+      }
+    }
+
     if (!filters.artifactType || filters.artifactType === "hld" || filters.artifactType === "lld") {
       const typeFilter = filters.artifactType === "hld" ? "hld" : filters.artifactType === "lld" ? "lld" : undefined;
       const specFilter = filters.specName ? `&specName=${encodeURIComponent(filters.specName)}` : "";
@@ -1993,6 +2086,12 @@ export class ArtifactSyncService {
         endpoint = isId 
           ? `/api/v1/requirements/${identifier}`
           : `/api/v1/requirements/?projectId=${project.projectId}&name=${encodeURIComponent(identifier)}`;
+        break;
+
+      case "tests":
+        endpoint = isId
+          ? `/api/v1/tests/${identifier}`
+          : `/api/v1/tests/?projectId=${project.projectId}&name=${encodeURIComponent(identifier)}`;
         break;
 
       case "hld":

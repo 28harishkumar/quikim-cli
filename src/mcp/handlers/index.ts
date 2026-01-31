@@ -27,6 +27,14 @@ export class ToolHandlers {
     return this.handlers.handlePullRequirements(codebase, userPrompt, projectContext, data);
   }
 
+  async handlePushTests(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
+    return this.handlers.handlePushTests(codebase, userPrompt, projectContext, data);
+  }
+
+  async handlePullTests(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
+    return this.handlers.handlePullTests(codebase, userPrompt, projectContext, data);
+  }
+
   async handlePushHLD(codebase: CodebaseContext, userPrompt: string, projectContext: ProjectContext, data?: any) {
     return this.handlers.handlePushHLD(codebase, userPrompt, projectContext, data);
   }

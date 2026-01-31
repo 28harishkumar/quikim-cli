@@ -16,6 +16,7 @@ export type ArtifactType =
   | "wireframe_files"
   | "flow_diagram"
   | "er_diagram"
+  | "tests"
   | "tasks";
 
 /** Versioned artifact types: one file per root (filename uses root_id) */
@@ -26,6 +27,7 @@ export const VERSIONED_ARTIFACT_TYPES: readonly ArtifactType[] = [
   "flow_diagram",
   "er_diagram",
   "wireframe_files",
+  "tests",
 ] as const;
 
 export type VersionedArtifactType = (typeof VERSIONED_ARTIFACT_TYPES)[number];

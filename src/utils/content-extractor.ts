@@ -29,7 +29,8 @@ export type ArtifactType =
   | "wireframe_files" 
   | "flow_diagram" 
   | "er_diagram" 
-  | "tasks";
+  | "tasks"
+  | "tests";
 
 /**
  * Extract content from various artifact formats
@@ -100,6 +101,7 @@ export function prepareContentForPush(
     case "lld":
     case "context":
     case "code_guideline":
+    case "tests":
       return content;
 
     case "wireframe_files":

@@ -47,6 +47,17 @@ export function extractFetchedArtifacts(
     let content = "";
     if (artifactType === "mermaid" && "mermaidDiagram" in obj) {
       content = String(obj.mermaidDiagram ?? "");
+    } else if (artifactType === "tests") {
+      content = JSON.stringify(
+        {
+          description: obj.description ?? "",
+          sampleInputOutput: obj.sampleInputOutput ?? {},
+          inputDescription: obj.inputDescription ?? {},
+          outputDescription: obj.outputDescription ?? {},
+        },
+        null,
+        2
+      );
     } else {
       content = extractText(obj.content ?? obj);
     }
@@ -67,6 +78,17 @@ export function extractFetchedArtifacts(
     let content = "";
     if (artifactType === "mermaid" && "mermaidDiagram" in single) {
       content = String(single.mermaidDiagram ?? "");
+    } else if (artifactType === "tests") {
+      content = JSON.stringify(
+        {
+          description: single.description ?? "",
+          sampleInputOutput: single.sampleInputOutput ?? {},
+          inputDescription: single.inputDescription ?? {},
+          outputDescription: single.outputDescription ?? {},
+        },
+        null,
+        2
+      );
     } else {
       content = extractText(single.content ?? single);
     }

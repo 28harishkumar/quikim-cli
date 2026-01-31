@@ -283,6 +283,63 @@ export class ServiceAwareAPIClient {
     });
   }
 
+  /**
+   * Fetch tests for a project.
+   */
+  async fetchTests(projectId: string, specName?: string): Promise<unknown> {
+    const listRes = await this.request<{ data?: { id: string }[]; pagination?: unknown }>(
+      'project',
+      `/api/v1/tests/?projectId=${projectId}${specName ? `&specName=${encodeURIComponent(specName)}` : ''}&limit=100`,
+      { method: 'GET' }
+    );
+    const body = listRes.data as { data?: { id: string }[] } | undefined;
+    const list = Array.isArray(body) ? body : (body?.data ?? []);
+    if (list.length === 0) return { success: true, data: [] };
+    const fullList: unknown[] = [];
+    for (const item of list) {
+      const fullRes = await this.request<{ data?: unknown }>(
+        'project',
+        `/api/v1/tests/${item.id}`,
+        { method: 'GET' }
+      );
+      const fullBody = fullRes.data as { data?: unknown } | undefined;
+      const full = fullBody?.data ?? fullRes.data;
+      if (full) fullList.push(full);
+    }
+    return { success: true, data: fullList };
+  }
+
+  /**
+   * Create/update test
+   */
+  async syncTest(projectId: string, payload: {
+    name?: string;
+    specName?: string;
+    tags?: string[];
+    description?: string;
+    sampleInputOutput?: unknown;
+    inputDescription?: unknown;
+    outputDescription?: unknown;
+    changeSummary?: string;
+    changeType?: string;
+  }): Promise<unknown> {
+    return this.request('project', '/api/v1/tests/', {
+      method: 'POST',
+      body: JSON.stringify({
+        projectId,
+        name: payload.name ?? 'Test',
+        specName: payload.specName ?? 'default',
+        tags: payload.tags ?? [],
+        description: payload.description ?? '',
+        sampleInputOutput: payload.sampleInputOutput ?? {},
+        inputDescription: payload.inputDescription ?? {},
+        outputDescription: payload.outputDescription ?? {},
+        changeSummary: payload.changeSummary,
+        changeType: payload.changeType ?? 'minor',
+      }),
+    });
+  }
+
   // ==================== Designs (Project Service) ====================
 
   /**

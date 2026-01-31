@@ -161,6 +161,40 @@ export class MCPCursorProtocolServer {
           },
         } as Tool,
         {
+          name: "generate_tests",
+          description:
+            "Save tests locally first (JSON with description, sampleInputOutput, inputDescription, outputDescription), then sync to server. Path: .quikim/artifacts/<spec>/tests_<id>.md.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              codebase: { type: "object", description: "Files array. Path: .quikim/artifacts/<spec>/tests_<id>.md." },
+              user_prompt: { type: "string" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
+            },
+            required: ["codebase", "user_prompt"],
+          },
+        } as Tool,
+        {
+          name: "pull_tests",
+          description:
+            "Read tests from local .quikim/artifacts/<spec>/ files. Pass data.force=true to fetch from API then write to local.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              codebase: { type: "object" },
+              user_prompt: { type: "string" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
+              data: {
+                type: "object",
+                properties: {
+                  force: { type: "boolean", description: "If true, fetch from API then write to local" },
+                },
+              },
+            },
+            required: ["user_prompt"],
+          },
+        } as Tool,
+        {
           name: "generate_hld",
           description:
             "Save HLD locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/hld_<id>.md. Optional: name/title.",
@@ -544,6 +578,20 @@ export class MCPCursorProtocolServer {
           );
         case "pull_requirements":
           return await this.toolHandlers.handlePullRequirements(
+            codebase,
+            userPrompt,
+            projectContext,
+            dataToPass
+          );
+        case "generate_tests":
+          return await this.toolHandlers.handlePushTests(
+            codebase,
+            userPrompt,
+            projectContext,
+            dataToPass
+          );
+        case "pull_tests":
+          return await this.toolHandlers.handlePullTests(
             codebase,
             userPrompt,
             projectContext,

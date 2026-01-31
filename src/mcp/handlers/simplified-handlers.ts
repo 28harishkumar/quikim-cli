@@ -14,6 +14,7 @@ import { HandlerResponse } from "../types/handler-types.js";
 
 // Import specialized handlers
 import { RequirementsHandler } from "./requirements-handler.js";
+import { TestsHandler } from "./tests-handler.js";
 import { DesignHandler } from "./design-handler.js";
 import { WireframeHandler } from "./wireframe-handler.js";
 import { TaskHandler } from "./task-handler.js";
@@ -28,6 +29,7 @@ import { CodeGuidelineHandler } from "./code-guideline-handler.js";
  */
 export class SimplifiedToolHandlers {
   private requirementsHandler: RequirementsHandler;
+  private testsHandler: TestsHandler;
   private designHandler: DesignHandler;
   private wireframeHandler: WireframeHandler;
   private taskHandler: TaskHandler;
@@ -38,6 +40,7 @@ export class SimplifiedToolHandlers {
 
   constructor(apiClient: ServiceAwareAPIClient) {
     this.requirementsHandler = new RequirementsHandler(apiClient);
+    this.testsHandler = new TestsHandler(apiClient);
     this.designHandler = new DesignHandler(apiClient);
     this.wireframeHandler = new WireframeHandler(apiClient);
     this.taskHandler = new TaskHandler(apiClient);
@@ -65,6 +68,26 @@ export class SimplifiedToolHandlers {
     data?: unknown
   ): Promise<HandlerResponse> {
     return this.requirementsHandler.handlePull(codebase, userPrompt, projectContext, data);
+  }
+
+  // ==================== Tests Handlers ====================
+
+  async handlePushTests(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.testsHandler.handlePush(codebase, userPrompt, projectContext, data);
+  }
+
+  async handlePullTests(
+    codebase: CodebaseContext,
+    userPrompt: string,
+    projectContext: ProjectContext,
+    data?: unknown
+  ): Promise<HandlerResponse> {
+    return this.testsHandler.handlePull(codebase, userPrompt, projectContext, data);
   }
 
   // ==================== HLD Handlers ====================

@@ -127,6 +127,35 @@ export class APIStructureGenerator {
         },
       },
 
+      // Tests endpoints (Project Service)
+      {
+        path: "/api/v1/tests/",
+        method: "GET",
+        service: "project",
+        description: "Fetch tests for a project",
+        queryParams: ["projectId", "specName"],
+        requiredFields: ["projectId"],
+      },
+      {
+        path: "/api/v1/tests/",
+        method: "POST",
+        service: "project",
+        description: "Create or update test",
+        requiredFields: ["projectId", "name"],
+        requestSchema: {
+          projectId: "string",
+          name: "string",
+          specName: "string (optional, default: default)",
+          tags: "string[] (optional)",
+          description: "string (optional)",
+          sampleInputOutput: "object (optional)",
+          inputDescription: "object (optional)",
+          outputDescription: "object (optional)",
+          changeSummary: "string (optional)",
+          changeType: "string (optional)",
+        },
+      },
+
       // Task endpoints (Project Service)
       {
         path: "/api/v1/tasks/",

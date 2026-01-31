@@ -103,6 +103,27 @@ export class APIService {
           );
           break;
 
+        case "tests": {
+          let payload: { name?: string; specName?: string; tags?: string[]; description?: string; sampleInputOutput?: unknown; inputDescription?: unknown; outputDescription?: unknown };
+          try {
+            payload = typeof content === "string" ? JSON.parse(content) : content as typeof payload;
+          } catch {
+            payload = { description: content, sampleInputOutput: {}, inputDescription: {}, outputDescription: {} };
+          }
+          result = await this.apiClient.syncTest(projectData.projectId, {
+            name: payload.name ?? metadata?.name as string,
+            specName: payload.specName ?? projectData.specName ?? "default",
+            tags: payload.tags,
+            description: payload.description,
+            sampleInputOutput: payload.sampleInputOutput,
+            inputDescription: payload.inputDescription,
+            outputDescription: payload.outputDescription,
+            changeSummary: metadata?.changeSummary as string,
+            changeType: (metadata?.changeType as string) ?? "minor",
+          });
+          break;
+        }
+
         default:
           throw new Error(`Syncing ${artifactType} is not yet implemented`);
       }
@@ -168,6 +189,10 @@ export class APIService {
 
         case "code_guideline":
           result = await this.apiClient.fetchCodeGuidelines(projectData.projectId);
+          break;
+
+        case "tests":
+          result = await this.apiClient.fetchTests(projectData.projectId, projectData.specName);
           break;
 
         default:
