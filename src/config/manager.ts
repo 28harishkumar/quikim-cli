@@ -15,6 +15,7 @@ import {
   DEFAULT_API_URL,
   LOCAL_USER_SERVICE_URL,
   LOCAL_PROJECT_SERVICE_URL,
+  LOCAL_WORKFLOW_SERVICE_URL,
   CONFIG_FILE_NAME,
   QUIKIM_DIR,
   PROJECT_CONFIG_FILE,
@@ -60,16 +61,28 @@ export class ConfigManager {
     globalConfig.set("projectServiceUrl", url);
   }
 
+  /** Get workflow service URL (server-side workflow; defaults to project URL + /workflow or dedicated URL) */
+  getWorkflowServiceUrl(): string {
+    return globalConfig.get("workflowServiceUrl") ?? globalConfig.get("projectServiceUrl") ?? this.getApiUrl();
+  }
+
+  /** Set workflow service URL */
+  setWorkflowServiceUrl(url: string): void {
+    globalConfig.set("workflowServiceUrl", url);
+  }
+
   /** Set local development mode (separate services) */
   setLocalMode(): void {
     globalConfig.set("userServiceUrl", LOCAL_USER_SERVICE_URL);
     globalConfig.set("projectServiceUrl", LOCAL_PROJECT_SERVICE_URL);
+    globalConfig.set("workflowServiceUrl", LOCAL_WORKFLOW_SERVICE_URL);
   }
 
   /** Set production mode (single gateway) */
   setProductionMode(): void {
     globalConfig.delete("userServiceUrl");
     globalConfig.delete("projectServiceUrl");
+    globalConfig.delete("workflowServiceUrl");
     globalConfig.set("apiUrl", DEFAULT_API_URL);
   }
 

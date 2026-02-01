@@ -12,6 +12,7 @@ export interface CLIConfig {
   apiUrl: string;
   userServiceUrl?: string;
   projectServiceUrl?: string;
+  workflowServiceUrl?: string;
   auth?: AuthConfig;
   currentProject?: ProjectConfig;
 }

@@ -467,6 +467,39 @@ export class MCPCursorProtocolServer {
             required: ["user_prompt"],
           },
         } as Tool,
+        {
+          name: "get_workflow_instruction",
+          description:
+            "Get the next workflow instruction for the project (action, prompt, context artifacts, decision trace). Call this before generating an artifact so the LLM knows what to generate and which @mentions to use.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              project_id: { type: "string", description: "Project ID (or from project_context)" },
+              user_prompt: { type: "string", description: "User intent, e.g. 'Build a restaurant app'" },
+              last_known_state: { type: "string", description: "Optional last workflow node id" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
+            },
+            required: ["user_prompt"],
+          },
+        } as Tool,
+        {
+          name: "report_workflow_progress",
+          description:
+            "Report that an artifact was created/updated so workflow state advances. Call after createArtifact (e.g. after generate_requirements, generate_hld). Include pending_instruction_id from get_workflow_instruction for idempotency.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              project_id: { type: "string", description: "Project ID" },
+              artifact_type: { type: "string", description: "e.g. requirement, hld, lld, tasks" },
+              spec_name: { type: "string", description: "Spec name (default: default)" },
+              artifact_name: { type: "string", description: "Artifact name" },
+              artifact_id: { type: "string", description: "Optional server artifact id" },
+              pending_instruction_id: { type: "string", description: "From get_workflow_instruction for idempotency" },
+              project_context: PROJECT_CONTEXT_SCHEMA,
+            },
+            required: ["project_id", "artifact_type", "spec_name"],
+          },
+        } as Tool,
       ];
 
       // Get workflow engine tools (lazy import to avoid circular dependency)
@@ -723,6 +756,71 @@ export class MCPCursorProtocolServer {
             projectContext,
             dataToPass
           );
+        case "get_workflow_instruction": {
+          const projectId = (args.project_id as string) || projectContext.projectId;
+          if (!projectId) {
+            return { content: [{ type: "text", text: "Error: project_id or project_context with projectId required." }], isError: true };
+          }
+          const workflowBase = configManager.getWorkflowServiceUrl().replace(/\/$/, "");
+          const token = configManager.getAuth()?.token ?? "";
+          const headers: Record<string, string> = { "Content-Type": "application/json" };
+          if (token) headers["Authorization"] = `Bearer ${token}`;
+          try {
+            const res = await fetch(`${workflowBase}/api/v1/workflow/next`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({
+                projectId,
+                userIntent: userPrompt,
+                lastKnownState: (args.last_known_state as string) || null,
+              }),
+            });
+            if (!res.ok) {
+              const errText = await res.text();
+              return { content: [{ type: "text", text: `Workflow service error: ${res.status} ${errText}` }], isError: true };
+            }
+            const instruction = await res.json();
+            return {
+              content: [{ type: "text", text: JSON.stringify(instruction, null, 2) }],
+            };
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return { content: [{ type: "text", text: `Workflow service call failed: ${msg}` }], isError: true };
+          }
+        }
+        case "report_workflow_progress": {
+          const projectId = (args.project_id as string) || projectContext.projectId;
+          if (!projectId) {
+            return { content: [{ type: "text", text: "Error: project_id or project_context with projectId required." }], isError: true };
+          }
+          const workflowBase = configManager.getWorkflowServiceUrl().replace(/\/$/, "");
+          const token = configManager.getAuth()?.token ?? "";
+          const headers: Record<string, string> = { "Content-Type": "application/json" };
+          if (token) headers["Authorization"] = `Bearer ${token}`;
+          try {
+            const res = await fetch(`${workflowBase}/api/v1/workflow/progress`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({
+                projectId,
+                artifactType: args.artifact_type as string,
+                specName: (args.spec_name as string) || "default",
+                artifactName: (args.artifact_name as string) || null,
+                artifactId: (args.artifact_id as string) || null,
+                pendingInstructionId: (args.pending_instruction_id as string) || null,
+              }),
+            });
+            if (!res.ok) {
+              const errText = await res.text();
+              return { content: [{ type: "text", text: `Workflow service error: ${res.status} ${errText}` }], isError: true };
+            }
+            const result = await res.json();
+            return { content: [{ type: "text", text: JSON.stringify(result) }] };
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return { content: [{ type: "text", text: `Workflow service call failed: ${msg}` }], isError: true };
+          }
+        }
         // Workflow engine tools
         case "detect_change":
         case "analyze_impact":

@@ -13,6 +13,7 @@ export const DEFAULT_API_URL = "https://api.quikim.com";
 /** Local development service URLs */
 export const LOCAL_USER_SERVICE_URL = "http://localhost:8001";
 export const LOCAL_PROJECT_SERVICE_URL = "http://localhost:8002";
+export const LOCAL_WORKFLOW_SERVICE_URL = "http://localhost:8004";
 
 /** Legacy: kept for backward compatibility */
 export const LOCAL_API_URL = LOCAL_USER_SERVICE_URL;
