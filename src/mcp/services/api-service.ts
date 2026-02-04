@@ -31,7 +31,7 @@ export class APIService {
           result = await this.apiClient.syncRequirements(
             projectData.projectId,
             content,
-            metadata
+            { ...metadata, specName: projectData.specName ?? "default", name: (metadata?.name as string) ?? "Requirements" }
           );
           break;
 

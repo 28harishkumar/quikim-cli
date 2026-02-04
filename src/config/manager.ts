@@ -31,8 +31,10 @@ const globalConfig = new Conf<CLIConfig>({
 
 /** Configuration manager for CLI */
 export class ConfigManager {
-  /** Get the API URL (legacy, defaults to user service) */
+  /** Get the API URL (legacy, defaults to user service). Env QUIKIM_API_BASE_URL overrides when set (e.g. Claude Desktop). */
   getApiUrl(): string {
+    const fromEnv = process.env.QUIKIM_API_BASE_URL;
+    if (fromEnv) return fromEnv.trim();
     return globalConfig.get("apiUrl", DEFAULT_API_URL);
   }
 
@@ -51,8 +53,10 @@ export class ConfigManager {
     globalConfig.set("userServiceUrl", url);
   }
 
-  /** Get project service URL */
+  /** Get project service URL. Env QUIKIM_API_BASE_URL overrides when set (e.g. Claude Desktop). */
   getProjectServiceUrl(): string {
+    const fromEnv = process.env.QUIKIM_API_BASE_URL;
+    if (fromEnv) return fromEnv.trim();
     return globalConfig.get("projectServiceUrl") ?? this.getApiUrl();
   }
 
@@ -61,8 +65,10 @@ export class ConfigManager {
     globalConfig.set("projectServiceUrl", url);
   }
 
-  /** Get workflow service URL (server-side workflow; defaults to project URL + /workflow or dedicated URL) */
+  /** Get workflow service URL (server-side workflow). Env QUIKIM_WORKFLOW_SERVICE_URL overrides when set (e.g. Claude Desktop). */
   getWorkflowServiceUrl(): string {
+    const fromEnv = process.env.QUIKIM_WORKFLOW_SERVICE_URL;
+    if (fromEnv) return fromEnv.trim();
     return globalConfig.get("workflowServiceUrl") ?? globalConfig.get("projectServiceUrl") ?? this.getApiUrl();
   }
 

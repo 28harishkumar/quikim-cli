@@ -29,7 +29,7 @@ quikim init
 # 3. Configure MCP Server (one-time setup)
 # For Cursor:
 quikim mcp install-cursor
-# For other editors: install-kiro, install-windsurf, install-zed, install-vscode, install-claude-code
+# For other editors: install-kiro, install-windsurf, install-zed, install-vscode, install-claude-code, install-claude-desktop
 
 # 4. Restart your IDE - Quikim tools are now available!
 
@@ -89,6 +89,7 @@ quikim artifacts sync  # Push then pull (full sync)
 | `quikim mcp install-zed`         | Configure MCP server in Zed              |
 | `quikim mcp install-vscode`      | Configure MCP server in VS Code          |
 | `quikim mcp install-claude-code` | Configure MCP server in Claude Code      |
+| `quikim mcp install-claude-desktop` | Configure MCP server in Claude Desktop app (writes auth token and project dir) |
 | `quikim mcp uninstall-<editor>`  | Remove MCP server from specified editor |
 | `quikim mcp status`              | Show MCP server status for all editors  |
 | `quikim mcp serve`               | Start MCP server (used by all editors)  |

@@ -123,7 +123,7 @@ export class QuikimAPIClient {
   /** Login with email and password */
   async login(email: string, password: string): Promise<LoginResponse> {
     const response = await this.request<LoginResponse>(
-      "/api/v1/auth/login",
+      "/api/v1/user/auth/login",
       {
         method: "POST",
         body: JSON.stringify({ email, password }),
@@ -144,7 +144,7 @@ export class QuikimAPIClient {
     name: string
   ): Promise<LoginResponse> {
     const response = await this.request<LoginResponse>(
-      "/api/v1/auth/register",
+      "/api/v1/user/auth/register",
       {
         method: "POST",
         body: JSON.stringify({ email, password, name }),
@@ -160,7 +160,7 @@ export class QuikimAPIClient {
 
   /** Get current user info */
   async getCurrentUser(): Promise<UserInfo> {
-    const response = await this.request<UserInfo>("/api/v1/users/me", {
+    const response = await this.request<UserInfo>("/api/v1/user/users/me", {
       method: "GET",
     });
 
@@ -177,7 +177,7 @@ export class QuikimAPIClient {
   async listProjects(): Promise<Project[]> {
     // API returns paginated response: { data: Project[], pagination: {...} }
     const response = await this.request<Project[]>(
-      "/api/v1/projects",
+      "/api/v1/project/projects",
       { method: "GET" }
     );
 
@@ -192,7 +192,7 @@ export class QuikimAPIClient {
   /** Get project details by ID */
   async getProject(projectId: string): Promise<ProjectDetails> {
     const response = await this.request<ProjectDetails>(
-      `/api/v1/projects/${projectId}`,
+      `/api/v1/project/projects/${projectId}`,
       { method: "GET" }
     );
 
@@ -209,7 +209,7 @@ export class QuikimAPIClient {
     slug: string
   ): Promise<ProjectDetails> {
     const response = await this.request<ProjectDetails>(
-      `/api/v1/organizations/${organizationId}/projects/slug/${slug}`,
+      `/api/v1/project/organizations/${organizationId}/projects/slug/${slug}`,
       { method: "GET" }
     );
 

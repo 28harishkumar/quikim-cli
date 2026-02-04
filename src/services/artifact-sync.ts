@@ -726,7 +726,7 @@ export class ArtifactSyncService {
       case "requirement": {
         // Use duplicate detection result if available
         if (duplicate && method === "PATCH") {
-          endpoint = `/api/v1/requirements/${duplicate.artifactId}`;
+          endpoint = `/requirements/${duplicate.artifactId}`;
           requestBody = {
             content: contentToPush,
             changeSummary: `Synced from CLI - spec: ${artifact.specName}`,
@@ -744,14 +744,14 @@ export class ArtifactSyncService {
             ));
           if (requirementExists) {
             method = "PATCH";
-            endpoint = `/api/v1/requirements/${artifactName}`;
+            endpoint = `/requirements/${artifactName}`;
             requestBody = {
               content: contentToPush,
               changeSummary: `Synced from CLI - spec: ${artifact.specName}`,
               changeType: "minor",
             };
           } else {
-            endpoint = "/api/v1/requirements";
+            endpoint = "/requirements";
             requestBody = {
               projectId,
               name: reqIdFromName
@@ -775,7 +775,7 @@ export class ArtifactSyncService {
           parsed = { description: String(contentToPush), sampleInputOutput: {}, inputDescription: {}, outputDescription: {} };
         }
         if (duplicate && method === "PATCH") {
-          endpoint = `/api/v1/tests/${duplicate.artifactId}`;
+          endpoint = `/tests/${duplicate.artifactId}`;
           requestBody = {
             name: artifact.artifactName,
             specName: artifact.specName || "default",
@@ -795,7 +795,7 @@ export class ArtifactSyncService {
             ));
           if (testExists) {
             method = "PATCH";
-            endpoint = `/api/v1/tests/${artifactName}`;
+            endpoint = `/tests/${artifactName}`;
             requestBody = {
               name: artifact.artifactName,
               specName: artifact.specName || "default",
@@ -805,7 +805,7 @@ export class ArtifactSyncService {
               outputDescription: parsed.outputDescription ?? {},
             };
           } else {
-            endpoint = "/api/v1/tests";
+            endpoint = "/tests";
             requestBody = {
               projectId,
               name: artifact.artifactName,
@@ -826,7 +826,7 @@ export class ArtifactSyncService {
       case "lld": {
         // Use duplicate detection result if available
         if (duplicate && method === "PATCH") {
-          endpoint = "/api/v1/designs";
+          endpoint = "/designs";
           requestBody = {
             projectId,
             id: duplicate.artifactId,
@@ -836,7 +836,7 @@ export class ArtifactSyncService {
             specName: artifact.specName || "default",
           };
         } else {
-          endpoint = "/api/v1/designs";
+          endpoint = "/designs";
           const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(artifactName);
           // Only send id when a non-deleted design exists; list excludes deleted so treat deleted as create-new
           const designExists =
@@ -863,7 +863,7 @@ export class ArtifactSyncService {
       case "flow_diagram": {
         const mermaidType = this.inferMermaidType(contentToPush);
         if (duplicate && method === "PATCH") {
-          endpoint = `/api/v1/designs/${duplicate.artifactId}/mermaid`;
+          endpoint = `/designs/${duplicate.artifactId}/mermaid`;
           method = "PATCH";
           requestBody = {
             mermaidDiagram: contentToPush,
@@ -879,11 +879,11 @@ export class ArtifactSyncService {
               artifactName
             ));
           if (designExists) {
-            endpoint = `/api/v1/designs/${artifactName}/mermaid`;
+            endpoint = `/designs/${artifactName}/mermaid`;
             method = "PATCH";
             requestBody = { mermaidDiagram: contentToPush, mermaidType };
           } else {
-            endpoint = "/api/v1/designs";
+            endpoint = "/designs";
             requestBody = {
               projectId,
               type: "flow",
@@ -899,7 +899,7 @@ export class ArtifactSyncService {
       }
 
       case "er_diagram":
-        endpoint = "/api/v1/er-diagrams";
+        endpoint = "/er-diagrams";
         requestBody = {
           projectId,
           name: artifactName,
@@ -910,7 +910,7 @@ export class ArtifactSyncService {
 
       case "context": {
         if (duplicate && method === "PATCH") {
-          endpoint = `/api/v1/projects/${projectId}/contexts/${duplicate.artifactId}`;
+          endpoint = `/projects/${projectId}/contexts/${duplicate.artifactId}`;
           method = "PUT";
           requestBody = {
             title: artifactName || extractTitleFromMarkdown(artifact.content) || "Context",
@@ -919,7 +919,7 @@ export class ArtifactSyncService {
             isActive: true,
           };
         } else {
-          endpoint = `/api/v1/projects/${projectId}/contexts`;
+          endpoint = `/projects/${projectId}/contexts`;
           requestBody = {
             title: artifactName || extractTitleFromMarkdown(artifact.content) || "Context",
             content: contentToPush,
@@ -931,7 +931,7 @@ export class ArtifactSyncService {
       }
 
       case "code_guideline":
-        endpoint = "/api/v1/code-guidelines";
+        endpoint = "/code-guidelines";
         requestBody = {
           scope: "project",
           projectId,
@@ -942,7 +942,7 @@ export class ArtifactSyncService {
         break;
 
       case "wireframe_files":
-        endpoint = `/api/v1/organizations/${organizationId}/projects/${projectId}/wireframes`;
+        endpoint = `/organizations/${organizationId}/projects/${projectId}/wireframes`;
         requestBody = {
           name: artifactName || extractTitleFromMarkdown(artifact.content) || "Wireframe",
           viewport: { width: 1280, height: 720, scale: 1 },
@@ -1009,7 +1009,7 @@ export class ArtifactSyncService {
         const specFilter = specName ? `&specName=${encodeURIComponent(specName)}` : "";
         const response = await this.makeRequest<unknown>(
           "project",
-          `/api/v1/milestones/?projectId=${projectId}${specFilter}`,
+          `/milestones/?projectId=${projectId}${specFilter}`,
           { method: "GET" }
         );
         return asList<Milestone>(response.data);
@@ -1017,7 +1017,7 @@ export class ArtifactSyncService {
       createMilestone: async (milestone: Partial<Milestone>): Promise<Milestone> => {
         const response = await this.makeRequest<{ success: boolean; data?: unknown }>(
           "project",
-          "/api/v1/milestones/",
+          "/milestones/",
           {
             method: "POST",
             body: JSON.stringify({
@@ -1126,7 +1126,7 @@ export class ArtifactSyncService {
         const specFilter = specName ? `&specName=${encodeURIComponent(specName)}` : "";
         const response = await this.makeRequest<unknown>(
           "project",
-          `/api/v1/milestones/?projectId=${projectId}${specFilter}`,
+          `/milestones/?projectId=${projectId}${specFilter}`,
           { method: "GET" }
         );
         return asList<Milestone>(response.data);
@@ -1134,7 +1134,7 @@ export class ArtifactSyncService {
       createMilestone: async (milestone: Partial<Milestone>): Promise<Milestone> => {
         const response = await this.makeRequest<{ success: boolean; data?: unknown }>(
           "project",
-          "/api/v1/milestones/",
+          "/milestones/",
           {
             method: "POST",
             body: JSON.stringify({
@@ -1190,7 +1190,7 @@ export class ArtifactSyncService {
         // Fetch existing tasks for this milestone for duplicate detection
         const existingTasksResponse = await this.makeRequest<unknown>(
           "project",
-          `/api/v1/tasks/?projectId=${projectId}&milestoneId=${milestoneId}`,
+          `/tasks/?projectId=${projectId}&milestoneId=${milestoneId}`,
           { method: "GET" }
         );
         const existingTasks = asList<{ id: string; title?: string; description?: string; status?: string }>(existingTasksResponse.data);
@@ -1235,7 +1235,7 @@ export class ArtifactSyncService {
 
           const response = await this.makeRequest<{ success: boolean; data?: unknown }>(
             "project",
-            "/api/v1/tasks/",
+            "/tasks/",
             {
               method: "POST",
               body: JSON.stringify(taskData),
@@ -1286,7 +1286,7 @@ export class ArtifactSyncService {
     const specFilter = specName ? `&specName=${encodeURIComponent(specName)}` : "";
     const milestoneResponse = await this.makeRequest<unknown>(
       "project",
-      `/api/v1/milestones/?projectId=${projectId}${specFilter}`,
+      `/milestones/?projectId=${projectId}${specFilter}`,
       { method: "GET" }
     );
     const serverMilestones = asList<{ id: string; name: string; description?: string; specName?: string }>(milestoneResponse.data);
@@ -1302,7 +1302,7 @@ export class ArtifactSyncService {
       // Fetch tasks for this milestone
       const tasksResponse = await this.makeRequest<unknown>(
         "project",
-        `/api/v1/tasks/?projectId=${projectId}&milestoneId=${milestone.id}`,
+        `/tasks/?projectId=${projectId}&milestoneId=${milestone.id}`,
         { method: "GET" }
       );
       const serverTasks = asList<{
@@ -1354,7 +1354,7 @@ export class ArtifactSyncService {
     try {
       const response = await this.makeRequest<{ success: boolean; data?: any }>(
         "project",
-        `/api/v1/tasks/${taskId}`,
+        `/tasks/${taskId}`,
         { method: "GET" }
       );
       if (!response.success || !response.data) {
@@ -1387,7 +1387,7 @@ export class ArtifactSyncService {
   private async createTask(_projectId: string, task: Omit<Task, "subtasks">): Promise<Task> {
     const response = await this.makeRequest<{ success: boolean; data?: any }>(
       "project",
-      "/api/v1/tasks/",
+      "/tasks/",
       {
         method: "POST",
         body: JSON.stringify({
@@ -1431,7 +1431,7 @@ export class ArtifactSyncService {
    * Push task prompt (create new version on server).
    */
   private async pushTaskPrompt(taskId: string, content: string): Promise<void> {
-    await this.makeRequest<{ success: boolean }>("project", `/api/v1/tasks/${taskId}/prompts`, {
+    await this.makeRequest<{ success: boolean }>("project", `/tasks/${taskId}/prompts`, {
       method: "POST",
       body: JSON.stringify({ content }),
     });
@@ -1443,7 +1443,7 @@ export class ArtifactSyncService {
   private async updateTask(_projectId: string, taskId: string, task: Omit<Task, "subtasks">): Promise<void> {
     const response = await this.makeRequest<{ success: boolean }>(
       "project",
-      `/api/v1/tasks/${taskId}`,
+      `/tasks/${taskId}`,
       {
         method: "PATCH",
         body: JSON.stringify({
@@ -1474,7 +1474,7 @@ export class ArtifactSyncService {
       // Update existing subtask
       await this.makeRequest<{ success: boolean }>(
         "project",
-        `/api/v1/tasks/${subtask.id}`,
+        `/tasks/${subtask.id}`,
         {
           method: "PATCH",
           body: JSON.stringify({
@@ -1490,7 +1490,7 @@ export class ArtifactSyncService {
       // Create new subtask
       await this.makeRequest<{ success: boolean }>(
         "project",
-        "/api/v1/tasks/",
+        "/tasks/",
         {
           method: "POST",
           body: JSON.stringify({
@@ -1616,7 +1616,7 @@ export class ArtifactSyncService {
     if (!filters.artifactType || filters.artifactType === "requirement") {
       const response = await this.makeRequest<{ data?: unknown[]; pagination?: unknown }>(
         "project",
-        `/api/v1/requirements/?projectId=${projectId}${filters.specName ? `&specName=${encodeURIComponent(filters.specName)}` : ""}`,
+        `/requirements/?projectId=${projectId}${filters.specName ? `&specName=${encodeURIComponent(filters.specName)}` : ""}`,
         { method: "GET" }
       );
       const list = asList<{ id: string; rootId?: string; specName?: string; name: string; version: number; createdAt: string; updatedAt: string }>(response.data);
@@ -1626,7 +1626,7 @@ export class ArtifactSyncService {
         if (filters.artifactName && req.name !== filters.artifactName && rootId !== filters.artifactName) continue;
         const fullRes = await this.makeRequest<{ data?: { content: unknown } }>(
           "project",
-          `/api/v1/requirements/${req.id}`,
+          `/requirements/${req.id}`,
           { method: "GET" }
         );
         const body = fullRes.data as { data?: { content: unknown } } | undefined;
@@ -1650,7 +1650,7 @@ export class ArtifactSyncService {
     if (!filters.artifactType || filters.artifactType === "tests") {
       const response = await this.makeRequest<{ data?: unknown[]; pagination?: unknown }>(
         "project",
-        `/api/v1/tests/?projectId=${projectId}${filters.specName ? `&specName=${encodeURIComponent(filters.specName)}` : ""}`,
+        `/tests/?projectId=${projectId}${filters.specName ? `&specName=${encodeURIComponent(filters.specName)}` : ""}`,
         { method: "GET" }
       );
       const list = asList<{ id: string; rootId?: string; specName?: string; name: string; version: number; tags?: string[]; createdAt: string; updatedAt: string }>(response.data);
@@ -1660,7 +1660,7 @@ export class ArtifactSyncService {
         if (filters.artifactName && t.name !== filters.artifactName && rootId !== filters.artifactName) continue;
         const fullRes = await this.makeRequest<{ data?: { description?: string; sampleInputOutput?: unknown; inputDescription?: unknown; outputDescription?: unknown } }>(
           "project",
-          `/api/v1/tests/${t.id}`,
+          `/tests/${t.id}`,
           { method: "GET" }
         );
         const full = (fullRes.data as { data?: { description?: string; sampleInputOutput?: unknown; inputDescription?: unknown; outputDescription?: unknown } })?.data;
@@ -1689,8 +1689,8 @@ export class ArtifactSyncService {
       const typeFilter = filters.artifactType === "hld" ? "hld" : filters.artifactType === "lld" ? "lld" : undefined;
       const specFilter = filters.specName ? `&specName=${encodeURIComponent(filters.specName)}` : "";
       const endpoint = typeFilter 
-        ? `/api/v1/designs/?projectId=${projectId}&type=${typeFilter}${specFilter}`
-        : `/api/v1/designs/?projectId=${projectId}${specFilter}`;
+        ? `/designs/?projectId=${projectId}&type=${typeFilter}${specFilter}`
+        : `/designs/?projectId=${projectId}${specFilter}`;
       
       const response = await this.makeRequest<unknown>(
         "project",
@@ -1722,7 +1722,7 @@ export class ArtifactSyncService {
       const specFilter = filters.specName ? `&specName=${encodeURIComponent(filters.specName)}` : "";
       const milestoneResponse = await this.makeRequest<unknown>(
         "project",
-        `/api/v1/milestones/?projectId=${projectId}${specFilter}`,
+        `/milestones/?projectId=${projectId}${specFilter}`,
         { method: "GET" }
       );
       const milestones = asList<{ id: string; name: string; description?: string; specName?: string; createdAt: string; updatedAt: string }>(milestoneResponse.data);
@@ -1730,7 +1730,7 @@ export class ArtifactSyncService {
       for (const milestone of milestones) {
         const tasksResponse = await this.makeRequest<unknown>(
           "project",
-          `/api/v1/tasks/?projectId=${projectId}&milestoneId=${milestone.id}${specFilter}`,
+          `/tasks/?projectId=${projectId}&milestoneId=${milestone.id}${specFilter}`,
           { method: "GET" }
         );
         
@@ -1841,7 +1841,7 @@ export class ArtifactSyncService {
       const specFilter = filters.specName ? `&specName=${encodeURIComponent(filters.specName)}` : "";
       const response = await this.makeRequest<unknown>(
         "project",
-        `/api/v1/designs/?projectId=${projectId}&type=flow${specFilter}`,
+        `/designs/?projectId=${projectId}&type=flow${specFilter}`,
         { method: "GET" }
       );
       const list = asList<{
@@ -1879,7 +1879,7 @@ export class ArtifactSyncService {
       const specFilter = filters.specName ? `&specName=${encodeURIComponent(filters.specName)}` : "";
       const response = await this.makeRequest<unknown>(
         "project",
-        `/api/v1/er-diagrams/?projectId=${projectId}${specFilter}`,
+        `/er-diagrams/?projectId=${projectId}${specFilter}`,
         { method: "GET" }
       );
       const list = asList<{ id: string; rootId?: string; specName?: string; name: string; content: unknown; version?: number; createdAt: string; updatedAt: string }>(response.data);
@@ -1906,7 +1906,7 @@ export class ArtifactSyncService {
     if (!filters.artifactType || filters.artifactType === "context") {
       const response = await this.makeRequest<unknown>(
         "project",
-        `/api/v1/projects/${projectId}/contexts`,
+        `/projects/${projectId}/contexts`,
         { method: "GET" }
       );
       const list = asList<{ id: string; title: string; content: unknown; createdAt: string; updatedAt: string }>(response.data);
@@ -1930,7 +1930,7 @@ export class ArtifactSyncService {
     if (!filters.artifactType || filters.artifactType === "code_guideline") {
       const response = await this.makeRequest<unknown>(
         "project",
-        `/api/v1/projects/${projectId}/code-guidelines`,
+        `/projects/${projectId}/code-guidelines`,
         { method: "GET" }
       );
       const raw = response.data as { data?: { guidelines?: Array<{ id: string; title: string; content: unknown; scope: string; scopeId: string | null; createdAt: string; updatedAt: string }> } } | undefined;
@@ -1956,7 +1956,7 @@ export class ArtifactSyncService {
     if (!filters.artifactType || filters.artifactType === "wireframe_files") {
       const response = await this.makeRequest<unknown>(
         "project",
-        `/api/v1/projects/${projectId}/wireframes`,
+        `/projects/${projectId}/wireframes`,
         { method: "GET" }
       );
       const list = asList<{ id: string; name: string; elements?: unknown; createdAt: string; updatedAt: string }>(response.data);
@@ -2084,45 +2084,45 @@ export class ArtifactSyncService {
     switch (artifactType) {
       case "requirement":
         endpoint = isId 
-          ? `/api/v1/requirements/${identifier}`
-          : `/api/v1/requirements/?projectId=${project.projectId}&name=${encodeURIComponent(identifier)}`;
+          ? `/requirements/${identifier}`
+          : `/requirements/?projectId=${project.projectId}&name=${encodeURIComponent(identifier)}`;
         break;
 
       case "tests":
         endpoint = isId
-          ? `/api/v1/tests/${identifier}`
-          : `/api/v1/tests/?projectId=${project.projectId}&name=${encodeURIComponent(identifier)}`;
+          ? `/tests/${identifier}`
+          : `/tests/?projectId=${project.projectId}&name=${encodeURIComponent(identifier)}`;
         break;
 
       case "hld":
       case "lld":
         endpoint = isId
-          ? `/api/v1/designs/${identifier}`
-          : `/api/v1/designs/?projectId=${project.projectId}&type=${artifactType}&name=${encodeURIComponent(identifier)}`;
+          ? `/designs/${identifier}`
+          : `/designs/?projectId=${project.projectId}&type=${artifactType}&name=${encodeURIComponent(identifier)}`;
         break;
 
       case "context":
       case "code_guideline":
       case "wireframe_files":
-        endpoint = `/api/v1/projects/${project.projectId}/artifacts/${identifier}`;
+        endpoint = `/projects/${project.projectId}/artifacts/${identifier}`;
         break;
 
       case "flow_diagram":
         endpoint = isId
-          ? `/api/v1/designs/${identifier}`
-          : `/api/v1/designs/?projectId=${project.projectId}&type=flow&name=${encodeURIComponent(identifier)}`;
+          ? `/designs/${identifier}`
+          : `/designs/?projectId=${project.projectId}&type=flow&name=${encodeURIComponent(identifier)}`;
         break;
 
       case "er_diagram":
         endpoint = isId
-          ? `/api/v1/er-diagrams/${identifier}`
-          : `/api/v1/er-diagrams/?projectId=${project.projectId}&name=${encodeURIComponent(identifier)}`;
+          ? `/er-diagrams/${identifier}`
+          : `/er-diagrams/?projectId=${project.projectId}&name=${encodeURIComponent(identifier)}`;
         break;
 
       case "tasks":
         endpoint = isId
-          ? `/api/v1/milestones/${identifier}`
-          : `/api/v1/milestones/?projectId=${project.projectId}&name=${encodeURIComponent(identifier)}`;
+          ? `/milestones/${identifier}`
+          : `/milestones/?projectId=${project.projectId}&name=${encodeURIComponent(identifier)}`;
         break;
 
       default:

@@ -31,7 +31,16 @@ import { SessionManager, sessionManager } from './session/manager.js';
 // import { WorkflowEngineTools } from './handlers/workflow-tools.js';
 import { logger } from './utils/logger.js';
 import { errorHandler, ErrorContext } from './utils/error-handler.js';
-import { PROTOCOL_CONFIG, PROJECT_CONTEXT_SCHEMA, ARTIFACT_NAME_TITLE_SCHEMA } from './utils/constants.js';
+import {
+  PROTOCOL_CONFIG,
+  PROJECT_CONTEXT_SCHEMA,
+  ARTIFACT_NAME_TITLE_SCHEMA,
+  REQUIREMENT_SPEC_NAMES_DESCRIPTION,
+  HLD_SPEC_NAMES_DESCRIPTION,
+  LLD_SPEC_NAMES_DESCRIPTION,
+  FLOW_SPEC_NAMES_DESCRIPTION,
+  WIREFRAME_SPEC_NAMES_DESCRIPTION,
+} from "./utils/constants.js";
 import { CodebaseContext } from './session/types.js';
 import { ToolHandlers } from './handlers/index.js';
 import { ServiceAwareAPIClient } from './api/service-client.js';
@@ -120,16 +129,21 @@ export class MCPCursorProtocolServer {
         {
           name: "generate_requirements",
           description:
-            "Save requirements locally first (markdown), then sync to server in background (non-blocking). Provide markdown in content; we save and send markdown to server as-is. Path: .quikim/artifacts/<spec>/requirement_<id>.md. Optional: name/title.",
+            `Save requirements locally (markdown), then sync to server. Path: .quikim/artifacts/<spec_name>/requirement_<name>.md. Use these spec_name values (same as organization dashboard): ${REQUIREMENT_SPEC_NAMES_DESCRIPTION}. Do not use 'default'. For 1.3, 1.4, 1.5, 1.6 the LLM must create one requirement file per entity (e.g. one file per screen, per API, per component, per code file).`,
           inputSchema: {
             type: "object",
             properties: {
               codebase: {
                 type: "object",
                 description:
-                  "Object with 'files' array. Each file must have 'path' and 'content'. Path: .quikim/artifacts/<spec>/requirement_<id>.md. content = markdown (saved and sent to server as markdown).",
+                  "Object with 'files' array. Path: .quikim/artifacts/<spec_name>/requirement_<name>.md. For 1.3/1.4/1.5/1.6 use one file per entity (e.g. one requirement_screen-login.md per screen). content = markdown.",
               },
               user_prompt: { type: "string", description: "Original user request" },
+              spec_name: {
+                type: "string",
+                description:
+                  `Spec name for this requirement. Must be one of (same as dashboard): ${REQUIREMENT_SPEC_NAMES_DESCRIPTION}. Custom spec names are also allowed. Do not use 'default'.`,
+              },
               name: ARTIFACT_NAME_TITLE_SCHEMA.name,
               title: ARTIFACT_NAME_TITLE_SCHEMA.title,
               project_context: PROJECT_CONTEXT_SCHEMA,
@@ -197,7 +211,7 @@ export class MCPCursorProtocolServer {
         {
           name: "generate_hld",
           description:
-            "Save HLD locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/hld_<id>.md. Optional: name/title.",
+            `Save HLD locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/hld_<id>.md. Use project_context.specName: ${HLD_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard). HLD has its own spec names; do not use LLD spec names here. Optional: name/title.`,
           inputSchema: {
             type: "object",
             properties: {
@@ -239,7 +253,7 @@ export class MCPCursorProtocolServer {
         {
           name: "generate_wireframes",
           description:
-            "Save wireframe locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/wireframe_files_<id>.md. Server expects canvas JSON or creates empty. Optional: name.",
+            `Save wireframe locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/wireframe_files_<id>.md. Use project_context.specName: ${WIREFRAME_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard). Optional: name.`,
           inputSchema: {
             type: "object",
             properties: {
@@ -362,7 +376,7 @@ export class MCPCursorProtocolServer {
         {
           name: "generate_mermaid",
           description:
-            "Save mermaid diagram locally first, then sync to server in background (non-blocking). Content: raw mermaid only (no code fences). Path: .quikim/artifacts/<spec>/flow_diagram_<id>.md.",
+            `Save mermaid diagram locally first, then sync to server in background (non-blocking). Content: raw mermaid only (no code fences). Path: .quikim/artifacts/<spec>/flow_diagram_<id>.md. Use project_context.specName: ${FLOW_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard).`,
           inputSchema: {
             type: "object",
             properties: {
@@ -394,7 +408,7 @@ export class MCPCursorProtocolServer {
         {
           name: "generate_lld",
           description:
-            "Save LLD locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/lld_<id>.md. Optional: name/title; user_prompt can specify component name.",
+            `Save LLD locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/lld_<id>.md. Use project_context.specName: ${LLD_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard). LLD has its own spec names; do not use HLD spec names here. Optional: name/title; user_prompt can specify component name.`,
           inputSchema: {
             type: "object",
             properties: {
@@ -474,7 +488,11 @@ export class MCPCursorProtocolServer {
           inputSchema: {
             type: "object",
             properties: {
-              project_id: { type: "string", description: "Project ID (or from project_context)" },
+              project_id: {
+                type: "string",
+                description:
+                  "Actual project ID from project_context. Do not use spec name like \"default\".",
+              },
               user_prompt: { type: "string", description: "User intent, e.g. 'Build a restaurant app'" },
               last_known_state: { type: "string", description: "Optional last workflow node id" },
               project_context: PROJECT_CONTEXT_SCHEMA,
@@ -489,9 +507,16 @@ export class MCPCursorProtocolServer {
           inputSchema: {
             type: "object",
             properties: {
-              project_id: { type: "string", description: "Project ID" },
+              project_id: {
+                type: "string",
+                description:
+                  "Actual project ID from project_context. Do not use spec name like \"default\".",
+              },
               artifact_type: { type: "string", description: "e.g. requirement, hld, lld, tasks" },
-              spec_name: { type: "string", description: "Spec name (default: default)" },
+              spec_name: {
+                type: "string",
+                description: `Spec name. For requirements use one of: ${REQUIREMENT_SPEC_NAMES_DESCRIPTION}, or custom. Default: default.`,
+              },
               artifact_name: { type: "string", description: "Artifact name" },
               artifact_id: { type: "string", description: "Optional server artifact id" },
               pending_instruction_id: { type: "string", description: "From get_workflow_instruction for idempotency" },
@@ -568,6 +593,7 @@ export class MCPCursorProtocolServer {
         ...(dataFromArgs || {}),
         ...(args.name != null ? { name: args.name } : {}),
         ...(args.title != null ? { title: args.title } : {}),
+        ...(args.spec_name != null ? { spec_name: args.spec_name } : {}),
       };
       const dataToPass = Object.keys(data).length ? data : dataFromArgs;
 
@@ -588,10 +614,19 @@ export class MCPCursorProtocolServer {
       const resolvedContext = await projectContextResolver.resolveFromCodebase(
         codebase
       );
+      const rawProjectContext = (args.project_context as Record<string, unknown>) || {};
       const projectContext: ProjectContext = {
         ...resolvedContext,
-        ...((args.project_context as Record<string, unknown>) || {}),
+        ...rawProjectContext,
+        ...(typeof args.spec_name === "string" ? { specName: args.spec_name } : {}),
       };
+      // Normalize so LLM-sent snake_case (spec_name, project_id) is used when camelCase missing
+      if (projectContext.specName == null && (rawProjectContext.spec_name as string) != null) {
+        projectContext.specName = rawProjectContext.spec_name as string;
+      }
+      if (projectContext.projectId == null && (rawProjectContext.project_id as string) != null) {
+        projectContext.projectId = rawProjectContext.project_id as string;
+      }
 
       logger.debug("[MCP Server] Calling handler", {
         toolName: name,
@@ -757,7 +792,9 @@ export class MCPCursorProtocolServer {
             dataToPass
           );
         case "get_workflow_instruction": {
-          const projectId = (args.project_id as string) || projectContext.projectId;
+          const rawProjectId = (args.project_id as string) || "";
+          const projectId =
+            rawProjectId && rawProjectId !== "default" ? rawProjectId : projectContext.projectId;
           if (!projectId) {
             return { content: [{ type: "text", text: "Error: project_id or project_context with projectId required." }], isError: true };
           }
@@ -789,7 +826,9 @@ export class MCPCursorProtocolServer {
           }
         }
         case "report_workflow_progress": {
-          const projectId = (args.project_id as string) || projectContext.projectId;
+          const rawProjectId = (args.project_id as string) || "";
+          const projectId =
+            rawProjectId && rawProjectId !== "default" ? rawProjectId : projectContext.projectId;
           if (!projectId) {
             return { content: [{ type: "text", text: "Error: project_id or project_context with projectId required." }], isError: true };
           }

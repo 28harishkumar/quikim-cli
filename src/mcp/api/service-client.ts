@@ -51,17 +51,14 @@ export class ServiceAwareAPIClient {
   }
 
   /**
-   * Get the appropriate service URL based on service type
+   * Get the appropriate service base URL (origin + /api/v1/user or /api/v1/project) for API gateway routing.
    */
   private getServiceURL(serviceType: ServiceType): string {
-    switch (serviceType) {
-      case 'user':
-        return configManager.getUserServiceUrl();
-      case 'project':
-        return configManager.getProjectServiceUrl();
-      default:
-        return this.config.baseURL;
-    }
+    const origin = serviceType === 'user'
+      ? configManager.getUserServiceUrl()
+      : configManager.getProjectServiceUrl();
+    const prefix = serviceType === 'user' ? '/api/v1/user' : '/api/v1/project';
+    return `${origin}${prefix}`;
   }
 
   /**
@@ -204,7 +201,7 @@ export class ServiceAwareAPIClient {
    * Login with email and password
    */
   async login(email: string, password: string): Promise<unknown> {
-    return this.request('user', '/api/v1/auth/login', {
+    return this.request('user', '/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
@@ -214,7 +211,7 @@ export class ServiceAwareAPIClient {
    * Get current user info
    */
   async getCurrentUser(): Promise<unknown> {
-    return this.request('user', '/api/v1/users/me', {
+    return this.request('user', '/users/me', {
       method: 'GET',
     });
   }
@@ -225,7 +222,7 @@ export class ServiceAwareAPIClient {
    * List projects
    */
   async listProjects(): Promise<unknown> {
-    return this.request('project', '/api/v1/projects', {
+    return this.request('project', '/projects', {
       method: 'GET',
     });
   }
@@ -234,7 +231,7 @@ export class ServiceAwareAPIClient {
    * Get project by ID
    */
   async getProject(projectId: string): Promise<unknown> {
-    return this.request('project', `/api/v1/projects/${projectId}`, {
+    return this.request('project', `/projects/${projectId}`, {
       method: 'GET',
     });
   }
@@ -248,7 +245,7 @@ export class ServiceAwareAPIClient {
   async fetchRequirements(projectId: string, specName?: string): Promise<unknown> {
     const listRes = await this.request<{ data?: { id: string }[]; pagination?: unknown }>(
       'project',
-      `/api/v1/requirements/?projectId=${projectId}${specName ? `&specName=${encodeURIComponent(specName)}` : ''}&limit=100`,
+      `/requirements/?projectId=${projectId}${specName ? `&specName=${encodeURIComponent(specName)}` : ''}&limit=100`,
       { method: 'GET' }
     );
     const body = listRes.data as { data?: { id: string }[] } | undefined;
@@ -258,7 +255,7 @@ export class ServiceAwareAPIClient {
     for (const item of list) {
       const fullRes = await this.request<{ data?: unknown }>(
         'project',
-        `/api/v1/requirements/${item.id}`,
+        `/requirements/${item.id}`,
         { method: 'GET' }
       );
       const fullBody = fullRes.data as { data?: unknown } | undefined;
@@ -269,14 +266,20 @@ export class ServiceAwareAPIClient {
   }
 
   /**
-   * Create/update requirements
+   * Create/update requirements. Sends specName and name so the server saves under the correct spec and display name.
    */
-  async syncRequirements(projectId: string, content: string, metadata?: Record<string, unknown>): Promise<unknown> {
-    return this.request('project', '/api/v1/requirements/', {
+  async syncRequirements(
+    projectId: string,
+    content: string,
+    metadata?: Record<string, unknown> & { specName?: string; name?: string }
+  ): Promise<unknown> {
+    return this.request('project', '/requirements/', {
       method: 'POST',
       body: JSON.stringify({
         projectId,
         content,
+        specName: metadata?.specName ?? 'default',
+        name: metadata?.name ?? 'Requirements',
         changeSummary: metadata?.changeSummary,
         changeType: metadata?.changeType || 'minor',
       }),
@@ -289,7 +292,7 @@ export class ServiceAwareAPIClient {
   async fetchTests(projectId: string, specName?: string): Promise<unknown> {
     const listRes = await this.request<{ data?: { id: string }[]; pagination?: unknown }>(
       'project',
-      `/api/v1/tests/?projectId=${projectId}${specName ? `&specName=${encodeURIComponent(specName)}` : ''}&limit=100`,
+      `/tests/?projectId=${projectId}${specName ? `&specName=${encodeURIComponent(specName)}` : ''}&limit=100`,
       { method: 'GET' }
     );
     const body = listRes.data as { data?: { id: string }[] } | undefined;
@@ -299,7 +302,7 @@ export class ServiceAwareAPIClient {
     for (const item of list) {
       const fullRes = await this.request<{ data?: unknown }>(
         'project',
-        `/api/v1/tests/${item.id}`,
+        `/tests/${item.id}`,
         { method: 'GET' }
       );
       const fullBody = fullRes.data as { data?: unknown } | undefined;
@@ -323,7 +326,7 @@ export class ServiceAwareAPIClient {
     changeSummary?: string;
     changeType?: string;
   }): Promise<unknown> {
-    return this.request('project', '/api/v1/tests/', {
+    return this.request('project', '/tests/', {
       method: 'POST',
       body: JSON.stringify({
         projectId,
@@ -346,7 +349,7 @@ export class ServiceAwareAPIClient {
    * Fetch HLD for a project
    */
   async fetchHLD(projectId: string): Promise<unknown> {
-    return this.request('project', `/api/v1/designs/?projectId=${projectId}&type=hld`, {
+    return this.request('project', `/designs/?projectId=${projectId}&type=hld`, {
       method: 'GET',
     });
   }
@@ -355,7 +358,7 @@ export class ServiceAwareAPIClient {
    * Create/update HLD
    */
   async syncHLD(projectId: string, content: string, metadata?: Record<string, unknown>): Promise<unknown> {
-    return this.request('project', '/api/v1/designs/', {
+    return this.request('project', '/designs/', {
       method: 'POST',
       body: JSON.stringify({
         projectId,
@@ -374,7 +377,7 @@ export class ServiceAwareAPIClient {
     if (componentName) {
       params.append('componentName', componentName);
     }
-    return this.request('project', `/api/v1/designs/?${params.toString()}`, {
+    return this.request('project', `/designs/?${params.toString()}`, {
       method: 'GET',
     });
   }
@@ -383,7 +386,7 @@ export class ServiceAwareAPIClient {
    * Fetch mermaid/flow diagrams for a project
    */
   async fetchMermaid(projectId: string): Promise<unknown> {
-    return this.request('project', `/api/v1/designs/?projectId=${projectId}&type=flow`, {
+    return this.request('project', `/designs/?projectId=${projectId}&type=flow`, {
       method: 'GET',
     });
   }
@@ -392,7 +395,7 @@ export class ServiceAwareAPIClient {
    * Create/update LLD
    */
   async syncLLD(projectId: string, content: string, componentName: string, metadata?: Record<string, unknown>): Promise<unknown> {
-    return this.request('project', '/api/v1/designs/', {
+    return this.request('project', '/designs/', {
       method: 'POST',
       body: JSON.stringify({
         projectId,
@@ -410,7 +413,7 @@ export class ServiceAwareAPIClient {
    * Fetch tasks for a project
    */
   async fetchTasks(projectId: string): Promise<unknown> {
-    return this.request('project', `/api/v1/tasks/?projectId=${projectId}`, {
+    return this.request('project', `/tasks/?projectId=${projectId}`, {
       method: 'GET',
     });
   }
@@ -419,7 +422,7 @@ export class ServiceAwareAPIClient {
    * Create/update task
    */
   async syncTask(projectId: string, content: string, metadata?: Record<string, unknown>): Promise<unknown> {
-    return this.request('project', '/api/v1/tasks/', {
+    return this.request('project', '/tasks/', {
       method: 'POST',
       body: JSON.stringify({
         projectId,
@@ -436,7 +439,7 @@ export class ServiceAwareAPIClient {
    * Get task prompt version history (list without full content).
    */
   async getTaskPromptVersionHistory(taskId: string): Promise<unknown> {
-    return this.request('project', `/api/v1/tasks/${taskId}/prompts/version-history`, {
+    return this.request('project', `/tasks/${taskId}/prompts/version-history`, {
       method: 'GET',
     });
   }
@@ -445,7 +448,7 @@ export class ServiceAwareAPIClient {
    * Get a single task prompt with full content.
    */
   async getTaskPrompt(taskId: string, promptId: string): Promise<unknown> {
-    return this.request('project', `/api/v1/tasks/${taskId}/prompts/${promptId}`, {
+    return this.request('project', `/tasks/${taskId}/prompts/${promptId}`, {
       method: 'GET',
     });
   }
@@ -457,7 +460,7 @@ export class ServiceAwareAPIClient {
     taskId: string,
     data: { content: string; changeSummary?: string; changeType?: string }
   ): Promise<unknown> {
-    return this.request('project', `/api/v1/tasks/${taskId}/prompts`, {
+    return this.request('project', `/tasks/${taskId}/prompts`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -470,7 +473,7 @@ export class ServiceAwareAPIClient {
     taskId: string,
     data: { sourcePromptId: string; changeSummary?: string; changeType?: string }
   ): Promise<unknown> {
-    return this.request('project', `/api/v1/tasks/${taskId}/prompts/restore`, {
+    return this.request('project', `/tasks/${taskId}/prompts/restore`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -482,7 +485,7 @@ export class ServiceAwareAPIClient {
    * Fetch ER diagram for a project
    */
   async fetchERDiagram(projectId: string): Promise<unknown> {
-    return this.request('project', `/api/v1/er-diagrams/?projectId=${projectId}`, {
+    return this.request('project', `/er-diagrams/?projectId=${projectId}`, {
       method: 'GET',
     });
   }
@@ -491,7 +494,7 @@ export class ServiceAwareAPIClient {
    * Create/update ER diagram
    */
   async syncERDiagram(projectId: string, content: string, metadata?: Record<string, unknown>): Promise<unknown> {
-    return this.request('project', '/api/v1/er-diagrams/', {
+    return this.request('project', '/er-diagrams/', {
       method: 'POST',
       body: JSON.stringify({
         projectId,
@@ -508,7 +511,7 @@ export class ServiceAwareAPIClient {
    * Fetch wireframes for a project
    */
   async fetchWireframes(projectId: string): Promise<unknown> {
-    return this.request('project', `/api/v1/projects/${projectId}/wireframes`, {
+    return this.request('project', `/projects/${projectId}/wireframes`, {
       method: 'GET',
     });
   }
@@ -524,8 +527,8 @@ export class ServiceAwareAPIClient {
     organizationId?: string
   ): Promise<unknown> {
     const path = organizationId
-      ? `/api/v1/organizations/${organizationId}/projects/${projectId}/wireframes`
-      : `/api/v1/projects/${projectId}/wireframes`;
+      ? `/organizations/${organizationId}/projects/${projectId}/wireframes`
+      : `/projects/${projectId}/wireframes`;
     const defaultName = (metadata?.name as string) || 'Wireframe from MCP';
     const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
     let name = defaultName.slice(0, 100) || 'Wireframe from MCP';
@@ -574,7 +577,7 @@ export class ServiceAwareAPIClient {
     specName?: string
   ): Promise<unknown> {
     const mermaidType = this.inferMermaidType(content);
-    const res = await this.request('project', '/api/v1/designs', {
+    const res = await this.request('project', '/designs', {
       method: 'POST',
       body: JSON.stringify({
         projectId,
@@ -602,7 +605,7 @@ export class ServiceAwareAPIClient {
    * Fetch contexts for a project
    */
   async fetchContexts(projectId: string): Promise<unknown> {
-    const res = await this.request('project', `/api/v1/projects/${projectId}/contexts`, {
+    const res = await this.request('project', `/projects/${projectId}/contexts`, {
       method: 'GET',
     });
     return res.data;
@@ -616,7 +619,7 @@ export class ServiceAwareAPIClient {
     content: string,
     metadata?: Record<string, unknown>
   ): Promise<unknown> {
-    const res = await this.request('project', `/api/v1/projects/${projectId}/contexts`, {
+    const res = await this.request('project', `/projects/${projectId}/contexts`, {
       method: 'POST',
       body: JSON.stringify({
         title: metadata?.title || metadata?.name || 'Context',
@@ -632,7 +635,7 @@ export class ServiceAwareAPIClient {
    * Fetch code guidelines for a project
    */
   async fetchCodeGuidelines(projectId: string): Promise<unknown> {
-    const res = await this.request('project', `/api/v1/projects/${projectId}/code-guidelines`, {
+    const res = await this.request('project', `/projects/${projectId}/code-guidelines`, {
       method: 'GET',
     });
     return res.data;
@@ -646,7 +649,7 @@ export class ServiceAwareAPIClient {
     content: string,
     metadata?: Record<string, unknown>
   ): Promise<unknown> {
-    const res = await this.request('project', '/api/v1/code-guidelines', {
+    const res = await this.request('project', '/code-guidelines', {
       method: 'POST',
       body: JSON.stringify({
         scope: 'project',

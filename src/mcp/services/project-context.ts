@@ -67,6 +67,19 @@ export class ProjectContextResolver {
     // Resolve spec name from .quikim/artifacts/<spec>/ paths
     const specName = ContentExtractor.getSpecNameFromCodebase(codebase) ?? "default";
 
+    // When running under Claude Desktop (or similar), codebase may not include .quikim/project.json.
+    // Fall back to reading from disk using QUIKIM_PROJECT_DIR so get_workflow_instruction and other
+    // tools that only use projectContext.projectId still get a valid projectId.
+    const fromDisk = await ContentExtractor.readProjectFromDisk();
+    if (fromDisk) {
+      return {
+        projectId: fromDisk.projectId,
+        organizationId: fromDisk.organizationId,
+        userId: fromDisk.userId,
+        specName,
+      };
+    }
+
     return {
       specName,
     };

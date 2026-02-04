@@ -79,14 +79,67 @@ export const PROJECT_CONTEXT_SCHEMA = {
   },
 };
 
+/**
+ * Requirement spec types (1.1–1.7) aligned with organization dashboard.
+ * Same values as quikim-opensource requirement-spec-types; custom spec names are also allowed.
+ */
+export const REQUIREMENT_SPEC_TYPES = [
+  { value: "overview", label: "Overview" },
+  { value: "business-functional", label: "Business & Functional Requirements" },
+  { value: "acceptance-criteria-screens", label: "Acceptance criteria - Screens" },
+  { value: "acceptance-criteria-apis", label: "Acceptance criteria - APIs" },
+  { value: "component-requirements", label: "Component requirements" },
+  { value: "acceptance-criteria-code-files", label: "Acceptance criteria - Code files" },
+  { value: "phase-milestone-breakdown", label: "Phase & milestone breakdown" },
+] as const;
+
+/** Comma-separated spec_name values for tool descriptions (same as dashboard dropdown). */
+export const REQUIREMENT_SPEC_NAMES_DESCRIPTION =
+  REQUIREMENT_SPEC_TYPES.map((t) => `${t.value} (${t.label})`).join(", ");
+
+/** HLD spec types (2.1–2.2) aligned with org dashboard. Different from LLD; use only for generate_hld/pull_hld. */
+export const HLD_SPEC_TYPES = [
+  { value: "project-architecture", label: "Project architecture" },
+  { value: "milestones-specs", label: "Milestones / Specs" },
+] as const;
+
+/** LLD spec types (3.1–3.6) aligned with org dashboard. Different from HLD; use only for generate_lld/pull_lld. */
+export const LLD_SPEC_TYPES = [
+  { value: "list-screens", label: "List of all screens" },
+  { value: "list-apis", label: "List of all APIs" },
+  { value: "file-tree", label: "File tree (all code files)" },
+  { value: "technical-details-code", label: "Technical details per code file" },
+  { value: "technical-detail-screen", label: "Technical detail per screen" },
+  { value: "technical-detail-api", label: "Technical detail per API" },
+] as const;
+
+/** Flow diagram spec types (4.1–4.2) aligned with organization dashboard. */
+export const FLOW_SPEC_TYPES = [
+  { value: "navigation-tree", label: "Navigation tree for all screens" },
+  { value: "business-logic-flow", label: "Business logic flow charts" },
+] as const;
+
+/** Wireframe spec types (5.1–5.2) aligned with organization dashboard. */
+export const WIREFRAME_SPEC_TYPES = [
+  { value: "wireframes-screens", label: "Wireframes for each screen" },
+  { value: "component-wireframes", label: "Component wireframes" },
+] as const;
+
+export const HLD_SPEC_NAMES_DESCRIPTION = HLD_SPEC_TYPES.map((t) => `${t.value} (${t.label})`).join(", ");
+export const LLD_SPEC_NAMES_DESCRIPTION = LLD_SPEC_TYPES.map((t) => `${t.value} (${t.label})`).join(", ");
+export const FLOW_SPEC_NAMES_DESCRIPTION = FLOW_SPEC_TYPES.map((t) => `${t.value} (${t.label})`).join(", ");
+export const WIREFRAME_SPEC_NAMES_DESCRIPTION = WIREFRAME_SPEC_TYPES.map((t) => `${t.value} (${t.label})`).join(", ");
+
 /** Optional name/title for artifacts; LLM can set these separately from content */
 export const ARTIFACT_NAME_TITLE_SCHEMA = {
   name: {
     type: "string" as const,
-    description: "Optional display name for the artifact (e.g. diagram title, wireframe name).",
+    description:
+      "Artifact id used for the file name (e.g. business-functional). Use a descriptive name so the file is requirement_<name>.md; avoid generic names like \"Requirement\".",
   },
   title: {
     type: "string" as const,
-    description: "Optional title (used for context, code_guideline, requirements where applicable).",
+    description:
+      "Optional title (used for context, code_guideline, requirements). If name is omitted, title is slugified for the file name.",
   },
 };

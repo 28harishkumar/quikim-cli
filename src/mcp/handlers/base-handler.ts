@@ -113,6 +113,22 @@ export abstract class BaseHandler {
   }
 
   /**
+   * Slugify a string for use as artifact name (filename-safe, lowercase, hyphens).
+   * @param s - Raw string (e.g. "Business Functional")
+   * @returns Slug (e.g. "business-functional")
+   */
+  private static slugArtifactName(s: string): string {
+    const slug = s
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
+    return slug || "artifact";
+  }
+
+  /**
    * Push: save to local first (markdown for tasks/requirements), then sync to server in background (non-blocking).
    * Requirements and tasks: send markdown directly to server (no conversion).
    */
@@ -156,6 +172,15 @@ export abstract class BaseHandler {
         }
         content = fromLocal.content;
         artifactName = fromLocal.artifactName;
+      }
+
+      const dataRecord = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
+      const nameFromData = dataRecord?.name as string | undefined;
+      const titleFromData = dataRecord?.title as string | undefined;
+      if (nameFromData?.trim()) {
+        artifactName = BaseHandler.slugArtifactName(nameFromData);
+      } else if (titleFromData?.trim()) {
+        artifactName = BaseHandler.slugArtifactName(titleFromData);
       }
 
       if (artifactType === "mermaid" || artifactType === "er_diagram") {

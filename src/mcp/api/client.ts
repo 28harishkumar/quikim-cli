@@ -184,14 +184,14 @@ export class QuikimAPIClient {
   async fetchRequirements(projectId: string): Promise<Requirements | null> {
     try {
       const response = await this.request<{ success: boolean; data: unknown[]; pagination?: unknown }>(
-        `/api/v1/requirements/?projectId=${projectId}&limit=1`,
+        `/requirements/?projectId=${projectId}&limit=1`,
         { method: "GET" },
       );
       const list = Array.isArray(response.data) ? response.data : (response.data as { data?: unknown[] })?.data ?? [];
       if (list.length === 0) return null;
       const first = list[0] as { id: string };
       const fullResponse = await this.request<{ success: boolean; data: Requirements }>(
-        `/api/v1/requirements/${first.id}`,
+        `/requirements/${first.id}`,
         { method: "GET" },
       );
       const body = fullResponse.data as { data?: Requirements };
@@ -209,9 +209,9 @@ export class QuikimAPIClient {
    */
   async fetchHLD(projectId: string): Promise<HLD | null> {
     try {
-      // GET /api/v1/designs/?projectId=xxx&type=hld
+      // GET /designs/?projectId=xxx&type=hld
       const response = await this.request<{ success: boolean; data: any[] }>(
-        `/api/v1/designs/?projectId=${projectId}&type=hld`,
+        `/designs/?projectId=${projectId}&type=hld`,
         { method: "GET" },
       );
       
@@ -231,9 +231,9 @@ export class QuikimAPIClient {
    */
   async fetchLLDs(projectId: string): Promise<LLD[]> {
     try {
-      // GET /api/v1/designs/?projectId=xxx&type=lld
+      // GET /designs/?projectId=xxx&type=lld
       const response = await this.request<{ success: boolean; data: any[] }>(
-        `/api/v1/designs/?projectId=${projectId}&type=lld`,
+        `/designs/?projectId=${projectId}&type=lld`,
         { method: "GET" },
       );
       return response.data?.data || [];
@@ -250,9 +250,9 @@ export class QuikimAPIClient {
    */
   async fetchLLD(projectId: string, componentName: string): Promise<LLD | null> {
     try {
-      // GET /api/v1/designs/?projectId=xxx&type=lld&componentName=xxx
+      // GET /designs/?projectId=xxx&type=lld&componentName=xxx
       const response = await this.request<{ success: boolean; data: any[] }>(
-        `/api/v1/designs/?projectId=${projectId}&type=lld&componentName=${encodeURIComponent(componentName)}`,
+        `/designs/?projectId=${projectId}&type=lld&componentName=${encodeURIComponent(componentName)}`,
         { method: "GET" },
       );
       const designs = response.data?.data || [];
@@ -270,9 +270,9 @@ export class QuikimAPIClient {
    */
   async fetchTasks(projectId: string): Promise<Tasks | null> {
     try {
-      // GET /api/v1/tasks/?projectId=xxx
+      // GET /tasks/?projectId=xxx
       const response = await this.request<{ success: boolean; data: any[] }>(
-        `/api/v1/tasks/?projectId=${projectId}`,
+        `/tasks/?projectId=${projectId}`,
         { method: "GET" },
       );
       
@@ -304,9 +304,9 @@ export class QuikimAPIClient {
    */
   async fetchERDiagram(projectId: string): Promise<ERDiagram | null> {
     try {
-      // GET /api/v1/er-diagrams/?projectId=xxx
+      // GET /er-diagrams/?projectId=xxx
       const response = await this.request<{ success: boolean; data: any[] }>(
-        `/api/v1/er-diagrams/?projectId=${projectId}`,
+        `/er-diagrams/?projectId=${projectId}`,
         { method: "GET" },
       );
       
@@ -346,7 +346,7 @@ export class QuikimAPIClient {
     try {
       // GET /api/v1/projects/:projectId/wireframes
       const response = await this.request<{ success: boolean; data: any[] }>(
-        `/api/v1/projects/${projectId}/wireframes`,
+        `/projects/${projectId}/wireframes`,
         { method: "GET" },
       );
       return response.data?.data || [];
@@ -403,7 +403,7 @@ export class QuikimAPIClient {
 
   /**
    * Search components via snippet-service API
-   * GET /api/v1/snippets/components?search={query}&limit={limit}&organizationId={orgId}
+   * GET /snippets/components?search={query}&limit={limit}&organizationId={orgId}
    */
   async searchComponents(
     query: string,
@@ -418,7 +418,7 @@ export class QuikimAPIClient {
       if (organizationId) {
         params.append("organizationId", organizationId);
       }
-      const url = `/api/v1/snippets/components?${params.toString()}`;
+      const url = `/snippets/components?${params.toString()}`;
       const response = await this.request<{ success: boolean; data: any[] }>(
         url,
         { method: "GET" },
@@ -447,7 +447,7 @@ export class QuikimAPIClient {
       if (limit) params.set("limit", limit.toString());
 
       const response = await this.request<{ success: boolean; data: any[] }>(
-        `/api/v1/snippets/sample-code/search?${params.toString()}`,
+        `/snippets/sample-code/search?${params.toString()}`,
         { method: "GET" },
       );
       return response.data?.data || [];
@@ -465,7 +465,7 @@ export class QuikimAPIClient {
   async fetchFeatures(): Promise<any[]> {
     try {
       const response = await this.request<{ success: boolean; data: any[] }>(
-        "/api/v1/snippets/features",
+        "/snippets/features",
         { method: "GET" },
       );
       const features = response.data?.data || [];
@@ -497,12 +497,12 @@ export class QuikimAPIClient {
 
   /**
    * Generate wireframe via tools-service API
-   * POST /api/v1/tools/wireframes/generate
+   * POST /tools/wireframes/generate
    */
   async generateWireframe(projectId: string, prompt: string): Promise<any> {
     try {
       const response = await this.request<{ success: boolean; data: any }>(
-        "/api/v1/tools/wireframes/generate",
+        "/tools/wireframes/generate",
         {
           method: "POST",
           body: JSON.stringify({ projectId, prompt }),
@@ -519,12 +519,12 @@ export class QuikimAPIClient {
 
   /**
    * Sync wireframe to Penpot
-   * POST /api/v1/tools/penpot/sync/:wireframeId/to-penpot
+   * POST /tools/penpot/sync/:wireframeId/to-penpot
    */
   async syncWireframeToPenpot(wireframeId: string): Promise<any> {
     try {
       const response = await this.request<{ success: boolean; data: any }>(
-        `/api/v1/tools/penpot/sync/${wireframeId}/to-penpot`,
+        `/tools/penpot/sync/${wireframeId}/to-penpot`,
         {
           method: "POST",
         },
@@ -540,12 +540,12 @@ export class QuikimAPIClient {
 
   /**
    * Convert Penpot design to React components
-   * POST /api/v1/tools/design-to-code/convert
+   * POST /tools/design-to-code/convert
    */
   async convertDesignToCode(wireframeId: string, options?: any): Promise<any> {
     try {
       const response = await this.request<{ success: boolean; data: any }>(
-        "/api/v1/tools/design-to-code/convert",
+        "/tools/design-to-code/convert",
         {
           method: "POST",
           body: JSON.stringify({ wireframeId, options }),
@@ -567,10 +567,10 @@ export class QuikimAPIClient {
    * Routes to correct service endpoint based on artifact type
    * 
    * Project Service Endpoints (port 8002):
-   * - POST /api/v1/requirements/ (create requirement)
-   * - POST /api/v1/designs/ (create HLD/LLD)
-   * - POST /api/v1/tasks/ (create task)
-   * - POST /api/v1/er-diagrams/ (create ER diagram)
+   * - POST /requirements/ (create requirement)
+   * - POST /designs/ (create HLD/LLD)
+   * - POST /tasks/ (create task)
+   * - POST /er-diagrams/ (create ER diagram)
    * - POST /api/v1/projects/:projectId/wireframes (create wireframe)
    */
   async syncArtifact(request: SyncRequest): Promise<SyncResponse> {
@@ -580,8 +580,8 @@ export class QuikimAPIClient {
     // Route to the correct service endpoint
     switch (request.artifactType) {
       case "requirements":
-        // POST /api/v1/requirements/
-        endpoint = `/api/v1/requirements/`;
+        // POST /requirements/
+        endpoint = `/requirements/`;
         requestBody = {
           projectId: request.projectId,
           content: request.content,
@@ -592,8 +592,8 @@ export class QuikimAPIClient {
 
       case "hld":
       case "lld":
-        // POST /api/v1/designs/
-        endpoint = `/api/v1/designs/`;
+        // POST /designs/
+        endpoint = `/designs/`;
         requestBody = {
           projectId: request.projectId,
           type: request.artifactType, // "hld" or "lld"
@@ -604,8 +604,8 @@ export class QuikimAPIClient {
         break;
 
       case "tasks":
-        // POST /api/v1/tasks/
-        endpoint = `/api/v1/tasks/`;
+        // POST /tasks/
+        endpoint = `/tasks/`;
         requestBody = {
           projectId: request.projectId,
           title: request.metadata?.title || "Task from MCP",
@@ -617,8 +617,8 @@ export class QuikimAPIClient {
         break;
 
       case "er_diagram":
-        // POST /api/v1/er-diagrams/
-        endpoint = `/api/v1/er-diagrams/`;
+        // POST /er-diagrams/
+        endpoint = `/er-diagrams/`;
         requestBody = {
           projectId: request.projectId,
           content: request.content,
@@ -629,7 +629,7 @@ export class QuikimAPIClient {
 
       case "wireframes":
         // POST /api/v1/projects/:projectId/wireframes
-        endpoint = `/api/v1/projects/${request.projectId}/wireframes`;
+        endpoint = `/projects/${request.projectId}/wireframes`;
         requestBody = {
           name: request.metadata?.name || "Wireframe from MCP",
           content: request.content,
@@ -752,12 +752,12 @@ export class QuikimAPIClient {
 
   /**
    * Sync wireframes from Penpot for a project
-   * POST /api/v1/tools/penpot/sync/project/:projectId/from-penpot
+   * POST /tools/penpot/sync/project/:projectId/from-penpot
    */
   async syncWireframesFromPenpot(projectId: string): Promise<any> {
     try {
       const response = await this.request<{ success: boolean; data: any }>(
-        `/api/v1/tools/penpot/sync/project/${projectId}/from-penpot`,
+        `/tools/penpot/sync/project/${projectId}/from-penpot`,
         {
           method: "POST",
         },
@@ -773,7 +773,7 @@ export class QuikimAPIClient {
 
   /**
    * Generate code from wireframe
-   * POST /api/v1/tools/design-to-code/convert-from-wireframe
+   * POST /tools/design-to-code/convert-from-wireframe
    */
   async generateCodeFromWireframe(
     wireframeContent: any,
@@ -782,7 +782,7 @@ export class QuikimAPIClient {
   ): Promise<any> {
     try {
       const response = await this.request<{ success: boolean; data: any }>(
-        "/api/v1/tools/design-to-code/convert-from-wireframe",
+        "/tools/design-to-code/convert-from-wireframe",
         {
           method: "POST",
           body: JSON.stringify({ wireframeContent, options, projectId }),
@@ -799,7 +799,7 @@ export class QuikimAPIClient {
 
   /**
    * List sync states for a project
-   * GET /api/v1/tools/penpot/sync?projectId=xxx
+   * GET /tools/penpot/sync?projectId=xxx
    */
   async listPenpotSyncStates(
     projectId: string,
@@ -811,7 +811,7 @@ export class QuikimAPIClient {
         params.append("status", status);
       }
       const response = await this.request<{ success: boolean; data: any[] }>(
-        `/api/v1/tools/penpot/sync?${params.toString()}`,
+        `/tools/penpot/sync?${params.toString()}`,
         {
           method: "GET",
         },

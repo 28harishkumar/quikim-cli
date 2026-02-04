@@ -357,7 +357,18 @@ The Quikim MCP Server provides tools for managing project artifacts throughout t
 
 All artifacts are stored under \`.quikim/artifacts/<spec name>/<artifact file>\`. Artifact files are named \`<artifact_type>_<artifact_id>.md\` (or \`<artifact_type>_<root_id>.md\` for versioned types: requirement, hld, lld, er_diagram, flow_diagram, wireframe_files).
 
-To use a custom spec name (e.g. \`my-feature\`), pass \`project_context: { specName: "my-feature" }\` in tool calls; otherwise the spec is inferred from artifact file paths or defaults to \`"default"\`.
+Requirement specs (1.x): use \`spec_name\` = \`overview\` (1.1), \`business-functional\` (1.2), \`acceptance-criteria-screens\` (1.3), \`acceptance-criteria-apis\` (1.4), \`component-requirements\` (1.5), \`acceptance-criteria-code-files\` (1.6), \`phase-milestone-breakdown\` (1.7). Do not use \`"default"\`. 1.2 can have many docs; create an additional business-functional doc only when the user explicitly asks for it. For 1.3, 1.4, 1.5, 1.6 there are multiple files—one per entity (one file per screen, per API, per component, per code file). Use a descriptive \`name\` per file (e.g. \`login-screen\`, \`get-orders-api\`).
+
+**HLD (2.x) and LLD (3.x) have different spec names** (per interlinking). Do not mix: use **HLD** spec names only for \`generate_hld\` / \`pull_hld\`; use **LLD** spec names only for \`generate_lld\` / \`pull_lld\`.
+
+- **HLD (2.x):** \`project-architecture\` (2.1), \`milestones-specs\` (2.2).
+- **LLD (3.x):** \`list-screens\` (3.1), \`list-apis\` (3.2), \`file-tree\` (3.3), \`technical-details-code\` (3.4), \`technical-detail-screen\` (3.5), \`technical-detail-api\` (3.6).
+- **Flow (4.x):** \`navigation-tree\` (4.1), \`business-logic-flow\` (4.2).
+- **Wireframe (5.x):** \`wireframes-screens\` (5.1), \`component-wireframes\` (5.2).
+
+Pass \`project_context: { specName: "<spec>" }\` (same values as organization dashboard); custom spec names are also allowed.
+
+**Do not confuse 3.x with 5.x:** Node **3.1** = **LLD** \"List of all screens\" (use \`generate_lld\` / \`pull_lld\`, spec \`list-screens\`). Node **5.1** = **Wireframes** for each screen (use \`generate_wireframes\`, spec \`wireframes-screens\`). If \`get_workflow_instruction\` says next is 3.1, generate LLD list-screens, not wireframes. If an artifact type (e.g. flow_diagram for 4.2) is already complete, the workflow will advance on the next call; you can proceed to the next step.
 
 ## Push behavior (all generate_* tools)
 

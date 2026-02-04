@@ -11,7 +11,7 @@ import { Command } from "commander";
 import { configManager } from "../config/manager.js";
 import * as output from "../utils/output.js";
 import { homedir, platform } from "os";
-import { join, dirname } from "path";
+import { join, dirname, resolve } from "path";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import { cwd } from "process";
@@ -20,7 +20,7 @@ import { execSync } from "child_process";
 import { fileURLToPath } from "url";
 
 /** Supported editor types */
-type EditorType = "cursor" | "kiro" | "windsurf" | "zed" | "vscode" | "claude-code";
+type EditorType = "cursor" | "kiro" | "windsurf" | "zed" | "vscode" | "claude-code" | "claude-desktop";
 
 /** MCP server configuration */
 interface MCPServerConfig {
@@ -76,6 +76,15 @@ interface ClaudeCodeConfig {
   };
   [key: string]: unknown;
 }
+
+/** Claude Desktop config structure (claude_desktop_config.json) */
+interface ClaudeDesktopConfig {
+  mcpServers?: Record<string, MCPServerConfig>;
+  [key: string]: unknown;
+}
+
+/** Server key used in Claude Desktop config for Quikim MCP */
+const CLAUDE_DESKTOP_QUIKIM_SERVER_KEY = "quikim-mcp-server";
 
 /** Get editor configuration based on editor type */
 function getEditorConfig(editor: EditorType): EditorConfig {
@@ -226,6 +235,39 @@ function getEditorConfig(editor: EditorType): EditorConfig {
       },
       isProjectLevel: false,
     },
+    "claude-desktop": {
+      name: "Claude Desktop",
+      getConfigPath: () => {
+        if (os === "win32") {
+          return join(home, "AppData", "Roaming", "Claude", "claude_desktop_config.json");
+        }
+        if (os === "darwin") {
+          return join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json");
+        }
+        return join(home, ".config", "Claude", "claude_desktop_config.json");
+      },
+      getConfigDir: () => {
+        if (os === "win32") {
+          return join(home, "AppData", "Roaming", "Claude");
+        }
+        if (os === "darwin") {
+          return join(home, "Library", "Application Support", "Claude");
+        }
+        return join(home, ".config", "Claude");
+      },
+      readConfig: async (path: string) => {
+        try {
+          const content = await readFile(path, "utf-8");
+          return JSON.parse(content) as ClaudeDesktopConfig;
+        } catch {
+          return { mcpServers: {} } as ClaudeDesktopConfig;
+        }
+      },
+      writeConfig: async (path: string, config: unknown) => {
+        await writeFile(path, JSON.stringify(config, null, 2), "utf-8");
+      },
+      isProjectLevel: false,
+    },
   };
 
   return configs[editor];
@@ -286,6 +328,65 @@ function findQuikimBinary(): { command: string; args: string[] } {
   return { command: "quikim", args: ["mcp", "serve"] };
 }
 
+/**
+ * Get absolute path to CLI dist/index.js for Claude Desktop (node + path).
+ * @returns Absolute path to cli/dist/index.js or empty string if not found
+ */
+function getClaudeDesktopCliPath(): string {
+  try {
+    const currentFile = fileURLToPath(import.meta.url);
+    const cliDir = dirname(dirname(dirname(currentFile)));
+    const distIndex = join(cliDir, "dist", "index.js");
+    if (existsSync(distIndex)) {
+      return distIndex;
+    }
+  } catch {
+    // Fallback failed
+  }
+  return "";
+}
+
+/**
+ * Get MCP server config for Claude Desktop with auth token and project dir in env.
+ * @param projectDir - Absolute path to project root (where .quikim lives)
+ * @param apiKey - Quikim API token from auth
+ * @returns MCPServerConfig for claude_desktop_config.json
+ */
+function getClaudeDesktopMCPServerConfig(projectDir: string, apiKey: string): MCPServerConfig {
+  const cliPath = getClaudeDesktopCliPath();
+  const command = cliPath ? process.execPath : "node";
+  const args = cliPath ? [cliPath, "mcp", "serve"] : ["mcp", "serve"];
+  if (!cliPath) {
+    // If no dist path, use quikim from PATH
+    const { command: cmd, args: a } = findQuikimBinary();
+    return getClaudeDesktopMCPServerConfigFromCommand(projectDir, apiKey, cmd, a);
+  }
+  return getClaudeDesktopMCPServerConfigFromCommand(projectDir, apiKey, command, args);
+}
+
+/**
+ * Build Claude Desktop MCP env and config from command/args.
+ */
+function getClaudeDesktopMCPServerConfigFromCommand(
+  projectDir: string,
+  apiKey: string,
+  command: string,
+  args: string[]
+): MCPServerConfig {
+  const env: Record<string, string> = {
+    QUIKIM_MCP_SILENT: "1",
+    QUIKIM_PROJECT_DIR: projectDir,
+    QUIKIM_API_KEY: apiKey,
+  };
+  if (configManager.isLocalMode()) {
+    env.QUIKIM_API_BASE_URL = configManager.getProjectServiceUrl();
+    env.QUIKIM_WORKFLOW_SERVICE_URL = configManager.getWorkflowServiceUrl();
+  } else {
+    env.QUIKIM_API_BASE_URL = configManager.getApiUrl();
+  }
+  return { command, args, env };
+}
+
 /** Get MCP server configuration */
 function getMCPServerConfig(): MCPServerConfig {
   const env: Record<string, string> = {};
@@ -293,6 +394,7 @@ function getMCPServerConfig(): MCPServerConfig {
   // Pass API URLs based on current CLI config
   if (configManager.isLocalMode()) {
     env.QUIKIM_API_BASE_URL = configManager.getProjectServiceUrl();
+    env.QUIKIM_WORKFLOW_SERVICE_URL = configManager.getWorkflowServiceUrl();
   } else {
     env.QUIKIM_API_BASE_URL = configManager.getApiUrl();
   }
@@ -321,12 +423,31 @@ function isQuikimConfigured(config: unknown, editor: EditorType): boolean {
   } else if (editor === "claude-code") {
     const c = config as ClaudeCodeConfig;
     return !!(c.mcp && c.mcp.servers && c.mcp.servers.quikim);
+  } else if (editor === "claude-desktop") {
+    const c = config as ClaudeDesktopConfig;
+    return !!(c.mcpServers && c.mcpServers[CLAUDE_DESKTOP_QUIKIM_SERVER_KEY]);
   }
   return false;
 }
 
 /** Add Quikim to editor config */
-function addQuikimToConfig(config: unknown, editor: EditorType): unknown {
+function addQuikimToConfig(
+  config: unknown,
+  editor: EditorType,
+  options?: { projectDir?: string; apiKey?: string }
+): unknown {
+  if (editor === "claude-desktop" && options?.projectDir && options?.apiKey) {
+    const c = config as ClaudeDesktopConfig;
+    if (!c.mcpServers) {
+      c.mcpServers = {};
+    }
+    c.mcpServers[CLAUDE_DESKTOP_QUIKIM_SERVER_KEY] = getClaudeDesktopMCPServerConfig(
+      options.projectDir,
+      options.apiKey
+    );
+    return c;
+  }
+
   const serverConfig = getMCPServerConfig();
 
   if (editor === "cursor" || editor === "vscode" || editor === "kiro") {
@@ -393,6 +514,12 @@ function removeQuikimFromConfig(config: unknown, editor: EditorType): unknown {
       delete c.mcp.servers.quikim;
     }
     return c;
+  } else if (editor === "claude-desktop") {
+    const c = config as ClaudeDesktopConfig;
+    if (c.mcpServers && c.mcpServers[CLAUDE_DESKTOP_QUIKIM_SERVER_KEY]) {
+      delete c.mcpServers[CLAUDE_DESKTOP_QUIKIM_SERVER_KEY];
+    }
+    return c;
   }
   return config;
 }
@@ -407,40 +534,63 @@ async function serveHandler(): Promise<void> {
 }
 
 /** Install MCP server configuration for an editor */
-async function installEditorHandler(editor: EditorType, options: { force?: boolean }): Promise<void> {
+async function installEditorHandler(
+  editor: EditorType,
+  options: { force?: boolean; projectDir?: string }
+): Promise<void> {
   const editorConfig = getEditorConfig(editor);
   const configPath = editorConfig.getConfigPath();
   const configDir = editorConfig.getConfigDir();
-  
+
   output.header(`Installing Quikim MCP Server for ${editorConfig.name}`);
   output.separator();
-  
-  // Check authentication status
-  if (!configManager.isAuthenticated()) {
-    output.warning("Not logged in. MCP server will have limited functionality.");
-    output.info('Run "quikim login" first for full server sync capabilities.');
-    output.separator();
+
+  // Claude Desktop requires auth and project dir (written into config env)
+  if (editor === "claude-desktop") {
+    if (!configManager.isAuthenticated()) {
+      output.error("Not logged in. Claude Desktop needs your API token in config.");
+      output.info('Run "quikim login" first, then run this command from your project root.');
+      process.exit(1);
+    }
+    const auth = configManager.getAuth();
+    if (!auth?.token) {
+      output.error("No auth token found. Run \"quikim login\" first.");
+      process.exit(1);
+    }
+  } else {
+    // Check authentication status for other editors
+    if (!configManager.isAuthenticated()) {
+      output.warning("Not logged in. MCP server will have limited functionality.");
+      output.info('Run "quikim login" first for full server sync capabilities.');
+      output.separator();
+    }
   }
-  
+
   // Ensure config directory exists
   try {
     await mkdir(configDir, { recursive: true });
   } catch {
     // Directory may already exist
   }
-  
+
   // Read existing config or create new one
   let config = await editorConfig.readConfig(configPath);
-  
+
   // Check if quikim already configured
   if (isQuikimConfigured(config, editor) && !options.force) {
     output.info(`Quikim MCP server is already configured in ${editorConfig.name}.`);
     output.info('Use --force to overwrite the existing configuration.');
     return;
   }
-  
-  // Add quikim MCP server configuration
-  config = addQuikimToConfig(config, editor);
+
+  // Add quikim MCP server configuration (with auth/projectDir for Claude Desktop)
+  const rawProjectDir = (options as { force?: boolean; projectDir?: string }).projectDir;
+  const projectDirForClaude = rawProjectDir ? resolve(rawProjectDir) : cwd();
+  const addOptions =
+    editor === "claude-desktop" && configManager.getAuth()?.token
+      ? { projectDir: projectDirForClaude, apiKey: configManager.getAuth()!.token }
+      : undefined;
+  config = addQuikimToConfig(config, editor, addOptions);
   
   // Write config
   try {
@@ -449,6 +599,10 @@ async function installEditorHandler(editor: EditorType, options: { force?: boole
     output.separator();
     output.tableRow("Config file", configPath);
     output.tableRow("Command", "quikim mcp serve");
+    if (editor === "claude-desktop" && addOptions?.projectDir) {
+      output.tableRow("Project dir", addOptions.projectDir);
+      output.tableRow("Auth", "Token written to config env");
+    }
     output.separator();
     output.info(`Restart ${editorConfig.name} to activate the MCP server.`);
     output.info(`After restart, Quikim tools will be available in ${editorConfig.name}'s AI assistant.`);
@@ -523,6 +677,14 @@ async function installClaudeCodeHandler(options: { force?: boolean }): Promise<v
   return installEditorHandler("claude-code", options);
 }
 
+/** Install Claude Desktop config (requires auth; uses cwd or --project-dir as project dir) */
+async function installClaudeDesktopHandler(options: {
+  force?: boolean;
+  projectDir?: string;
+}): Promise<void> {
+  return installEditorHandler("claude-desktop", options);
+}
+
 /** Uninstall handler for specific editor */
 async function uninstallCursorHandler(): Promise<void> {
   return uninstallEditorHandler("cursor");
@@ -548,13 +710,25 @@ async function uninstallClaudeCodeHandler(): Promise<void> {
   return uninstallEditorHandler("claude-code");
 }
 
+async function uninstallClaudeDesktopHandler(): Promise<void> {
+  return uninstallEditorHandler("claude-desktop");
+}
+
 /** Show MCP server status */
 async function statusHandler(): Promise<void> {
   output.header("Quikim MCP Server Status");
   output.separator();
   
   // Check all editor configurations
-  const editors: EditorType[] = ["cursor", "kiro", "windsurf", "zed", "vscode", "claude-code"];
+  const editors: EditorType[] = [
+    "cursor",
+    "kiro",
+    "windsurf",
+    "zed",
+    "vscode",
+    "claude-code",
+    "claude-desktop",
+  ];
   const editorStatus: Array<{ name: string; configured: boolean; path: string }> = [];
   
   for (const editor of editors) {
@@ -621,6 +795,7 @@ async function statusHandler(): Promise<void> {
     output.info('  quikim mcp install-zed        - Install for Zed');
     output.info('  quikim mcp install-vscode      - Install for VS Code');
     output.info('  quikim mcp install-claude-code - Install for Claude Code');
+    output.info('  quikim mcp install-claude-desktop - Install for Claude Desktop app');
   }
   
   if (!isAuthenticated) {
@@ -680,6 +855,18 @@ export function createMCPCommands(): Command {
     .option("-f, --force", "Overwrite existing configuration")
     .action(installClaudeCodeHandler);
 
+  mcp
+    .command("install-claude-desktop")
+    .description(
+      "Configure Quikim MCP server in Claude Desktop app (writes auth token and project dir to config)"
+    )
+    .option("-f, --force", "Overwrite existing configuration")
+    .option(
+      "--project-dir <path>",
+      "Project root path (default: current directory). Use if not running from project root."
+    )
+    .action(installClaudeDesktopHandler);
+
   // Uninstall commands for each editor
   mcp
     .command("uninstall-cursor")
@@ -710,6 +897,11 @@ export function createMCPCommands(): Command {
     .command("uninstall-claude-code")
     .description("Remove Quikim MCP server from Claude Code")
     .action(uninstallClaudeCodeHandler);
+
+  mcp
+    .command("uninstall-claude-desktop")
+    .description("Remove Quikim MCP server from Claude Desktop app")
+    .action(uninstallClaudeDesktopHandler);
 
   mcp
     .command("status")
