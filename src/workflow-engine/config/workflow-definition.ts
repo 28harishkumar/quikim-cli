@@ -18,6 +18,9 @@ export interface WorkflowNodeDef {
   specName: string;
   artifactName: string;
   dependencies: string[];
+  usedBy: string[];
+  label: string;
+  category: string;
 }
 
 /** Ordered list of node ids in agile flow (deterministic next) */
@@ -57,6 +60,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "overview",
     artifactName: "overview",
     dependencies: [],
+    usedBy: ["1.2", "1.6", "2.1", "1.7"],
+    label: "Overview",
+    category: "requirements",
   },
   "1.2": {
     nodeId: "1.2",
@@ -64,6 +70,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "business-functional",
     artifactName: "business-functional",
     dependencies: ["1.1"],
+    usedBy: ["1.3", "1.4", "1.5", "2.1", "4.2"],
+    label: "Business & Functional Requirements",
+    category: "requirements",
   },
   "4.2": {
     nodeId: "4.2",
@@ -71,6 +80,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "business-logic-flow",
     artifactName: "business-logic-flow",
     dependencies: ["1.2", "2.1"],
+    usedBy: ["3.4", "6.1", "7.1"],
+    label: "Business logic flow charts",
+    category: "flow_diagram",
   },
   "2.1": {
     nodeId: "2.1",
@@ -78,6 +90,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "project-architecture",
     artifactName: "project-architecture",
     dependencies: ["1.1", "1.2"],
+    usedBy: ["3.3", "3.4", "4.2"],
+    label: "Project architecture",
+    category: "hld",
   },
   "2.2": {
     nodeId: "2.2",
@@ -85,6 +100,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "milestones-specs",
     artifactName: "milestones-specs",
     dependencies: ["1.7"],
+    usedBy: ["6.1"],
+    label: "Milestones / Specs",
+    category: "hld",
   },
   "3.1": {
     nodeId: "3.1",
@@ -92,6 +110,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "list-screens",
     artifactName: "list-screens",
     dependencies: ["1.3"],
+    usedBy: ["3.5", "4.1", "5.1"],
+    label: "List of all screens",
+    category: "lld",
   },
   "4.1": {
     nodeId: "4.1",
@@ -99,6 +120,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "navigation-tree",
     artifactName: "navigation-tree",
     dependencies: ["3.1"],
+    usedBy: ["5.1", "6.1"],
+    label: "Navigation tree for all screens",
+    category: "flow_diagram",
   },
   "5.1": {
     nodeId: "5.1",
@@ -106,6 +130,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "wireframes-screens",
     artifactName: "wireframes-screens",
     dependencies: ["1.3", "3.5", "4.1"],
+    usedBy: ["6.1", "7.1"],
+    label: "Wireframes for each screen",
+    category: "wireframe",
   },
   "5.2": {
     nodeId: "5.2",
@@ -113,6 +140,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "component-wireframes",
     artifactName: "component-wireframes",
     dependencies: ["1.5", "3.3"],
+    usedBy: ["5.1", "6.1"],
+    label: "Component wireframes",
+    category: "wireframe",
   },
   "1.3": {
     nodeId: "1.3",
@@ -120,6 +150,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "acceptance-criteria-screens",
     artifactName: "acceptance-screens",
     dependencies: ["1.2"],
+    usedBy: ["3.1", "3.5", "4.1", "5.1", "1.6"],
+    label: "Acceptance criteria – Screens",
+    category: "requirements",
   },
   "3.2": {
     nodeId: "3.2",
@@ -127,6 +160,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "list-apis",
     artifactName: "list-apis",
     dependencies: ["1.4"],
+    usedBy: ["3.6", "7.1", "3.5"],
+    label: "List of all APIs",
+    category: "lld",
   },
   "1.4": {
     nodeId: "1.4",
@@ -134,6 +170,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "acceptance-criteria-apis",
     artifactName: "acceptance-apis",
     dependencies: ["1.2"],
+    usedBy: ["3.2", "3.6", "7.1", "1.6"],
+    label: "Acceptance criteria – APIs",
+    category: "requirements",
   },
   "3.3": {
     nodeId: "3.3",
@@ -141,6 +180,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "file-tree",
     artifactName: "file-tree",
     dependencies: ["2.1", "1.5"],
+    usedBy: ["3.4", "3.5", "3.6", "5.2"],
+    label: "File tree (all code files)",
+    category: "lld",
   },
   "1.5": {
     nodeId: "1.5",
@@ -148,6 +190,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "component-requirements",
     artifactName: "component-requirements",
     dependencies: ["1.2"],
+    usedBy: ["3.3", "5.2", "1.6"],
+    label: "Component requirements",
+    category: "requirements",
   },
   "1.6": {
     nodeId: "1.6",
@@ -155,6 +200,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "acceptance-criteria-code-files",
     artifactName: "acceptance-code-files",
     dependencies: ["1.3", "1.4", "1.5"],
+    usedBy: ["3.4"],
+    label: "Acceptance criteria – Code files",
+    category: "requirements",
   },
   "3.4": {
     nodeId: "3.4",
@@ -162,6 +210,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "technical-details-code",
     artifactName: "technical-details-code",
     dependencies: ["1.6", "3.3", "3.4", "3.5"],
+    usedBy: ["6.1", "7.1"],
+    label: "Technical details per code file",
+    category: "lld",
   },
   "3.5": {
     nodeId: "3.5",
@@ -169,6 +220,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "technical-detail-screen",
     artifactName: "technical-detail-screen",
     dependencies: ["3.1", "3.2", "3.3"],
+    usedBy: ["5.1", "6.1", "3.4"],
+    label: "Technical detail per screen",
+    category: "lld",
   },
   "3.6": {
     nodeId: "3.6",
@@ -176,6 +230,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "technical-detail-api",
     artifactName: "technical-detail-api",
     dependencies: ["3.2", "3.3"],
+    usedBy: ["3.4", "7.1"],
+    label: "Technical detail per API",
+    category: "lld",
   },
   "1.7": {
     nodeId: "1.7",
@@ -183,6 +240,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "phase-milestone-breakdown",
     artifactName: "phase-milestone",
     dependencies: ["1.1"],
+    usedBy: ["2.2", "6.1"],
+    label: "Phase & milestone breakdown",
+    category: "requirements",
   },
   "7.1": {
     nodeId: "7.1",
@@ -190,6 +250,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "test-json-api",
     artifactName: "test-json-api",
     dependencies: ["1.4", "3.2", "3.4", "4.2"],
+    usedBy: [],
+    label: "Test json for each API",
+    category: "tests",
   },
   "6.1": {
     nodeId: "6.1",
@@ -197,6 +260,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "tasks-milestone",
     artifactName: "tasks-milestone",
     dependencies: ["2.2", "3.4", "3.5", "5.1", "5.2", "6.1"],
+    usedBy: ["6.2"],
+    label: "Tasks (grouped by milestone)",
+    category: "tasks",
   },
   "6.2": {
     nodeId: "6.2",
@@ -204,6 +270,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "subtasks",
     artifactName: "subtasks",
     dependencies: ["6.1", "6.2"],
+    usedBy: [],
+    label: "Subtasks",
+    category: "tasks",
   },
 };
 
@@ -230,7 +299,7 @@ export function getNodeDef(nodeId: string): WorkflowNodeDef | undefined {
 export function getNodeIdByArtifact(
   artifactType: string,
   specName: string,
-  artifactName: string
+  artifactName: string,
 ): string | undefined {
   const spec = specName || "default";
   const nameNorm = (s: string) => s.toLowerCase().replace(/\s+/g, "-");
@@ -239,7 +308,8 @@ export function getNodeIdByArtifact(
     if (
       def.artifactType === artifactType &&
       (def.specName || "default") === spec &&
-      (def.artifactName === artifactName || nameNorm(def.artifactName) === target)
+      (def.artifactName === artifactName ||
+        nameNorm(def.artifactName) === target)
     ) {
       return nodeId;
     }

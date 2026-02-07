@@ -555,9 +555,92 @@ export class MCPCursorProtocolServer {
           },
         } as Tool,
         {
+          name: "pull_skills",
+          description:
+            "Fetch all workflow skills from the server and cache them locally at .quikim/skills/. " +
+            "Skills guide artifact generation for each workflow step (instructions, output format, dependencies, dependents). " +
+            "Call this once when starting a project or when skills may have been updated.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              project_context: PROJECT_CONTEXT_SCHEMA,
+            },
+            required: [],
+          },
+        } as Tool,
+        {
+          name: "get_skill",
+          description:
+            "Get the skill instructions for a specific workflow node. " +
+            "Returns the SKILL.md content that guides artifact generation for that node " +
+            "(instructions, output format, dependencies, dependents). " +
+            "Reads from local .quikim/skills/ cache first; falls back to server API.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              node_id: {
+                type: "string",
+                description: "Workflow node ID (e.g. '1.1', '2.1', '3.4')",
+              },
+              project_context: PROJECT_CONTEXT_SCHEMA,
+            },
+            required: ["node_id"],
+          },
+        } as Tool,
+        {
+          name: "get_llm_queue",
+          description:
+            "Fetch pending LLM generation queue items for a project. Returns items with full prompt payloads. After generating, save with generate_* tool, report_workflow_progress, then update_queue_item.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              project_id: {
+                type: "string",
+                description: "Project ID from project_context.",
+              },
+              status: {
+                type: "string",
+                enum: ["pending", "processing", "completed", "failed"],
+                description: "Filter by status. Default: pending.",
+              },
+              limit: {
+                type: "number",
+                description: "Max items. Default: 10.",
+              },
+              project_context: PROJECT_CONTEXT_SCHEMA,
+            },
+            required: [],
+          },
+        } as Tool,
+        {
+          name: "update_queue_item",
+          description:
+            "Update LLM queue item status. Use 'processing' before generating, 'completed' after, or 'failed' with error_message.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              queue_id: {
+                type: "string",
+                description: "Queue item ID.",
+              },
+              status: {
+                type: "string",
+                enum: ["processing", "completed", "failed"],
+                description: "New status.",
+              },
+              error_message: {
+                type: "string",
+                description: "Error message when status is 'failed'.",
+              },
+              project_context: PROJECT_CONTEXT_SCHEMA,
+            },
+            required: ["queue_id", "status"],
+          },
+        } as Tool,
+        {
           name: "get_workflow_instruction",
           description:
-            "Get the next workflow instruction for the project (action, prompt, context artifacts, decision trace). Call this before generating an artifact so the LLM knows what to generate and which @mentions to use.",
+            "Get the next workflow instruction for the project (action, prompt, context artifacts, skill content, decision trace). Call this before generating an artifact so the LLM knows what to generate and which @mentions to use.",
           inputSchema: {
             type: "object",
             properties: {
@@ -751,11 +834,15 @@ export class MCPCursorProtocolServer {
       // Route to appropriate handler
       switch (name) {
         case "generate_requirements":
-          return await this.toolHandlers.handlePushRequirements(
-            codebase,
-            userPrompt,
-            projectContext,
-            dataToPass,
+          return await this.appendNextStepSkill(
+            name,
+            args as Record<string, unknown>,
+            await this.toolHandlers.handlePushRequirements(
+              codebase,
+              userPrompt,
+              projectContext,
+              dataToPass,
+            ),
           );
         case "pull_requirements":
           return await this.toolHandlers.handlePullRequirements(
@@ -765,11 +852,15 @@ export class MCPCursorProtocolServer {
             dataToPass,
           );
         case "generate_tests":
-          return await this.toolHandlers.handlePushTests(
-            codebase,
-            userPrompt,
-            projectContext,
-            dataToPass,
+          return await this.appendNextStepSkill(
+            name,
+            args as Record<string, unknown>,
+            await this.toolHandlers.handlePushTests(
+              codebase,
+              userPrompt,
+              projectContext,
+              dataToPass,
+            ),
           );
         case "pull_tests":
           return await this.toolHandlers.handlePullTests(
@@ -779,11 +870,15 @@ export class MCPCursorProtocolServer {
             dataToPass,
           );
         case "generate_hld":
-          return await this.toolHandlers.handlePushHLD(
-            codebase,
-            userPrompt,
-            projectContext,
-            dataToPass,
+          return await this.appendNextStepSkill(
+            name,
+            args as Record<string, unknown>,
+            await this.toolHandlers.handlePushHLD(
+              codebase,
+              userPrompt,
+              projectContext,
+              dataToPass,
+            ),
           );
         case "pull_hld":
           return await this.toolHandlers.handlePullHLD(
@@ -800,18 +895,26 @@ export class MCPCursorProtocolServer {
             dataToPass,
           );
         case "generate_wireframes":
-          return await this.toolHandlers.handlePushWireframes(
-            codebase,
-            userPrompt,
-            projectContext,
-            dataToPass,
+          return await this.appendNextStepSkill(
+            name,
+            args as Record<string, unknown>,
+            await this.toolHandlers.handlePushWireframes(
+              codebase,
+              userPrompt,
+              projectContext,
+              dataToPass,
+            ),
           );
         case "generate_tasks":
-          return await this.toolHandlers.handlePushTasks(
-            codebase,
-            userPrompt,
-            projectContext,
-            dataToPass,
+          return await this.appendNextStepSkill(
+            name,
+            args as Record<string, unknown>,
+            await this.toolHandlers.handlePushTasks(
+              codebase,
+              userPrompt,
+              projectContext,
+              dataToPass,
+            ),
           );
         case "pull_tasks":
           return await this.toolHandlers.handlePullTasks(
@@ -835,11 +938,15 @@ export class MCPCursorProtocolServer {
             dataToPass,
           );
         case "er_diagram_push":
-          return await this.toolHandlers.handleERDiagramPush(
-            codebase,
-            userPrompt,
-            projectContext,
-            dataToPass,
+          return await this.appendNextStepSkill(
+            name,
+            args as Record<string, unknown>,
+            await this.toolHandlers.handleERDiagramPush(
+              codebase,
+              userPrompt,
+              projectContext,
+              dataToPass,
+            ),
           );
         case "pull_rules":
           return await this.toolHandlers.handlePullRules(
@@ -856,11 +963,15 @@ export class MCPCursorProtocolServer {
             dataToPass,
           );
         case "generate_mermaid":
-          return await this.toolHandlers.handlePushMermaid(
-            codebase,
-            userPrompt,
-            projectContext,
-            dataToPass,
+          return await this.appendNextStepSkill(
+            name,
+            args as Record<string, unknown>,
+            await this.toolHandlers.handlePushMermaid(
+              codebase,
+              userPrompt,
+              projectContext,
+              dataToPass,
+            ),
           );
         case "pull_lld":
           return await this.toolHandlers.handlePullLLD(
@@ -870,18 +981,26 @@ export class MCPCursorProtocolServer {
             dataToPass,
           );
         case "generate_lld":
-          return await this.toolHandlers.handlePushLLD(
-            codebase,
-            userPrompt,
-            projectContext,
-            dataToPass,
+          return await this.appendNextStepSkill(
+            name,
+            args as Record<string, unknown>,
+            await this.toolHandlers.handlePushLLD(
+              codebase,
+              userPrompt,
+              projectContext,
+              dataToPass,
+            ),
           );
         case "generate_context":
-          return await this.toolHandlers.handlePushContext(
-            codebase,
-            userPrompt,
-            projectContext,
-            dataToPass,
+          return await this.appendNextStepSkill(
+            name,
+            args as Record<string, unknown>,
+            await this.toolHandlers.handlePushContext(
+              codebase,
+              userPrompt,
+              projectContext,
+              dataToPass,
+            ),
           );
         case "pull_context":
           return await this.toolHandlers.handlePullContext(
@@ -891,11 +1010,15 @@ export class MCPCursorProtocolServer {
             dataToPass,
           );
         case "generate_code_guideline":
-          return await this.toolHandlers.handlePushCodeGuideline(
-            codebase,
-            userPrompt,
-            projectContext,
-            dataToPass,
+          return await this.appendNextStepSkill(
+            name,
+            args as Record<string, unknown>,
+            await this.toolHandlers.handlePushCodeGuideline(
+              codebase,
+              userPrompt,
+              projectContext,
+              dataToPass,
+            ),
           );
         case "pull_code_guideline":
           return await this.toolHandlers.handlePullCodeGuideline(
@@ -904,6 +1027,115 @@ export class MCPCursorProtocolServer {
             projectContext,
             dataToPass,
           );
+        case "pull_skills": {
+          const workflowBase = configManager
+            .getWorkflowServiceUrl()
+            .replace(/\/$/, "");
+          const token = configManager.getAuth()?.token ?? "";
+          const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+          };
+          if (token) headers["Authorization"] = `Bearer ${token}`;
+          try {
+            const res = await fetch(
+              `${workflowBase}/api/v1/workflow/skills/all`,
+              { method: "GET", headers },
+            );
+            if (!res.ok) {
+              const errText = await res.text();
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: `Skills fetch error: ${res.status} ${errText}`,
+                  },
+                ],
+                isError: true,
+              };
+            }
+            const body = (await res.json()) as {
+              skills?: Array<{
+                nodeId: string;
+                content: string;
+                metadata?: Record<string, unknown>;
+              }>;
+            };
+            const { SkillFileManager } =
+              await import("../services/skill-file-manager.js");
+            const skillManager = new SkillFileManager();
+            const count = await skillManager.writeAllSkills(body.skills || []);
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Pulled ${count} skills to .quikim/skills/`,
+                },
+              ],
+            };
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return {
+              content: [{ type: "text", text: `Pull skills failed: ${msg}` }],
+              isError: true,
+            };
+          }
+        }
+        case "get_skill": {
+          const nodeId = args.node_id as string;
+          const { SkillFileManager } =
+            await import("../services/skill-file-manager.js");
+          const { WORKFLOW_NODES } =
+            await import("../workflow-engine/config/workflow-definition.js");
+          const skillManager = new SkillFileManager();
+          const nodeDef = WORKFLOW_NODES[nodeId];
+          const specName = nodeDef?.specName || "default";
+          // Try local cache first
+          let skillContent = await skillManager.readSkillFile(nodeId, specName);
+          if (!skillContent) {
+            // Fallback: fetch from server and cache locally
+            const workflowBase = configManager
+              .getWorkflowServiceUrl()
+              .replace(/\/$/, "");
+            const token = configManager.getAuth()?.token ?? "";
+            const headers: Record<string, string> = {
+              "Content-Type": "application/json",
+            };
+            if (token) headers["Authorization"] = `Bearer ${token}`;
+            try {
+              const res = await fetch(
+                `${workflowBase}/api/v1/workflow/skills/${nodeId}`,
+                { method: "GET", headers },
+              );
+              if (res.ok) {
+                const body = (await res.json()) as { content?: string };
+                skillContent = body.content ?? null;
+                if (skillContent) {
+                  await skillManager.writeSkillFile(
+                    nodeId,
+                    specName,
+                    skillContent,
+                  );
+                }
+              }
+            } catch {
+              /* fall through */
+            }
+          }
+          if (!skillContent) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `No skill found for node ${nodeId}`,
+                },
+              ],
+              isError: true,
+            };
+          }
+          return {
+            content: [{ type: "text", text: skillContent }],
+          };
+        }
         case "get_workflow_instruction": {
           const rawProjectId = (args.project_id as string) || "";
           const projectId =
@@ -951,7 +1183,31 @@ export class MCPCursorProtocolServer {
                 isError: true,
               };
             }
-            const instruction = await res.json();
+            const instruction = (await res.json()) as Record<string, unknown>;
+
+            // If server did not include skillContent, load from local cache
+            if (
+              !instruction.skillContent &&
+              (instruction.nextCandidates as string[] | undefined)?.length
+            ) {
+              const nextNodeId = (instruction.nextCandidates as string[])[0];
+              const { SkillFileManager } =
+                await import("../services/skill-file-manager.js");
+              const { WORKFLOW_NODES } =
+                await import("../workflow-engine/config/workflow-definition.js");
+              const skillManager = new SkillFileManager();
+              const nodeDef = WORKFLOW_NODES[nextNodeId];
+              if (nodeDef) {
+                const localSkill = await skillManager.readSkillFile(
+                  nextNodeId,
+                  nodeDef.specName,
+                );
+                if (localSkill) {
+                  instruction.skillContent = localSkill;
+                }
+              }
+            }
+
             return {
               content: [
                 { type: "text", text: JSON.stringify(instruction, null, 2) },
@@ -1035,6 +1291,180 @@ export class MCPCursorProtocolServer {
             };
           }
         }
+        case "get_llm_queue": {
+          const rawProjectId = (args.project_id as string) || "";
+          const projectId =
+            rawProjectId && rawProjectId !== "default"
+              ? rawProjectId
+              : projectContext.projectId;
+          if (!projectId) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: "Error: project_id or project_context with projectId required.",
+                },
+              ],
+              isError: true,
+            };
+          }
+          const workflowBase = configManager
+            .getWorkflowServiceUrl()
+            .replace(/\/$/, "");
+          const token = configManager.getAuth()?.token ?? "";
+          const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+          };
+          if (token) headers["Authorization"] = `Bearer ${token}`;
+          try {
+            const queueStatus = (args.status as string) || "pending";
+            const queueLimit = (args.limit as number) || 10;
+            const params = new URLSearchParams({
+              projectId,
+              status: queueStatus,
+              limit: String(queueLimit),
+            });
+            const listRes = await fetch(
+              `${workflowBase}/api/v1/workflow/queue?${params}`,
+              { method: "GET", headers },
+            );
+            if (!listRes.ok) {
+              const errText = await listRes.text();
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: `Queue list error: ${listRes.status} ${errText}`,
+                  },
+                ],
+                isError: true,
+              };
+            }
+            const listBody = (await listRes.json()) as {
+              items?: Array<Record<string, unknown>>;
+            };
+            const queueItems = listBody.items || [];
+            if (queueItems.length === 0) {
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: JSON.stringify({
+                      items: [],
+                      message: `No ${queueStatus} queue items for project ${projectId}.`,
+                    }),
+                  },
+                ],
+              };
+            }
+            // Fetch payload for each item
+            const enrichedItems = [];
+            for (const item of queueItems) {
+              try {
+                const payloadRes = await fetch(
+                  `${workflowBase}/api/v1/workflow/queue/${item.id}/payload`,
+                  { method: "GET", headers },
+                );
+                if (payloadRes.ok) {
+                  const payload = await payloadRes.json();
+                  enrichedItems.push({ ...item, payload });
+                } else {
+                  enrichedItems.push({
+                    ...item,
+                    payload: null,
+                    payloadError: `HTTP ${payloadRes.status}`,
+                  });
+                }
+              } catch (payloadErr) {
+                enrichedItems.push({
+                  ...item,
+                  payload: null,
+                  payloadError: String(payloadErr),
+                });
+              }
+            }
+            const result = {
+              items: enrichedItems,
+              count: enrichedItems.length,
+              instructions:
+                "For each item: 1) update_queue_item(id, 'processing'), " +
+                "2) Generate content using payload (systemPrompt + skillContent as system, userPrompt as user), " +
+                "3) Save via generate_* tool (e.g. generate_requirements), " +
+                "4) report_workflow_progress to advance workflow, " +
+                "5) update_queue_item(id, 'completed'). On error: update_queue_item(id, 'failed', error_message).",
+            };
+            return {
+              content: [
+                { type: "text", text: JSON.stringify(result, null, 2) },
+              ],
+            };
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return {
+              content: [{ type: "text", text: `Queue fetch failed: ${msg}` }],
+              isError: true,
+            };
+          }
+        }
+        case "update_queue_item": {
+          const queueId = args.queue_id as string;
+          const newStatus = args.status as string;
+          if (!queueId || !newStatus) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: "Error: queue_id and status are required.",
+                },
+              ],
+              isError: true,
+            };
+          }
+          const workflowBase = configManager
+            .getWorkflowServiceUrl()
+            .replace(/\/$/, "");
+          const token = configManager.getAuth()?.token ?? "";
+          const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+          };
+          if (token) headers["Authorization"] = `Bearer ${token}`;
+          try {
+            const patchBody: Record<string, string> = { status: newStatus };
+            if (args.error_message) {
+              patchBody.errorMessage = args.error_message as string;
+            }
+            const res = await fetch(
+              `${workflowBase}/api/v1/workflow/queue/${queueId}`,
+              {
+                method: "PATCH",
+                headers,
+                body: JSON.stringify(patchBody),
+              },
+            );
+            if (!res.ok) {
+              const errText = await res.text();
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: `Queue update error: ${res.status} ${errText}`,
+                  },
+                ],
+                isError: true,
+              };
+            }
+            const result = await res.json();
+            return {
+              content: [{ type: "text", text: JSON.stringify(result) }],
+            };
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return {
+              content: [{ type: "text", text: `Queue update failed: ${msg}` }],
+              isError: true,
+            };
+          }
+        }
         // Workflow engine tools
         case "detect_change":
         case "analyze_impact":
@@ -1055,6 +1485,77 @@ export class MCPCursorProtocolServer {
           throw new Error(`Unknown tool: ${name}`);
       }
     });
+  }
+
+  /**
+   * After a generate_* tool succeeds, look up the next workflow step and
+   * append its skill content to the response so the LLM knows what to
+   * generate next.
+   */
+  private async appendNextStepSkill(
+    toolName: string,
+    args: Record<string, unknown>,
+    result: {
+      content: Array<{ type: string; text: string }>;
+      isError?: boolean;
+    },
+  ): Promise<typeof result> {
+    if (result.isError) return result;
+    try {
+      const { WORKFLOW_NODES, WORKFLOW_NODE_ORDER, getNodeIdByArtifact } =
+        await import("../workflow-engine/config/workflow-definition.js");
+      const { SkillFileManager } =
+        await import("../services/skill-file-manager.js");
+
+      // Map generate_* tool name to artifact type
+      const toolToArtifactType: Record<string, string> = {
+        generate_requirements: "requirement",
+        generate_hld: "hld",
+        generate_lld: "lld",
+        generate_mermaid: "flow_diagram",
+        generate_wireframes: "wireframe_files",
+        generate_tasks: "tasks",
+        generate_context: "context",
+        generate_code_guideline: "code_guideline",
+      };
+      const artifactType = toolToArtifactType[toolName];
+      if (!artifactType) return result;
+
+      const specName = (args.spec_name as string) || "default";
+      const artifactName = (args.name as string) || specName;
+
+      // Find current node
+      const currentNodeId = getNodeIdByArtifact(
+        artifactType,
+        specName,
+        artifactName,
+      );
+      if (!currentNodeId) return result;
+
+      // Find next node in agile flow order
+      const idx = WORKFLOW_NODE_ORDER.indexOf(currentNodeId);
+      if (idx < 0 || idx >= WORKFLOW_NODE_ORDER.length - 1) return result;
+      const nextNodeId = WORKFLOW_NODE_ORDER[idx + 1];
+      const nextDef = WORKFLOW_NODES[nextNodeId];
+      if (!nextDef) return result;
+
+      // Load next step's skill from local cache
+      const skillManager = new SkillFileManager();
+      const nextSkill = await skillManager.readSkillFile(
+        nextNodeId,
+        nextDef.specName,
+      );
+      if (!nextSkill) return result;
+
+      // Append to result
+      result.content.push({
+        type: "text",
+        text: `\n\n--- NEXT WORKFLOW STEP: ${nextDef.label} (${nextNodeId}) ---\n${nextSkill}`,
+      });
+    } catch {
+      // Non-fatal: skill injection is best-effort
+    }
+    return result;
   }
 
   /**
