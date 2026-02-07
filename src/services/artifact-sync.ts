@@ -14,6 +14,7 @@ import {
   type Task as KiroTask
 } from "./tasks-converter.js";
 import { configManager } from "../config/manager.js";
+import { PROJECT_SERVICE_API_PREFIX } from "../config/constants.js";
 import { promises as fs } from "fs";
 import { join, dirname } from "path";
 import {
@@ -1541,7 +1542,10 @@ export class ArtifactSyncService {
       ? configManager.getUserServiceUrl()
       : configManager.getProjectServiceUrl();
     const base = baseURL.replace(/\/$/, "");
-    const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+    let path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+    if (serviceType === "project") {
+      path = path.startsWith(PROJECT_SERVICE_API_PREFIX) ? path : `${PROJECT_SERVICE_API_PREFIX}${path}`;
+    }
     const url = `${base}${path}`;
     const method = (options.method ?? "GET").toUpperCase();
 

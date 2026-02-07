@@ -1,14 +1,14 @@
 /**
  * Quikim - Service-Aware API Client
  * Routes requests to appropriate microservices (user-service, project-service)
- * 
+ *
  * Copyright (c) 2026 Quikim Pvt. Ltd.
- * 
+ *
  * This file is part of Quikim, licensed under the AGPL-3.0 License.
  * See LICENSE file in the project root for full license information.
  */
 
-import { configManager } from '../../config/manager.js';
+import { configManager } from "../../config/manager.js";
 import {
   APIError,
   AuthenticationError,
@@ -16,9 +16,9 @@ import {
   NetworkError,
   TimeoutError,
   RateLimitError,
-} from './errors.js';
+} from "./errors.js";
 
-export type ServiceType = 'user' | 'project';
+export type ServiceType = "user" | "project";
 
 export interface ServiceConfig {
   baseURL: string;
@@ -54,10 +54,11 @@ export class ServiceAwareAPIClient {
    * Get the appropriate service base URL (origin + /api/v1/user or /api/v1/project) for API gateway routing.
    */
   private getServiceURL(serviceType: ServiceType): string {
-    const origin = serviceType === 'user'
-      ? configManager.getUserServiceUrl()
-      : configManager.getProjectServiceUrl();
-    const prefix = serviceType === 'user' ? '/api/v1/user' : '/api/v1/project';
+    const origin =
+      serviceType === "user"
+        ? configManager.getUserServiceUrl()
+        : configManager.getProjectServiceUrl();
+    const prefix = serviceType === "user" ? "/api/v1/user" : "/api/v1/project";
     return `${origin}${prefix}`;
   }
 
@@ -72,7 +73,7 @@ export class ServiceAwareAPIClient {
   ): Promise<APIResponse<T>> {
     const baseURL = this.getServiceURL(serviceType);
     const url = `${baseURL}${endpoint}`;
-    
+
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       ...(this.config.apiKey && {
@@ -114,7 +115,9 @@ export class ServiceAwareAPIClient {
     } catch (error: unknown) {
       const err = error as Error;
       if (err.name === "AbortError") {
-        throw new TimeoutError(`Request to ${serviceType}:${endpoint} timed out`);
+        throw new TimeoutError(
+          `Request to ${serviceType}:${endpoint} timed out`,
+        );
       }
 
       // Retry on network errors
@@ -201,8 +204,8 @@ export class ServiceAwareAPIClient {
    * Login with email and password
    */
   async login(email: string, password: string): Promise<unknown> {
-    return this.request('user', '/auth/login', {
-      method: 'POST',
+    return this.request("user", "/auth/login", {
+      method: "POST",
       body: JSON.stringify({ email, password }),
     });
   }
@@ -211,8 +214,8 @@ export class ServiceAwareAPIClient {
    * Get current user info
    */
   async getCurrentUser(): Promise<unknown> {
-    return this.request('user', '/users/me', {
-      method: 'GET',
+    return this.request("user", "/users/me", {
+      method: "GET",
     });
   }
 
@@ -222,8 +225,8 @@ export class ServiceAwareAPIClient {
    * List projects
    */
   async listProjects(): Promise<unknown> {
-    return this.request('project', '/projects', {
-      method: 'GET',
+    return this.request("project", "/projects", {
+      method: "GET",
     });
   }
 
@@ -231,8 +234,8 @@ export class ServiceAwareAPIClient {
    * Get project by ID
    */
   async getProject(projectId: string): Promise<unknown> {
-    return this.request('project', `/projects/${projectId}`, {
-      method: 'GET',
+    return this.request("project", `/projects/${projectId}`, {
+      method: "GET",
     });
   }
 
@@ -242,11 +245,17 @@ export class ServiceAwareAPIClient {
    * Fetch requirements for a project.
    * List API returns items without content; fetches full requirement (with content) for each item.
    */
-  async fetchRequirements(projectId: string, specName?: string): Promise<unknown> {
-    const listRes = await this.request<{ data?: { id: string }[]; pagination?: unknown }>(
-      'project',
-      `/requirements/?projectId=${projectId}${specName ? `&specName=${encodeURIComponent(specName)}` : ''}&limit=100`,
-      { method: 'GET' }
+  async fetchRequirements(
+    projectId: string,
+    specName?: string,
+  ): Promise<unknown> {
+    const listRes = await this.request<{
+      data?: { id: string }[];
+      pagination?: unknown;
+    }>(
+      "project",
+      `/requirements/?projectId=${projectId}${specName ? `&specName=${encodeURIComponent(specName)}` : ""}&limit=100`,
+      { method: "GET" },
     );
     const body = listRes.data as { data?: { id: string }[] } | undefined;
     const list = Array.isArray(body) ? body : (body?.data ?? []);
@@ -254,9 +263,9 @@ export class ServiceAwareAPIClient {
     const fullList: unknown[] = [];
     for (const item of list) {
       const fullRes = await this.request<{ data?: unknown }>(
-        'project',
+        "project",
         `/requirements/${item.id}`,
-        { method: 'GET' }
+        { method: "GET" },
       );
       const fullBody = fullRes.data as { data?: unknown } | undefined;
       const full = fullBody?.data ?? fullRes.data;
@@ -271,17 +280,17 @@ export class ServiceAwareAPIClient {
   async syncRequirements(
     projectId: string,
     content: string,
-    metadata?: Record<string, unknown> & { specName?: string; name?: string }
+    metadata?: Record<string, unknown> & { specName?: string; name?: string },
   ): Promise<unknown> {
-    return this.request('project', '/requirements/', {
-      method: 'POST',
+    return this.request("project", "/requirements/", {
+      method: "POST",
       body: JSON.stringify({
         projectId,
         content,
-        specName: metadata?.specName ?? 'default',
-        name: metadata?.name ?? 'Requirements',
+        specName: metadata?.specName ?? "default",
+        name: metadata?.name ?? "Requirements",
         changeSummary: metadata?.changeSummary,
-        changeType: metadata?.changeType || 'minor',
+        changeType: metadata?.changeType || "minor",
       }),
     });
   }
@@ -290,10 +299,13 @@ export class ServiceAwareAPIClient {
    * Fetch tests for a project.
    */
   async fetchTests(projectId: string, specName?: string): Promise<unknown> {
-    const listRes = await this.request<{ data?: { id: string }[]; pagination?: unknown }>(
-      'project',
-      `/tests/?projectId=${projectId}${specName ? `&specName=${encodeURIComponent(specName)}` : ''}&limit=100`,
-      { method: 'GET' }
+    const listRes = await this.request<{
+      data?: { id: string }[];
+      pagination?: unknown;
+    }>(
+      "project",
+      `/tests/?projectId=${projectId}${specName ? `&specName=${encodeURIComponent(specName)}` : ""}&limit=100`,
+      { method: "GET" },
     );
     const body = listRes.data as { data?: { id: string }[] } | undefined;
     const list = Array.isArray(body) ? body : (body?.data ?? []);
@@ -301,9 +313,9 @@ export class ServiceAwareAPIClient {
     const fullList: unknown[] = [];
     for (const item of list) {
       const fullRes = await this.request<{ data?: unknown }>(
-        'project',
+        "project",
         `/tests/${item.id}`,
-        { method: 'GET' }
+        { method: "GET" },
       );
       const fullBody = fullRes.data as { data?: unknown } | undefined;
       const full = fullBody?.data ?? fullRes.data;
@@ -315,30 +327,33 @@ export class ServiceAwareAPIClient {
   /**
    * Create/update test
    */
-  async syncTest(projectId: string, payload: {
-    name?: string;
-    specName?: string;
-    tags?: string[];
-    description?: string;
-    sampleInputOutput?: unknown;
-    inputDescription?: unknown;
-    outputDescription?: unknown;
-    changeSummary?: string;
-    changeType?: string;
-  }): Promise<unknown> {
-    return this.request('project', '/tests/', {
-      method: 'POST',
+  async syncTest(
+    projectId: string,
+    payload: {
+      name?: string;
+      specName?: string;
+      tags?: string[];
+      description?: string;
+      sampleInputOutput?: unknown;
+      inputDescription?: unknown;
+      outputDescription?: unknown;
+      changeSummary?: string;
+      changeType?: string;
+    },
+  ): Promise<unknown> {
+    return this.request("project", "/tests/", {
+      method: "POST",
       body: JSON.stringify({
         projectId,
-        name: payload.name ?? 'Test',
-        specName: payload.specName ?? 'default',
+        name: payload.name ?? "Test",
+        specName: payload.specName ?? "default",
         tags: payload.tags ?? [],
-        description: payload.description ?? '',
+        description: payload.description ?? "",
         sampleInputOutput: payload.sampleInputOutput ?? {},
         inputDescription: payload.inputDescription ?? {},
         outputDescription: payload.outputDescription ?? {},
         changeSummary: payload.changeSummary,
-        changeType: payload.changeType ?? 'minor',
+        changeType: payload.changeType ?? "minor",
       }),
     });
   }
@@ -349,21 +364,31 @@ export class ServiceAwareAPIClient {
    * Fetch HLD for a project
    */
   async fetchHLD(projectId: string): Promise<unknown> {
-    return this.request('project', `/designs/?projectId=${projectId}&type=hld`, {
-      method: 'GET',
-    });
+    return this.request(
+      "project",
+      `/designs/?projectId=${projectId}&type=hld`,
+      {
+        method: "GET",
+      },
+    );
   }
 
   /**
    * Create/update HLD
    */
-  async syncHLD(projectId: string, content: string, metadata?: Record<string, unknown>): Promise<unknown> {
-    return this.request('project', '/designs/', {
-      method: 'POST',
+  async syncHLD(
+    projectId: string,
+    content: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<unknown> {
+    return this.request("project", "/designs/", {
+      method: "POST",
       body: JSON.stringify({
         projectId,
-        type: 'hld',
+        type: "hld",
         content,
+        specName: metadata?.specName ?? "default",
+        name: metadata?.name ?? "HLD",
         changeSummary: metadata?.changeSummary,
       }),
     });
@@ -373,12 +398,12 @@ export class ServiceAwareAPIClient {
    * Fetch LLD for a project
    */
   async fetchLLD(projectId: string, componentName?: string): Promise<unknown> {
-    const params = new URLSearchParams({ projectId, type: 'lld' });
+    const params = new URLSearchParams({ projectId, type: "lld" });
     if (componentName) {
-      params.append('componentName', componentName);
+      params.append("componentName", componentName);
     }
-    return this.request('project', `/designs/?${params.toString()}`, {
-      method: 'GET',
+    return this.request("project", `/designs/?${params.toString()}`, {
+      method: "GET",
     });
   }
 
@@ -386,22 +411,33 @@ export class ServiceAwareAPIClient {
    * Fetch mermaid/flow diagrams for a project
    */
   async fetchMermaid(projectId: string): Promise<unknown> {
-    return this.request('project', `/designs/?projectId=${projectId}&type=flow`, {
-      method: 'GET',
-    });
+    return this.request(
+      "project",
+      `/designs/?projectId=${projectId}&type=flow`,
+      {
+        method: "GET",
+      },
+    );
   }
 
   /**
    * Create/update LLD
    */
-  async syncLLD(projectId: string, content: string, componentName: string, metadata?: Record<string, unknown>): Promise<unknown> {
-    return this.request('project', '/designs/', {
-      method: 'POST',
+  async syncLLD(
+    projectId: string,
+    content: string,
+    componentName: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<unknown> {
+    return this.request("project", "/designs/", {
+      method: "POST",
       body: JSON.stringify({
         projectId,
-        type: 'lld',
+        type: "lld",
         content,
         componentName,
+        specName: metadata?.specName ?? "default",
+        name: metadata?.name ?? "LLD",
         changeSummary: metadata?.changeSummary,
       }),
     });
@@ -413,24 +449,29 @@ export class ServiceAwareAPIClient {
    * Fetch tasks for a project
    */
   async fetchTasks(projectId: string): Promise<unknown> {
-    return this.request('project', `/tasks/?projectId=${projectId}`, {
-      method: 'GET',
+    return this.request("project", `/tasks/?projectId=${projectId}`, {
+      method: "GET",
     });
   }
 
   /**
    * Create/update task
    */
-  async syncTask(projectId: string, content: string, metadata?: Record<string, unknown>): Promise<unknown> {
-    return this.request('project', '/tasks/', {
-      method: 'POST',
+  async syncTask(
+    projectId: string,
+    content: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<unknown> {
+    return this.request("project", "/tasks/", {
+      method: "POST",
       body: JSON.stringify({
         projectId,
-        title: metadata?.title || 'Task from MCP',
+        title: metadata?.title || "Task from MCP",
         description: content,
-        status: metadata?.status || 'todo',
-        priority: metadata?.priority || 'medium',
-        type: metadata?.type || 'feature',
+        specName: metadata?.specName ?? "default",
+        status: metadata?.status || "todo",
+        priority: metadata?.priority || "medium",
+        type: metadata?.type || "feature",
       }),
     });
   }
@@ -439,8 +480,8 @@ export class ServiceAwareAPIClient {
    * Get task prompt version history (list without full content).
    */
   async getTaskPromptVersionHistory(taskId: string): Promise<unknown> {
-    return this.request('project', `/tasks/${taskId}/prompts/version-history`, {
-      method: 'GET',
+    return this.request("project", `/tasks/${taskId}/prompts/version-history`, {
+      method: "GET",
     });
   }
 
@@ -448,8 +489,8 @@ export class ServiceAwareAPIClient {
    * Get a single task prompt with full content.
    */
   async getTaskPrompt(taskId: string, promptId: string): Promise<unknown> {
-    return this.request('project', `/tasks/${taskId}/prompts/${promptId}`, {
-      method: 'GET',
+    return this.request("project", `/tasks/${taskId}/prompts/${promptId}`, {
+      method: "GET",
     });
   }
 
@@ -458,10 +499,10 @@ export class ServiceAwareAPIClient {
    */
   async createTaskPrompt(
     taskId: string,
-    data: { content: string; changeSummary?: string; changeType?: string }
+    data: { content: string; changeSummary?: string; changeType?: string },
   ): Promise<unknown> {
-    return this.request('project', `/tasks/${taskId}/prompts`, {
-      method: 'POST',
+    return this.request("project", `/tasks/${taskId}/prompts`, {
+      method: "POST",
       body: JSON.stringify(data),
     });
   }
@@ -471,10 +512,14 @@ export class ServiceAwareAPIClient {
    */
   async restoreTaskPrompt(
     taskId: string,
-    data: { sourcePromptId: string; changeSummary?: string; changeType?: string }
+    data: {
+      sourcePromptId: string;
+      changeSummary?: string;
+      changeType?: string;
+    },
   ): Promise<unknown> {
-    return this.request('project', `/tasks/${taskId}/prompts/restore`, {
-      method: 'POST',
+    return this.request("project", `/tasks/${taskId}/prompts/restore`, {
+      method: "POST",
       body: JSON.stringify(data),
     });
   }
@@ -485,21 +530,26 @@ export class ServiceAwareAPIClient {
    * Fetch ER diagram for a project
    */
   async fetchERDiagram(projectId: string): Promise<unknown> {
-    return this.request('project', `/er-diagrams/?projectId=${projectId}`, {
-      method: 'GET',
+    return this.request("project", `/er-diagrams/?projectId=${projectId}`, {
+      method: "GET",
     });
   }
 
   /**
    * Create/update ER diagram
    */
-  async syncERDiagram(projectId: string, content: string, metadata?: Record<string, unknown>): Promise<unknown> {
-    return this.request('project', '/er-diagrams/', {
-      method: 'POST',
+  async syncERDiagram(
+    projectId: string,
+    content: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<unknown> {
+    return this.request("project", "/er-diagrams/", {
+      method: "POST",
       body: JSON.stringify({
         projectId,
         content,
-        name: metadata?.name || 'ER Diagram',
+        name: metadata?.name || "ER Diagram",
+        specName: metadata?.specName ?? "default",
         changeSummary: metadata?.changeSummary,
       }),
     });
@@ -511,8 +561,8 @@ export class ServiceAwareAPIClient {
    * Fetch wireframes for a project
    */
   async fetchWireframes(projectId: string): Promise<unknown> {
-    return this.request('project', `/projects/${projectId}/wireframes`, {
-      method: 'GET',
+    return this.request("project", `/projects/${projectId}/wireframes`, {
+      method: "GET",
     });
   }
 
@@ -524,27 +574,34 @@ export class ServiceAwareAPIClient {
     projectId: string,
     content: string,
     metadata?: Record<string, unknown>,
-    organizationId?: string
+    organizationId?: string,
   ): Promise<unknown> {
     const path = organizationId
       ? `/organizations/${organizationId}/projects/${projectId}/wireframes`
       : `/projects/${projectId}/wireframes`;
-    const defaultName = (metadata?.name as string) || 'Wireframe from MCP';
-    const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
-    let name = defaultName.slice(0, 100) || 'Wireframe from MCP';
+    const defaultName = (metadata?.name as string) || "Wireframe from MCP";
+    const clamp = (n: number, min: number, max: number) =>
+      Math.min(max, Math.max(min, n));
+    let name = defaultName.slice(0, 100) || "Wireframe from MCP";
     let viewport = { width: 1280, height: 720, scale: 1 as number };
     let elements: unknown[] = [];
     if (organizationId && content.trim()) {
       try {
         const parsed = JSON.parse(content) as Record<string, unknown>;
-        if (typeof parsed.name === 'string' && parsed.name.length >= 1) {
+        if (typeof parsed.name === "string" && parsed.name.length >= 1) {
           name = parsed.name.slice(0, 100);
         }
-        if (parsed.viewport && typeof parsed.viewport === 'object') {
+        if (parsed.viewport && typeof parsed.viewport === "object") {
           const v = parsed.viewport as Record<string, unknown>;
-          const w = typeof v.width === 'number' ? clamp(v.width, 320, 7680) : 1280;
-          const h = typeof v.height === 'number' ? clamp(v.height, 240, 4320) : 720;
-          viewport = { width: w, height: h, scale: typeof v.scale === 'number' ? v.scale : 1 };
+          const w =
+            typeof v.width === "number" ? clamp(v.width, 320, 7680) : 1280;
+          const h =
+            typeof v.height === "number" ? clamp(v.height, 240, 4320) : 720;
+          viewport = {
+            width: w,
+            height: h,
+            scale: typeof v.scale === "number" ? v.scale : 1,
+          };
         }
         if (Array.isArray(parsed.elements)) {
           elements = parsed.elements;
@@ -553,15 +610,17 @@ export class ServiceAwareAPIClient {
         // Use defaults when content is not valid JSON
       }
     }
+    const specName = (metadata?.specName as string) ?? "default";
     const body = organizationId
-      ? { name, viewport, elements }
+      ? { name, specName, viewport, elements }
       : {
           name,
+          specName,
           content,
-          componentType: metadata?.componentType || 'website',
+          componentType: metadata?.componentType || "website",
         };
-    const res = await this.request('project', path, {
-      method: 'POST',
+    const res = await this.request("project", path, {
+      method: "POST",
       body: JSON.stringify(body),
     });
     return res.data;
@@ -574,17 +633,17 @@ export class ServiceAwareAPIClient {
     projectId: string,
     content: string,
     metadata?: Record<string, unknown>,
-    specName?: string
+    specName?: string,
   ): Promise<unknown> {
     const mermaidType = this.inferMermaidType(content);
-    const res = await this.request('project', '/designs', {
-      method: 'POST',
+    const res = await this.request("project", "/designs", {
+      method: "POST",
       body: JSON.stringify({
         projectId,
-        type: 'flow',
-        name: metadata?.name || 'Flow',
-        specName: specName || 'default',
-        content: '',
+        type: "flow",
+        name: metadata?.name || "Flow",
+        specName: specName || "default",
+        content: "",
         mermaidDiagram: content,
         mermaidType,
       }),
@@ -593,21 +652,25 @@ export class ServiceAwareAPIClient {
   }
 
   private inferMermaidType(content: string): string {
-    const s = (content || '').trim();
-    if (/^\s*erDiagram\s/mi.test(s)) return 'entity';
-    if (/^\s*sequenceDiagram\s/mi.test(s)) return 'sequence';
-    if (/^\s*classDiagram\s/mi.test(s)) return 'class';
-    if (/^\s*stateDiagram\s/mi.test(s)) return 'state';
-    return 'flowchart';
+    const s = (content || "").trim();
+    if (/^\s*erDiagram\s/im.test(s)) return "entity";
+    if (/^\s*sequenceDiagram\s/im.test(s)) return "sequence";
+    if (/^\s*classDiagram\s/im.test(s)) return "class";
+    if (/^\s*stateDiagram\s/im.test(s)) return "state";
+    return "flowchart";
   }
 
   /**
    * Fetch contexts for a project
    */
   async fetchContexts(projectId: string): Promise<unknown> {
-    const res = await this.request('project', `/projects/${projectId}/contexts`, {
-      method: 'GET',
-    });
+    const res = await this.request(
+      "project",
+      `/projects/${projectId}/contexts`,
+      {
+        method: "GET",
+      },
+    );
     return res.data;
   }
 
@@ -617,17 +680,21 @@ export class ServiceAwareAPIClient {
   async syncContext(
     projectId: string,
     content: string,
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
   ): Promise<unknown> {
-    const res = await this.request('project', `/projects/${projectId}/contexts`, {
-      method: 'POST',
-      body: JSON.stringify({
-        title: metadata?.title || metadata?.name || 'Context',
-        content,
-        description: metadata?.description || '',
-        isActive: true,
-      }),
-    });
+    const res = await this.request(
+      "project",
+      `/projects/${projectId}/contexts`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          title: metadata?.title || metadata?.name || "Context",
+          content,
+          description: metadata?.description || "",
+          isActive: true,
+        }),
+      },
+    );
     return res.data;
   }
 
@@ -635,9 +702,13 @@ export class ServiceAwareAPIClient {
    * Fetch code guidelines for a project
    */
   async fetchCodeGuidelines(projectId: string): Promise<unknown> {
-    const res = await this.request('project', `/projects/${projectId}/code-guidelines`, {
-      method: 'GET',
-    });
+    const res = await this.request(
+      "project",
+      `/projects/${projectId}/code-guidelines`,
+      {
+        method: "GET",
+      },
+    );
     return res.data;
   }
 
@@ -647,16 +718,16 @@ export class ServiceAwareAPIClient {
   async syncCodeGuideline(
     projectId: string,
     content: string,
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
   ): Promise<unknown> {
-    const res = await this.request('project', '/code-guidelines', {
-      method: 'POST',
+    const res = await this.request("project", "/code-guidelines", {
+      method: "POST",
       body: JSON.stringify({
-        scope: 'project',
+        scope: "project",
         projectId,
-        title: metadata?.title || metadata?.name || 'Guideline',
+        title: metadata?.title || metadata?.name || "Guideline",
         content,
-        description: metadata?.description || '',
+        description: metadata?.description || "",
       }),
     });
     return res.data;
@@ -669,10 +740,14 @@ export class ServiceAwareAPIClient {
    */
   async healthCheck(serviceType: ServiceType): Promise<boolean> {
     try {
-      const response = await this.request<{ status: string }>(serviceType, '/health', {
-        method: 'GET',
-      });
-      return response.success && response.data?.status === 'ok';
+      const response = await this.request<{ status: string }>(
+        serviceType,
+        "/health",
+        {
+          method: "GET",
+        },
+      );
+      return response.success && response.data?.status === "ok";
     } catch {
       return false;
     }
@@ -683,22 +758,26 @@ export class ServiceAwareAPIClient {
   /**
    * Fetch pending queue requests for a project
    */
-  async fetchPendingQueueRequests(projectId: string): Promise<Array<{
-    id: string;
-    projectId: string;
-    type: string;
-    status: string;
-    context: Record<string, unknown>;
-  }>> {
+  async fetchPendingQueueRequests(projectId: string): Promise<
+    Array<{
+      id: string;
+      projectId: string;
+      type: string;
+      status: string;
+      context: Record<string, unknown>;
+    }>
+  > {
     try {
-      const response = await this.request<Array<{
-        id: string;
-        projectId: string;
-        type: string;
-        status: string;
-        context: Record<string, unknown>;
-      }>>('project', `/api/projects/${projectId}/queue/pending`, {
-        method: 'GET',
+      const response = await this.request<
+        Array<{
+          id: string;
+          projectId: string;
+          type: string;
+          status: string;
+          context: Record<string, unknown>;
+        }>
+      >("project", `/projects/${projectId}/queue/pending`, {
+        method: "GET",
       });
       return response.data || [];
     } catch (error) {
@@ -714,12 +793,12 @@ export class ServiceAwareAPIClient {
    */
   async updateQueueRequestStatus(
     requestId: string,
-    status: 'pending' | 'processing' | 'completed' | 'failed',
-    result?: Record<string, unknown>
+    status: "pending" | "processing" | "completed" | "failed",
+    result?: Record<string, unknown>,
   ): Promise<void> {
     try {
-      await this.request('project', `/api/projects/queue/${requestId}`, {
-        method: 'PATCH',
+      await this.request("project", `/projects/queue/${requestId}`, {
+        method: "PATCH",
         body: JSON.stringify({ status, result }),
       });
     } catch (error) {

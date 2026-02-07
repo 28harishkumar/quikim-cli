@@ -9,6 +9,7 @@
  */
 
 import { configManager } from "../config/manager.js";
+import { PROJECT_SERVICE_API_PREFIX } from "../config/constants.js";
 
 export interface APIEndpoint {
   path: string;
@@ -46,9 +47,9 @@ export class APIStructureGenerator {
    */
   static generateAPIStructure(): APIStructure {
     const endpoints: APIEndpoint[] = [
-      // Authentication endpoints (User Service)
+      // Authentication endpoints (User Service - /api/v1/user prefix)
       {
-        path: "/api/v1/auth/login",
+        path: "/api/v1/user/auth/login",
         method: "POST",
         service: "user",
         description: "Authenticate user with email and password",
@@ -59,21 +60,21 @@ export class APIStructureGenerator {
         },
       },
       {
-        path: "/api/v1/users/me",
+        path: "/api/v1/user/users/me",
         method: "GET",
         service: "user",
         description: "Get current user information",
       },
 
-      // Project endpoints (Project Service)
+      // Project endpoints (Project Service - /api/v1/project prefix)
       {
-        path: "/api/v1/projects",
+        path: `${PROJECT_SERVICE_API_PREFIX}/projects`,
         method: "GET",
         service: "project",
         description: "List all projects for authenticated user",
       },
       {
-        path: "/api/v1/projects/{projectId}",
+        path: `${PROJECT_SERVICE_API_PREFIX}/projects/{projectId}`,
         method: "GET",
         service: "project",
         description: "Get project details by ID",
@@ -82,7 +83,7 @@ export class APIStructureGenerator {
 
       // Requirements endpoints (Project Service)
       {
-        path: "/api/v1/requirements/",
+        path: `${PROJECT_SERVICE_API_PREFIX}/requirements/`,
         method: "GET",
         service: "project",
         description: "Fetch requirements for a project",
@@ -90,7 +91,7 @@ export class APIStructureGenerator {
         requiredFields: ["projectId"],
       },
       {
-        path: "/api/v1/requirements/",
+        path: `${PROJECT_SERVICE_API_PREFIX}/requirements/`,
         method: "POST",
         service: "project",
         description: "Create or update requirements",
@@ -105,7 +106,7 @@ export class APIStructureGenerator {
 
       // Design endpoints (Project Service)
       {
-        path: "/api/v1/designs/",
+        path: `${PROJECT_SERVICE_API_PREFIX}/designs/`,
         method: "GET",
         service: "project",
         description: "Fetch designs (HLD/LLD) for a project",
@@ -113,7 +114,7 @@ export class APIStructureGenerator {
         requiredFields: ["projectId", "type"],
       },
       {
-        path: "/api/v1/designs/",
+        path: `${PROJECT_SERVICE_API_PREFIX}/designs/`,
         method: "POST",
         service: "project",
         description: "Create or update design (HLD/LLD)",
@@ -129,7 +130,7 @@ export class APIStructureGenerator {
 
       // Tests endpoints (Project Service)
       {
-        path: "/api/v1/tests/",
+        path: `${PROJECT_SERVICE_API_PREFIX}/tests/`,
         method: "GET",
         service: "project",
         description: "Fetch tests for a project",
@@ -137,7 +138,7 @@ export class APIStructureGenerator {
         requiredFields: ["projectId"],
       },
       {
-        path: "/api/v1/tests/",
+        path: `${PROJECT_SERVICE_API_PREFIX}/tests/`,
         method: "POST",
         service: "project",
         description: "Create or update test",
@@ -158,7 +159,7 @@ export class APIStructureGenerator {
 
       // Task endpoints (Project Service)
       {
-        path: "/api/v1/tasks/",
+        path: `${PROJECT_SERVICE_API_PREFIX}/tasks/`,
         method: "GET",
         service: "project",
         description: "Fetch tasks for a project",
@@ -166,7 +167,7 @@ export class APIStructureGenerator {
         requiredFields: ["projectId"],
       },
       {
-        path: "/api/v1/tasks/",
+        path: `${PROJECT_SERVICE_API_PREFIX}/tasks/`,
         method: "POST",
         service: "project",
         description: "Create or update task",
@@ -183,7 +184,7 @@ export class APIStructureGenerator {
 
       // ER Diagram endpoints (Project Service)
       {
-        path: "/api/v1/er-diagrams/",
+        path: `${PROJECT_SERVICE_API_PREFIX}/er-diagrams/`,
         method: "GET",
         service: "project",
         description: "Fetch ER diagrams for a project",
@@ -191,7 +192,7 @@ export class APIStructureGenerator {
         requiredFields: ["projectId"],
       },
       {
-        path: "/api/v1/er-diagrams/",
+        path: `${PROJECT_SERVICE_API_PREFIX}/er-diagrams/`,
         method: "POST",
         service: "project",
         description: "Create or update ER diagram",
@@ -206,14 +207,14 @@ export class APIStructureGenerator {
 
       // Wireframe endpoints (Project Service)
       {
-        path: "/api/v1/projects/{projectId}/wireframes",
+        path: `${PROJECT_SERVICE_API_PREFIX}/projects/{projectId}/wireframes`,
         method: "GET",
         service: "project",
         description: "Fetch wireframes for a project",
         pathParams: ["projectId"],
       },
       {
-        path: "/api/v1/projects/{projectId}/wireframes",
+        path: `${PROJECT_SERVICE_API_PREFIX}/projects/{projectId}/wireframes`,
         method: "POST",
         service: "project",
         description: "Create or update wireframe",

@@ -1,14 +1,18 @@
 /**
  * Quikim - API Service for MCP Operations
- * 
+ *
  * Copyright (c) 2026 Quikim Pvt. Ltd.
- * 
+ *
  * This file is part of Quikim, licensed under the AGPL-3.0 License.
  * See LICENSE file in the project root for full license information.
  */
 
 import { ServiceAwareAPIClient } from "../api/service-client.js";
-import { ArtifactType, APICallResult, ProjectData } from "../types/handler-types.js";
+import {
+  ArtifactType,
+  APICallResult,
+  ProjectData,
+} from "../types/handler-types.js";
 import { logger } from "../utils/logger.js";
 
 export class APIService {
@@ -21,7 +25,7 @@ export class APIService {
     artifactType: ArtifactType,
     content: string,
     projectData: ProjectData,
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
   ): Promise<APICallResult> {
     try {
       let result: unknown;
@@ -31,7 +35,11 @@ export class APIService {
           result = await this.apiClient.syncRequirements(
             projectData.projectId,
             content,
-            { ...metadata, specName: projectData.specName ?? "default", name: (metadata?.name as string) ?? "Requirements" }
+            {
+              ...metadata,
+              specName: projectData.specName ?? "default",
+              name: (metadata?.name as string) ?? "Requirements",
+            },
           );
           break;
 
@@ -39,17 +47,26 @@ export class APIService {
           result = await this.apiClient.syncHLD(
             projectData.projectId,
             content,
-            metadata
+            {
+              ...metadata,
+              specName: projectData.specName ?? "default",
+              name: (metadata?.name as string) ?? "HLD",
+            },
           );
           break;
 
         case "lld":
-          const componentName = metadata?.componentName as string || "default";
+          const componentName =
+            (metadata?.componentName as string) || "default";
           result = await this.apiClient.syncLLD(
             projectData.projectId,
             content,
             componentName,
-            metadata
+            {
+              ...metadata,
+              specName: projectData.specName ?? "default",
+              name: (metadata?.name as string) ?? "LLD",
+            },
           );
           break;
 
@@ -57,7 +74,7 @@ export class APIService {
           result = await this.apiClient.syncTask(
             projectData.projectId,
             content,
-            metadata
+            { ...metadata, specName: projectData.specName ?? "default" },
           );
           break;
 
@@ -65,8 +82,8 @@ export class APIService {
           result = await this.apiClient.syncWireframe(
             projectData.projectId,
             content,
-            metadata,
-            projectData.organizationId
+            { ...metadata, specName: projectData.specName ?? "default" },
+            projectData.organizationId,
           );
           break;
 
@@ -74,7 +91,7 @@ export class APIService {
           result = await this.apiClient.syncERDiagram(
             projectData.projectId,
             content,
-            metadata
+            { ...metadata, specName: projectData.specName ?? "default" },
           );
           break;
 
@@ -83,7 +100,7 @@ export class APIService {
             projectData.projectId,
             content,
             metadata,
-            projectData.specName
+            projectData.specName,
           );
           break;
 
@@ -91,7 +108,7 @@ export class APIService {
           result = await this.apiClient.syncContext(
             projectData.projectId,
             content,
-            metadata
+            metadata,
           );
           break;
 
@@ -99,19 +116,35 @@ export class APIService {
           result = await this.apiClient.syncCodeGuideline(
             projectData.projectId,
             content,
-            metadata
+            metadata,
           );
           break;
 
         case "tests": {
-          let payload: { name?: string; specName?: string; tags?: string[]; description?: string; sampleInputOutput?: unknown; inputDescription?: unknown; outputDescription?: unknown };
+          let payload: {
+            name?: string;
+            specName?: string;
+            tags?: string[];
+            description?: string;
+            sampleInputOutput?: unknown;
+            inputDescription?: unknown;
+            outputDescription?: unknown;
+          };
           try {
-            payload = typeof content === "string" ? JSON.parse(content) : content as typeof payload;
+            payload =
+              typeof content === "string"
+                ? JSON.parse(content)
+                : (content as typeof payload);
           } catch {
-            payload = { description: content, sampleInputOutput: {}, inputDescription: {}, outputDescription: {} };
+            payload = {
+              description: content,
+              sampleInputOutput: {},
+              inputDescription: {},
+              outputDescription: {},
+            };
           }
           result = await this.apiClient.syncTest(projectData.projectId, {
-            name: payload.name ?? metadata?.name as string,
+            name: payload.name ?? (metadata?.name as string),
             specName: payload.specName ?? projectData.specName ?? "default",
             tags: payload.tags,
             description: payload.description,
@@ -133,9 +166,10 @@ export class APIService {
         data: result,
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       logger.logError(`Failed to sync ${artifactType}`, error);
-      
+
       return {
         success: false,
         error: errorMessage,
@@ -149,14 +183,16 @@ export class APIService {
   async fetchArtifact(
     artifactType: ArtifactType,
     projectData: ProjectData,
-    componentName?: string
+    componentName?: string,
   ): Promise<APICallResult> {
     try {
       let result: unknown;
 
       switch (artifactType) {
         case "requirements":
-          result = await this.apiClient.fetchRequirements(projectData.projectId);
+          result = await this.apiClient.fetchRequirements(
+            projectData.projectId,
+          );
           break;
 
         case "hld":
@@ -164,7 +200,10 @@ export class APIService {
           break;
 
         case "lld":
-          result = await this.apiClient.fetchLLD(projectData.projectId, componentName);
+          result = await this.apiClient.fetchLLD(
+            projectData.projectId,
+            componentName,
+          );
           break;
 
         case "tasks":
@@ -188,11 +227,16 @@ export class APIService {
           break;
 
         case "code_guideline":
-          result = await this.apiClient.fetchCodeGuidelines(projectData.projectId);
+          result = await this.apiClient.fetchCodeGuidelines(
+            projectData.projectId,
+          );
           break;
 
         case "tests":
-          result = await this.apiClient.fetchTests(projectData.projectId, projectData.specName);
+          result = await this.apiClient.fetchTests(
+            projectData.projectId,
+            projectData.specName,
+          );
           break;
 
         default:
@@ -204,9 +248,10 @@ export class APIService {
         data: result,
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       logger.logError(`Failed to fetch ${artifactType}`, error);
-      
+
       return {
         success: false,
         error: errorMessage,

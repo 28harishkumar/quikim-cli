@@ -34,6 +34,7 @@ import {
   TimeoutError,
   RateLimitError,
 } from './errors.js';
+import { PROJECT_SERVICE_API_PREFIX } from '../../config/constants.js';
 
 export class QuikimAPIClient {
   private config: Required<APIConfig>;
@@ -184,14 +185,14 @@ export class QuikimAPIClient {
   async fetchRequirements(projectId: string): Promise<Requirements | null> {
     try {
       const response = await this.request<{ success: boolean; data: unknown[]; pagination?: unknown }>(
-        `/requirements/?projectId=${projectId}&limit=1`,
+        `${PROJECT_SERVICE_API_PREFIX}/requirements/?projectId=${projectId}&limit=1`,
         { method: "GET" },
       );
       const list = Array.isArray(response.data) ? response.data : (response.data as { data?: unknown[] })?.data ?? [];
       if (list.length === 0) return null;
       const first = list[0] as { id: string };
       const fullResponse = await this.request<{ success: boolean; data: Requirements }>(
-        `/requirements/${first.id}`,
+        `${PROJECT_SERVICE_API_PREFIX}/requirements/${first.id}`,
         { method: "GET" },
       );
       const body = fullResponse.data as { data?: Requirements };
@@ -209,9 +210,9 @@ export class QuikimAPIClient {
    */
   async fetchHLD(projectId: string): Promise<HLD | null> {
     try {
-      // GET /designs/?projectId=xxx&type=hld
+      // GET /api/v1/project/designs/?projectId=xxx&type=hld
       const response = await this.request<{ success: boolean; data: any[] }>(
-        `/designs/?projectId=${projectId}&type=hld`,
+        `${PROJECT_SERVICE_API_PREFIX}/designs/?projectId=${projectId}&type=hld`,
         { method: "GET" },
       );
       
@@ -231,9 +232,9 @@ export class QuikimAPIClient {
    */
   async fetchLLDs(projectId: string): Promise<LLD[]> {
     try {
-      // GET /designs/?projectId=xxx&type=lld
+      // GET /api/v1/project/designs/?projectId=xxx&type=lld
       const response = await this.request<{ success: boolean; data: any[] }>(
-        `/designs/?projectId=${projectId}&type=lld`,
+        `${PROJECT_SERVICE_API_PREFIX}/designs/?projectId=${projectId}&type=lld`,
         { method: "GET" },
       );
       return response.data?.data || [];
@@ -250,9 +251,9 @@ export class QuikimAPIClient {
    */
   async fetchLLD(projectId: string, componentName: string): Promise<LLD | null> {
     try {
-      // GET /designs/?projectId=xxx&type=lld&componentName=xxx
+      // GET /api/v1/project/designs/?projectId=xxx&type=lld&componentName=xxx
       const response = await this.request<{ success: boolean; data: any[] }>(
-        `/designs/?projectId=${projectId}&type=lld&componentName=${encodeURIComponent(componentName)}`,
+        `${PROJECT_SERVICE_API_PREFIX}/designs/?projectId=${projectId}&type=lld&componentName=${encodeURIComponent(componentName)}`,
         { method: "GET" },
       );
       const designs = response.data?.data || [];
@@ -270,9 +271,9 @@ export class QuikimAPIClient {
    */
   async fetchTasks(projectId: string): Promise<Tasks | null> {
     try {
-      // GET /tasks/?projectId=xxx
+      // GET /api/v1/project/tasks/?projectId=xxx
       const response = await this.request<{ success: boolean; data: any[] }>(
-        `/tasks/?projectId=${projectId}`,
+        `${PROJECT_SERVICE_API_PREFIX}/tasks/?projectId=${projectId}`,
         { method: "GET" },
       );
       
@@ -304,9 +305,9 @@ export class QuikimAPIClient {
    */
   async fetchERDiagram(projectId: string): Promise<ERDiagram | null> {
     try {
-      // GET /er-diagrams/?projectId=xxx
+      // GET /api/v1/project/er-diagrams/?projectId=xxx
       const response = await this.request<{ success: boolean; data: any[] }>(
-        `/er-diagrams/?projectId=${projectId}`,
+        `${PROJECT_SERVICE_API_PREFIX}/er-diagrams/?projectId=${projectId}`,
         { method: "GET" },
       );
       
@@ -327,7 +328,7 @@ export class QuikimAPIClient {
   async fetchPrismaSchema(projectId: string): Promise<PrismaSchema | null> {
     try {
       const response = await this.request<PrismaSchema>(
-        `/api/projects/${projectId}/prisma-schema/latest`,
+        `${PROJECT_SERVICE_API_PREFIX}/projects/${projectId}/prisma-schema/latest`,
         { method: "GET" },
       );
       return response.data || null;
@@ -344,9 +345,9 @@ export class QuikimAPIClient {
    */
   async fetchWireframes(projectId: string): Promise<Wireframe[]> {
     try {
-      // GET /api/v1/projects/:projectId/wireframes
+      // GET /api/v1/project/projects/:projectId/wireframes
       const response = await this.request<{ success: boolean; data: any[] }>(
-        `/projects/${projectId}/wireframes`,
+        `${PROJECT_SERVICE_API_PREFIX}/projects/${projectId}/wireframes`,
         { method: "GET" },
       );
       return response.data?.data || [];
@@ -364,7 +365,7 @@ export class QuikimAPIClient {
   async fetchTheme(projectId: string): Promise<Theme | null> {
     try {
       const response = await this.request<Theme>(
-        `/api/projects/${projectId}/theme/latest`,
+        `${PROJECT_SERVICE_API_PREFIX}/projects/${projectId}/theme/latest`,
         { method: "GET" },
       );
       return response.data || null;
@@ -389,8 +390,8 @@ export class QuikimAPIClient {
       if (organizationId) params.set("organizationId", organizationId);
       if (userId) params.set("userId", userId);
       const queryString = params.toString();
-      const url = `/api/projects/${projectId}/code-guidelines/latest${queryString ? `?${queryString}` : ""}`;
-      
+      const url = `${PROJECT_SERVICE_API_PREFIX}/projects/${projectId}/code-guidelines/latest${queryString ? `?${queryString}` : ""}`;
+
       const response = await this.request<CodeGuidelines>(url, { method: "GET" });
       return response.data || null;
     } catch (error) {
@@ -418,7 +419,7 @@ export class QuikimAPIClient {
       if (organizationId) {
         params.append("organizationId", organizationId);
       }
-      const url = `/snippets/components?${params.toString()}`;
+      const url = `${PROJECT_SERVICE_API_PREFIX}/snippets/components?${params.toString()}`;
       const response = await this.request<{ success: boolean; data: any[] }>(
         url,
         { method: "GET" },
@@ -447,7 +448,7 @@ export class QuikimAPIClient {
       if (limit) params.set("limit", limit.toString());
 
       const response = await this.request<{ success: boolean; data: any[] }>(
-        `/snippets/sample-code/search?${params.toString()}`,
+        `${PROJECT_SERVICE_API_PREFIX}/snippets/sample-code/search?${params.toString()}`,
         { method: "GET" },
       );
       return response.data?.data || [];
@@ -465,7 +466,7 @@ export class QuikimAPIClient {
   async fetchFeatures(): Promise<any[]> {
     try {
       const response = await this.request<{ success: boolean; data: any[] }>(
-        "/snippets/features",
+        `${PROJECT_SERVICE_API_PREFIX}/snippets/features`,
         { method: "GET" },
       );
       const features = response.data?.data || [];
@@ -502,7 +503,7 @@ export class QuikimAPIClient {
   async generateWireframe(projectId: string, prompt: string): Promise<any> {
     try {
       const response = await this.request<{ success: boolean; data: any }>(
-        "/tools/wireframes/generate",
+        `${PROJECT_SERVICE_API_PREFIX}/tools/wireframes/generate`,
         {
           method: "POST",
           body: JSON.stringify({ projectId, prompt }),
@@ -524,7 +525,7 @@ export class QuikimAPIClient {
   async syncWireframeToPenpot(wireframeId: string): Promise<any> {
     try {
       const response = await this.request<{ success: boolean; data: any }>(
-        `/tools/penpot/sync/${wireframeId}/to-penpot`,
+        `${PROJECT_SERVICE_API_PREFIX}/tools/penpot/sync/${wireframeId}/to-penpot`,
         {
           method: "POST",
         },
@@ -545,7 +546,7 @@ export class QuikimAPIClient {
   async convertDesignToCode(wireframeId: string, options?: any): Promise<any> {
     try {
       const response = await this.request<{ success: boolean; data: any }>(
-        "/tools/design-to-code/convert",
+        `${PROJECT_SERVICE_API_PREFIX}/tools/design-to-code/convert`,
         {
           method: "POST",
           body: JSON.stringify({ wireframeId, options }),
@@ -580,8 +581,8 @@ export class QuikimAPIClient {
     // Route to the correct service endpoint
     switch (request.artifactType) {
       case "requirements":
-        // POST /requirements/
-        endpoint = `/requirements/`;
+        // POST /api/v1/project/requirements/
+        endpoint = `${PROJECT_SERVICE_API_PREFIX}/requirements/`;
         requestBody = {
           projectId: request.projectId,
           content: request.content,
@@ -592,8 +593,8 @@ export class QuikimAPIClient {
 
       case "hld":
       case "lld":
-        // POST /designs/
-        endpoint = `/designs/`;
+        // POST /api/v1/project/designs/
+        endpoint = `${PROJECT_SERVICE_API_PREFIX}/designs/`;
         requestBody = {
           projectId: request.projectId,
           type: request.artifactType, // "hld" or "lld"
@@ -604,8 +605,8 @@ export class QuikimAPIClient {
         break;
 
       case "tasks":
-        // POST /tasks/
-        endpoint = `/tasks/`;
+        // POST /api/v1/project/tasks/
+        endpoint = `${PROJECT_SERVICE_API_PREFIX}/tasks/`;
         requestBody = {
           projectId: request.projectId,
           title: request.metadata?.title || "Task from MCP",
@@ -617,8 +618,8 @@ export class QuikimAPIClient {
         break;
 
       case "er_diagram":
-        // POST /er-diagrams/
-        endpoint = `/er-diagrams/`;
+        // POST /api/v1/project/er-diagrams/
+        endpoint = `${PROJECT_SERVICE_API_PREFIX}/er-diagrams/`;
         requestBody = {
           projectId: request.projectId,
           content: request.content,
@@ -628,8 +629,8 @@ export class QuikimAPIClient {
         break;
 
       case "wireframes":
-        // POST /api/v1/projects/:projectId/wireframes
-        endpoint = `/projects/${request.projectId}/wireframes`;
+        // POST /api/v1/project/projects/:projectId/wireframes
+        endpoint = `${PROJECT_SERVICE_API_PREFIX}/projects/${request.projectId}/wireframes`;
         requestBody = {
           name: request.metadata?.name || "Wireframe from MCP",
           content: request.content,
@@ -683,7 +684,7 @@ export class QuikimAPIClient {
     context: Record<string, any>,
   ): Promise<QueuedRequest> {
     const response = await this.request<QueuedRequest>(
-      `/api/projects/${projectId}/queue`,
+      `${PROJECT_SERVICE_API_PREFIX}/projects/${projectId}/queue`,
       {
         method: "POST",
         body: JSON.stringify({ type, context }),
@@ -703,7 +704,7 @@ export class QuikimAPIClient {
   async fetchPendingRequests(projectId: string): Promise<QueuedRequest[]> {
     try {
       const response = await this.request<QueuedRequest[]>(
-        `/api/projects/${projectId}/queue/pending`,
+        `${PROJECT_SERVICE_API_PREFIX}/projects/${projectId}/queue/pending`,
         { method: "GET" },
       );
       return response.data || [];
@@ -724,7 +725,7 @@ export class QuikimAPIClient {
     status: QueuedRequest["status"],
     result?: any,
   ): Promise<void> {
-    await this.request(`/api/projects/${projectId}/queue/${requestId}`, {
+    await this.request(`${PROJECT_SERVICE_API_PREFIX}/projects/${projectId}/queue/${requestId}`, {
       method: "PATCH",
       body: JSON.stringify({ status, result }),
     });
@@ -737,7 +738,7 @@ export class QuikimAPIClient {
    */
   async checkLLMKeyStatus(projectId: string): Promise<LLMKeyStatus> {
     const response = await this.request<LLMKeyStatus>(
-      `/api/projects/${projectId}/llm-keys/status`,
+      `${PROJECT_SERVICE_API_PREFIX}/projects/${projectId}/llm-keys/status`,
       { method: "GET" },
     );
 
@@ -757,7 +758,7 @@ export class QuikimAPIClient {
   async syncWireframesFromPenpot(projectId: string): Promise<any> {
     try {
       const response = await this.request<{ success: boolean; data: any }>(
-        `/tools/penpot/sync/project/${projectId}/from-penpot`,
+        `${PROJECT_SERVICE_API_PREFIX}/tools/penpot/sync/project/${projectId}/from-penpot`,
         {
           method: "POST",
         },
@@ -782,7 +783,7 @@ export class QuikimAPIClient {
   ): Promise<any> {
     try {
       const response = await this.request<{ success: boolean; data: any }>(
-        "/tools/design-to-code/convert-from-wireframe",
+        `${PROJECT_SERVICE_API_PREFIX}/tools/design-to-code/convert-from-wireframe`,
         {
           method: "POST",
           body: JSON.stringify({ wireframeContent, options, projectId }),
@@ -811,7 +812,7 @@ export class QuikimAPIClient {
         params.append("status", status);
       }
       const response = await this.request<{ success: boolean; data: any[] }>(
-        `/tools/penpot/sync?${params.toString()}`,
+        `${PROJECT_SERVICE_API_PREFIX}/tools/penpot/sync?${params.toString()}`,
         {
           method: "GET",
         },
@@ -834,7 +835,7 @@ export class QuikimAPIClient {
   async fetchMermaidDiagrams(projectId: string): Promise<MermaidDiagram[]> {
     try {
       const response = await this.request<MermaidDiagram[]>(
-        `/api/projects/${projectId}/mermaid-diagrams`,
+        `${PROJECT_SERVICE_API_PREFIX}/projects/${projectId}/mermaid-diagrams`,
         { method: "GET" },
       );
       return response.data || [];
@@ -856,7 +857,7 @@ export class QuikimAPIClient {
   ): Promise<MermaidDiagram | null> {
     try {
       const response = await this.request<MermaidDiagram>(
-        `/api/projects/${projectId}/mermaid-diagrams/${diagramId}`,
+        `${PROJECT_SERVICE_API_PREFIX}/projects/${projectId}/mermaid-diagrams/${diagramId}`,
         { method: "GET" },
       );
       return response.data || null;
@@ -878,7 +879,7 @@ export class QuikimAPIClient {
   ): Promise<MermaidDiagram[]> {
     try {
       const response = await this.request<MermaidDiagram[]>(
-        `/api/projects/${projectId}/mermaid-diagrams?type=${diagramType}`,
+        `${PROJECT_SERVICE_API_PREFIX}/projects/${projectId}/mermaid-diagrams?type=${diagramType}`,
         { method: "GET" },
       );
       return response.data || [];
@@ -909,7 +910,7 @@ export class QuikimAPIClient {
   ): Promise<MermaidDiagram | null> {
     try {
       const response = await this.request<MermaidDiagram>(
-        `/api/projects/${projectId}/mermaid-diagrams`,
+        `${PROJECT_SERVICE_API_PREFIX}/projects/${projectId}/mermaid-diagrams`,
         {
           method: "POST",
           body: JSON.stringify(diagram),
@@ -934,7 +935,7 @@ export class QuikimAPIClient {
   ): Promise<boolean> {
     try {
       await this.request(
-        `/api/projects/${projectId}/mermaid-diagrams/${diagramId}`,
+        `${PROJECT_SERVICE_API_PREFIX}/projects/${projectId}/mermaid-diagrams/${diagramId}`,
         { method: "DELETE" },
       );
       return true;
@@ -953,7 +954,8 @@ export class QuikimAPIClient {
    */
   async healthCheck(): Promise<boolean> {
     try {
-      const response = await this.request<{ status: string }>("/api/health", {
+      // Project service exposes health at /health (no API prefix)
+      const response = await this.request<{ status: string }>("/health", {
         method: "GET",
       });
       return response.success && response.data?.status === "ok";
