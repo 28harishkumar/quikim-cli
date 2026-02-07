@@ -2,9 +2,9 @@
  * Quikim - MCP Server Core
  * Lightweight server that processes XML requests and integrates with decision engine
  * Integrated with CLI for shared authentication and configuration
- * 
+ *
  * Copyright (c) 2026 Quikim Pvt. Ltd.
- * 
+ *
  * This file is part of Quikim, licensed under the AGPL-3.0 License.
  * See LICENSE file in the project root for full license information.
  */
@@ -21,16 +21,16 @@ import {
 import {
   generateMCPPrompts,
   getPromptContent,
-} from './prompts/capabilities.js';
-import { mkdirSync, appendFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { getQuikimProjectRoot } from '../config/project-root.js';
+} from "./prompts/capabilities.js";
+import { mkdirSync, appendFileSync } from "fs";
+import { join, dirname } from "path";
+import { getQuikimProjectRoot } from "../config/project-root.js";
 
-import { SessionManager, sessionManager } from './session/manager.js';
+import { SessionManager, sessionManager } from "./session/manager.js";
 // Lazy import to avoid circular dependency: server.ts -> workflow-tools.ts -> integration/index.ts -> server.ts
 // import { WorkflowEngineTools } from './handlers/workflow-tools.js';
-import { logger } from './utils/logger.js';
-import { errorHandler, ErrorContext } from './utils/error-handler.js';
+import { logger } from "./utils/logger.js";
+import { errorHandler, ErrorContext } from "./utils/error-handler.js";
 import {
   PROTOCOL_CONFIG,
   PROJECT_CONTEXT_SCHEMA,
@@ -41,16 +41,16 @@ import {
   FLOW_SPEC_NAMES_DESCRIPTION,
   WIREFRAME_SPEC_NAMES_DESCRIPTION,
 } from "./utils/constants.js";
-import { CodebaseContext } from './session/types.js';
-import { ToolHandlers } from './handlers/index.js';
-import { ServiceAwareAPIClient } from './api/service-client.js';
+import { CodebaseContext } from "./session/types.js";
+import { ToolHandlers } from "./handlers/index.js";
+import { ServiceAwareAPIClient } from "./api/service-client.js";
 import {
   projectContextResolver,
   ProjectContext,
-} from './services/project-context.js';
+} from "./services/project-context.js";
 
 // Import CLI config manager for shared authentication
-import { configManager } from '../config/manager.js';
+import { configManager } from "../config/manager.js";
 
 export class MCPCursorProtocolServer {
   private server: Server;
@@ -69,7 +69,7 @@ export class MCPCursorProtocolServer {
           tools: {},
           prompts: {},
         },
-      }
+      },
     );
 
     this.sessionManager = sessionManager;
@@ -77,13 +77,16 @@ export class MCPCursorProtocolServer {
     // Initialize API client using CLI's shared configuration
     // Priority: 1) Environment variable, 2) CLI config
     const apiKey = this.resolveApiKey();
-    
-    logger.info("Initializing MCP server with service-aware API configuration", {
-      userServiceUrl: configManager.getUserServiceUrl(),
-      projectServiceUrl: configManager.getProjectServiceUrl(),
-      hasApiKey: !!apiKey,
-      isLocalMode: configManager.isLocalMode(),
-    });
+
+    logger.info(
+      "Initializing MCP server with service-aware API configuration",
+      {
+        userServiceUrl: configManager.getUserServiceUrl(),
+        projectServiceUrl: configManager.getProjectServiceUrl(),
+        hasApiKey: !!apiKey,
+        isLocalMode: configManager.isLocalMode(),
+      },
+    );
 
     this.apiClient = new ServiceAwareAPIClient({
       apiKey,
@@ -108,13 +111,13 @@ export class MCPCursorProtocolServer {
     if (process.env.QUIKIM_API_KEY) {
       return process.env.QUIKIM_API_KEY;
     }
-    
+
     // Use CLI's stored authentication token
     const auth = configManager.getAuth();
     if (auth?.token && configManager.isAuthenticated()) {
       return auth.token;
     }
-    
+
     return "";
   }
 
@@ -128,8 +131,7 @@ export class MCPCursorProtocolServer {
       const existingTools = [
         {
           name: "generate_requirements",
-          description:
-            `Save requirements locally (markdown), then sync to server. Path: .quikim/artifacts/<spec_name>/requirement_<name>.md. Use these spec_name values (same as organization dashboard): ${REQUIREMENT_SPEC_NAMES_DESCRIPTION}. Do not use 'default'. For 1.3, 1.4, 1.5, 1.6 the LLM must create one requirement file per entity (e.g. one file per screen, per API, per component, per code file).`,
+          description: `Save requirements locally (markdown), then sync to server. Path: .quikim/artifacts/<spec_name>/requirement_<name>.md. Use these spec_name values (same as organization dashboard): ${REQUIREMENT_SPEC_NAMES_DESCRIPTION}. Do not use 'default'. For 1.3, 1.4, 1.5, 1.6 the LLM must create one requirement file per entity (e.g. one file per screen, per API, per component, per code file).`,
           inputSchema: {
             type: "object",
             properties: {
@@ -138,11 +140,13 @@ export class MCPCursorProtocolServer {
                 description:
                   "Object with 'files' array. Path: .quikim/artifacts/<spec_name>/requirement_<name>.md. For 1.3/1.4/1.5/1.6 use one file per entity (e.g. one requirement_screen-login.md per screen). content = markdown.",
               },
-              user_prompt: { type: "string", description: "Original user request" },
+              user_prompt: {
+                type: "string",
+                description: "Original user request",
+              },
               spec_name: {
                 type: "string",
-                description:
-                  `Spec name for this requirement. Must be one of (same as dashboard): ${REQUIREMENT_SPEC_NAMES_DESCRIPTION}. Custom spec names are also allowed. Do not use 'default'.`,
+                description: `Spec name for this requirement. Must be one of (same as dashboard): ${REQUIREMENT_SPEC_NAMES_DESCRIPTION}. Custom spec names are also allowed. Do not use 'default'.`,
               },
               name: ARTIFACT_NAME_TITLE_SCHEMA.name,
               title: ARTIFACT_NAME_TITLE_SCHEMA.title,
@@ -166,7 +170,8 @@ export class MCPCursorProtocolServer {
                 properties: {
                   force: {
                     type: "boolean",
-                    description: "If true, fetch from API then write to local; otherwise read from local files",
+                    description:
+                      "If true, fetch from API then write to local; otherwise read from local files",
                   },
                 },
               },
@@ -177,12 +182,21 @@ export class MCPCursorProtocolServer {
         {
           name: "generate_tests",
           description:
-            "Save tests locally first (JSON with description, sampleInputOutput, inputDescription, outputDescription), then sync to server. Path: .quikim/artifacts/<spec>/tests_<id>.md.",
+            "Save tests locally first (JSON with description, sampleInputOutput, inputDescription, outputDescription), then sync to server. Path: .quikim/artifacts/<spec>/tests_<id>.md. Use spec_name to set the spec.",
           inputSchema: {
             type: "object",
             properties: {
-              codebase: { type: "object", description: "Files array. Path: .quikim/artifacts/<spec>/tests_<id>.md." },
+              codebase: {
+                type: "object",
+                description:
+                  "Files array. Path: .quikim/artifacts/<spec>/tests_<id>.md.",
+              },
               user_prompt: { type: "string" },
+              spec_name: {
+                type: "string",
+                description:
+                  "Spec name for this test. Use a descriptive spec name matching the API or feature being tested. Do not use 'default'.",
+              },
               project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["codebase", "user_prompt"],
@@ -201,7 +215,10 @@ export class MCPCursorProtocolServer {
               data: {
                 type: "object",
                 properties: {
-                  force: { type: "boolean", description: "If true, fetch from API then write to local" },
+                  force: {
+                    type: "boolean",
+                    description: "If true, fetch from API then write to local",
+                  },
                 },
               },
             },
@@ -210,13 +227,20 @@ export class MCPCursorProtocolServer {
         } as Tool,
         {
           name: "generate_hld",
-          description:
-            `Save HLD locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/hld_<id>.md. Use project_context.specName: ${HLD_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard). HLD has its own spec names; do not use LLD spec names here. Optional: name/title.`,
+          description: `Save HLD locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/hld_<id>.md. Use spec_name: ${HLD_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard). HLD has its own spec names; do not use LLD spec names here. Optional: name/title.`,
           inputSchema: {
             type: "object",
             properties: {
-              codebase: { type: "object", description: "Files array. Path: .quikim/artifacts/<spec>/hld_<id>.md." },
+              codebase: {
+                type: "object",
+                description:
+                  "Files array. Path: .quikim/artifacts/<spec>/hld_<id>.md.",
+              },
               user_prompt: { type: "string" },
+              spec_name: {
+                type: "string",
+                description: `Spec name for this HLD. Must be one of: ${HLD_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard). Do not use 'default'.`,
+              },
               name: ARTIFACT_NAME_TITLE_SCHEMA.name,
               title: ARTIFACT_NAME_TITLE_SCHEMA.title,
               project_context: PROJECT_CONTEXT_SCHEMA,
@@ -252,8 +276,7 @@ export class MCPCursorProtocolServer {
         } as Tool,
         {
           name: "generate_wireframes",
-          description:
-            `Save wireframe locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/wireframe_files_<id>.md. Use project_context.specName: ${WIREFRAME_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard). Optional: name.`,
+          description: `Save wireframe locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/wireframe_files_<id>.md. Use spec_name: ${WIREFRAME_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard). Optional: name.`,
           inputSchema: {
             type: "object",
             properties: {
@@ -263,6 +286,10 @@ export class MCPCursorProtocolServer {
                   "Files array. Path: .quikim/artifacts/<spec>/wireframe_files_<id>.md. Content: optional JSON { name, viewport: { width, height }, elements }.",
               },
               user_prompt: { type: "string" },
+              spec_name: {
+                type: "string",
+                description: `Spec name for this wireframe. Must be one of: ${WIREFRAME_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard). Do not use 'default'.`,
+              },
               name: ARTIFACT_NAME_TITLE_SCHEMA.name,
               project_context: PROJECT_CONTEXT_SCHEMA,
             },
@@ -272,7 +299,7 @@ export class MCPCursorProtocolServer {
         {
           name: "generate_tasks",
           description:
-            "Save tasks locally first (markdown, Kiro/task format), then sync to server in background (non-blocking). Provide markdown in content; we save and send markdown to server as-is. Path: .quikim/artifacts/<spec>/tasks_<id>.md. File format: YAML frontmatter (--- id, specName, status, ... ---) then # Title, ## Description, ## Subtasks (- [ ] or [x] text), ## Checklist, ## Comments, ## Attachments.",
+            "Save tasks locally first (markdown, Kiro/task format), then sync to server in background (non-blocking). Provide markdown in content; we save and send markdown to server as-is. Path: .quikim/artifacts/<spec>/tasks_<id>.md. File format: YAML frontmatter (--- id, specName, status, ... ---) then # Title, ## Description, ## Subtasks (- [ ] or [x] text), ## Checklist, ## Comments, ## Attachments. Use spec_name to set the spec.",
           inputSchema: {
             type: "object",
             properties: {
@@ -282,6 +309,11 @@ export class MCPCursorProtocolServer {
                   "Files array. Path: .quikim/artifacts/<spec>/tasks_<id>.md. content = markdown (Kiro/task format; saved and sent to server as markdown).",
               },
               user_prompt: { type: "string" },
+              spec_name: {
+                type: "string",
+                description:
+                  "Spec name for this task. Use a descriptive spec name matching the milestone or feature. Do not use 'default'.",
+              },
               name: ARTIFACT_NAME_TITLE_SCHEMA.name,
               project_context: PROJECT_CONTEXT_SCHEMA,
             },
@@ -331,7 +363,7 @@ export class MCPCursorProtocolServer {
         {
           name: "er_diagram_push",
           description:
-            "Save ER diagram locally first, then sync to server in background (non-blocking). Content: raw mermaid erDiagram only. Path: .quikim/artifacts/<spec>/er_diagram_<id>.md.",
+            "Save ER diagram locally first, then sync to server in background (non-blocking). Content: raw mermaid erDiagram only. Path: .quikim/artifacts/<spec>/er_diagram_<id>.md. Use spec_name to set the spec.",
           inputSchema: {
             type: "object",
             properties: {
@@ -341,6 +373,11 @@ export class MCPCursorProtocolServer {
                   "Files array. Path: .quikim/artifacts/<spec>/er_diagram_<id>.md. content = raw mermaid erDiagram only.",
               },
               user_prompt: { type: "string" },
+              spec_name: {
+                type: "string",
+                description:
+                  "Spec name for this ER diagram. Use a descriptive spec name. Do not use 'default'.",
+              },
               name: ARTIFACT_NAME_TITLE_SCHEMA.name,
               project_context: PROJECT_CONTEXT_SCHEMA,
             },
@@ -362,7 +399,8 @@ export class MCPCursorProtocolServer {
         } as Tool,
         {
           name: "pull_mermaid",
-          description: "Fetch mermaid diagrams from server (flowchart, sequence, class, ER, state, gantt, etc.)",
+          description:
+            "Fetch mermaid diagrams from server (flowchart, sequence, class, ER, state, gantt, etc.)",
           inputSchema: {
             type: "object",
             properties: {
@@ -375,8 +413,7 @@ export class MCPCursorProtocolServer {
         } as Tool,
         {
           name: "generate_mermaid",
-          description:
-            `Save mermaid diagram locally first, then sync to server in background (non-blocking). Content: raw mermaid only (no code fences). Path: .quikim/artifacts/<spec>/flow_diagram_<id>.md. Use project_context.specName: ${FLOW_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard).`,
+          description: `Save mermaid diagram locally first, then sync to server in background (non-blocking). Content: raw mermaid only (no code fences). Path: .quikim/artifacts/<spec>/flow_diagram_<id>.md. Use spec_name: ${FLOW_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard).`,
           inputSchema: {
             type: "object",
             properties: {
@@ -386,6 +423,10 @@ export class MCPCursorProtocolServer {
                   "Files array. Path: .quikim/artifacts/<spec>/flow_diagram_<id>.md. content = raw mermaid only (no code fences).",
               },
               user_prompt: { type: "string" },
+              spec_name: {
+                type: "string",
+                description: `Spec name for this flow diagram. Must be one of: ${FLOW_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard). Do not use 'default'.`,
+              },
               name: ARTIFACT_NAME_TITLE_SCHEMA.name,
               project_context: PROJECT_CONTEXT_SCHEMA,
             },
@@ -394,12 +435,17 @@ export class MCPCursorProtocolServer {
         } as Tool,
         {
           name: "pull_lld",
-          description: "Fetch or generate Low-Level Design (LLD) for a specific component. LLD provides detailed specifications including interfaces, data models, method specifications, and sequence diagrams.",
+          description:
+            "Fetch or generate Low-Level Design (LLD) for a specific component. LLD provides detailed specifications including interfaces, data models, method specifications, and sequence diagrams.",
           inputSchema: {
             type: "object",
             properties: {
               codebase: { type: "object" },
-              user_prompt: { type: "string", description: "Include component name, e.g., 'pull_lld for auth service' or 'LLD for payment module'" },
+              user_prompt: {
+                type: "string",
+                description:
+                  "Include component name, e.g., 'pull_lld for auth service' or 'LLD for payment module'",
+              },
               project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["user_prompt"],
@@ -407,13 +453,24 @@ export class MCPCursorProtocolServer {
         } as Tool,
         {
           name: "generate_lld",
-          description:
-            `Save LLD locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/lld_<id>.md. Use project_context.specName: ${LLD_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard). LLD has its own spec names; do not use HLD spec names here. Optional: name/title; user_prompt can specify component name.`,
+          description: `Save LLD locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/lld_<id>.md. Use spec_name: ${LLD_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard). LLD has its own spec names; do not use HLD spec names here. Optional: name/title; user_prompt can specify component name.`,
           inputSchema: {
             type: "object",
             properties: {
-              codebase: { type: "object", description: "Files array. Path: .quikim/artifacts/<spec>/lld_<id>.md." },
-              user_prompt: { type: "string", description: "Optionally specify component name to push specific LLD" },
+              codebase: {
+                type: "object",
+                description:
+                  "Files array. Path: .quikim/artifacts/<spec>/lld_<id>.md.",
+              },
+              user_prompt: {
+                type: "string",
+                description:
+                  "Optionally specify component name to push specific LLD",
+              },
+              spec_name: {
+                type: "string",
+                description: `Spec name for this LLD. Must be one of: ${LLD_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard). Do not use 'default'.`,
+              },
               name: ARTIFACT_NAME_TITLE_SCHEMA.name,
               title: ARTIFACT_NAME_TITLE_SCHEMA.title,
               project_context: PROJECT_CONTEXT_SCHEMA,
@@ -428,7 +485,11 @@ export class MCPCursorProtocolServer {
           inputSchema: {
             type: "object",
             properties: {
-              codebase: { type: "object", description: "Files array. Path: .quikim/artifacts/<spec>/context_<id>.md. content = plain text only." },
+              codebase: {
+                type: "object",
+                description:
+                  "Files array. Path: .quikim/artifacts/<spec>/context_<id>.md. content = plain text only.",
+              },
               user_prompt: { type: "string" },
               name: ARTIFACT_NAME_TITLE_SCHEMA.name,
               title: ARTIFACT_NAME_TITLE_SCHEMA.title,
@@ -439,14 +500,18 @@ export class MCPCursorProtocolServer {
         } as Tool,
         {
           name: "pull_context",
-          description: "Read context from local files or fetch from API (data.force=true)",
+          description:
+            "Read context from local files or fetch from API (data.force=true)",
           inputSchema: {
             type: "object",
             properties: {
               codebase: { type: "object" },
               user_prompt: { type: "string" },
               project_context: PROJECT_CONTEXT_SCHEMA,
-              data: { type: "object", properties: { force: { type: "boolean" } } },
+              data: {
+                type: "object",
+                properties: { force: { type: "boolean" } },
+              },
             },
             required: ["user_prompt"],
           },
@@ -458,7 +523,11 @@ export class MCPCursorProtocolServer {
           inputSchema: {
             type: "object",
             properties: {
-              codebase: { type: "object", description: "Files array. Path: .quikim/artifacts/<spec>/code_guideline_<id>.md. content = plain text/markdown only." },
+              codebase: {
+                type: "object",
+                description:
+                  "Files array. Path: .quikim/artifacts/<spec>/code_guideline_<id>.md. content = plain text/markdown only.",
+              },
               user_prompt: { type: "string" },
               name: ARTIFACT_NAME_TITLE_SCHEMA.name,
               title: ARTIFACT_NAME_TITLE_SCHEMA.title,
@@ -469,14 +538,18 @@ export class MCPCursorProtocolServer {
         } as Tool,
         {
           name: "pull_code_guideline",
-          description: "Read code guidelines from local files or fetch from API (data.force=true)",
+          description:
+            "Read code guidelines from local files or fetch from API (data.force=true)",
           inputSchema: {
             type: "object",
             properties: {
               codebase: { type: "object" },
               user_prompt: { type: "string" },
               project_context: PROJECT_CONTEXT_SCHEMA,
-              data: { type: "object", properties: { force: { type: "boolean" } } },
+              data: {
+                type: "object",
+                properties: { force: { type: "boolean" } },
+              },
             },
             required: ["user_prompt"],
           },
@@ -491,10 +564,16 @@ export class MCPCursorProtocolServer {
               project_id: {
                 type: "string",
                 description:
-                  "Actual project ID from project_context. Do not use spec name like \"default\".",
+                  'Actual project ID from project_context. Do not use spec name like "default".',
               },
-              user_prompt: { type: "string", description: "User intent, e.g. 'Build a restaurant app'" },
-              last_known_state: { type: "string", description: "Optional last workflow node id" },
+              user_prompt: {
+                type: "string",
+                description: "User intent, e.g. 'Build a restaurant app'",
+              },
+              last_known_state: {
+                type: "string",
+                description: "Optional last workflow node id",
+              },
               project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["user_prompt"],
@@ -510,16 +589,25 @@ export class MCPCursorProtocolServer {
               project_id: {
                 type: "string",
                 description:
-                  "Actual project ID from project_context. Do not use spec name like \"default\".",
+                  'Actual project ID from project_context. Do not use spec name like "default".',
               },
-              artifact_type: { type: "string", description: "e.g. requirement, hld, lld, tasks" },
+              artifact_type: {
+                type: "string",
+                description: "e.g. requirement, hld, lld, tasks",
+              },
               spec_name: {
                 type: "string",
                 description: `Spec name. For requirements use one of: ${REQUIREMENT_SPEC_NAMES_DESCRIPTION}, or custom. Default: default.`,
               },
               artifact_name: { type: "string", description: "Artifact name" },
-              artifact_id: { type: "string", description: "Optional server artifact id" },
-              pending_instruction_id: { type: "string", description: "From get_workflow_instruction for idempotency" },
+              artifact_id: {
+                type: "string",
+                description: "Optional server artifact id",
+              },
+              pending_instruction_id: {
+                type: "string",
+                description: "From get_workflow_instruction for idempotency",
+              },
               project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["project_id", "artifact_type", "spec_name"],
@@ -528,7 +616,8 @@ export class MCPCursorProtocolServer {
       ];
 
       // Get workflow engine tools (lazy import to avoid circular dependency)
-      const { WorkflowEngineTools } = await import('./handlers/workflow-tools.js');
+      const { WorkflowEngineTools } =
+        await import("./handlers/workflow-tools.js");
       const workflowTools = await WorkflowEngineTools.listTools();
 
       // Combine all tools
@@ -543,21 +632,37 @@ export class MCPCursorProtocolServer {
 
       // DEBUG: Write to workspace file
       try {
-        const logPath = join(getQuikimProjectRoot(), '.quikim', 'mcp-debug.log');
+        const logPath = join(
+          getQuikimProjectRoot(),
+          ".quikim",
+          "mcp-debug.log",
+        );
         mkdirSync(dirname(logPath), { recursive: true });
         appendFileSync(logPath, `\n=== ${new Date().toISOString()} ===\n`);
         appendFileSync(logPath, `Tool: ${name}\n`);
-        appendFileSync(logPath, `Args keys: ${Object.keys(args || {}).join(', ')}\n`);
+        appendFileSync(
+          logPath,
+          `Args keys: ${Object.keys(args || {}).join(", ")}\n`,
+        );
         if (args?.codebase) {
           const files = (args.codebase as any)?.files;
           appendFileSync(logPath, `Files count: ${files?.length || 0}\n`);
           if (files && files.length > 0) {
             files.forEach((f: any, i: number) => {
               appendFileSync(logPath, `  File ${i}: ${f.path}\n`);
-              appendFileSync(logPath, `    Content type: ${typeof f.content}\n`);
+              appendFileSync(
+                logPath,
+                `    Content type: ${typeof f.content}\n`,
+              );
               if (Array.isArray(f.content)) {
-                appendFileSync(logPath, `    Content array length: ${f.content.length}\n`);
-                appendFileSync(logPath, `    First block: ${JSON.stringify(f.content[0]).substring(0, 100)}\n`);
+                appendFileSync(
+                  logPath,
+                  `    Content array length: ${f.content.length}\n`,
+                );
+                appendFileSync(
+                  logPath,
+                  `    First block: ${JSON.stringify(f.content[0]).substring(0, 100)}\n`,
+                );
               }
             });
           }
@@ -611,20 +716,28 @@ export class MCPCursorProtocolServer {
       }
 
       // Resolve project context from codebase
-      const resolvedContext = await projectContextResolver.resolveFromCodebase(
-        codebase
-      );
-      const rawProjectContext = (args.project_context as Record<string, unknown>) || {};
+      const resolvedContext =
+        await projectContextResolver.resolveFromCodebase(codebase);
+      const rawProjectContext =
+        (args.project_context as Record<string, unknown>) || {};
       const projectContext: ProjectContext = {
         ...resolvedContext,
         ...rawProjectContext,
-        ...(typeof args.spec_name === "string" ? { specName: args.spec_name } : {}),
+        ...(typeof args.spec_name === "string"
+          ? { specName: args.spec_name }
+          : {}),
       };
       // Normalize so LLM-sent snake_case (spec_name, project_id) is used when camelCase missing
-      if (projectContext.specName == null && (rawProjectContext.spec_name as string) != null) {
+      if (
+        projectContext.specName == null &&
+        (rawProjectContext.spec_name as string) != null
+      ) {
         projectContext.specName = rawProjectContext.spec_name as string;
       }
-      if (projectContext.projectId == null && (rawProjectContext.project_id as string) != null) {
+      if (
+        projectContext.projectId == null &&
+        (rawProjectContext.project_id as string) != null
+      ) {
         projectContext.projectId = rawProjectContext.project_id as string;
       }
 
@@ -642,165 +755,179 @@ export class MCPCursorProtocolServer {
             codebase,
             userPrompt,
             projectContext,
-            dataToPass
+            dataToPass,
           );
         case "pull_requirements":
           return await this.toolHandlers.handlePullRequirements(
             codebase,
             userPrompt,
             projectContext,
-            dataToPass
+            dataToPass,
           );
         case "generate_tests":
           return await this.toolHandlers.handlePushTests(
             codebase,
             userPrompt,
             projectContext,
-            dataToPass
+            dataToPass,
           );
         case "pull_tests":
           return await this.toolHandlers.handlePullTests(
             codebase,
             userPrompt,
             projectContext,
-            dataToPass
+            dataToPass,
           );
         case "generate_hld":
           return await this.toolHandlers.handlePushHLD(
             codebase,
             userPrompt,
             projectContext,
-            dataToPass
+            dataToPass,
           );
         case "pull_hld":
           return await this.toolHandlers.handlePullHLD(
             codebase,
             userPrompt,
             projectContext,
-            dataToPass
+            dataToPass,
           );
         case "pull_wireframe":
           return await this.toolHandlers.handlePullWireframe(
             codebase,
             userPrompt,
             projectContext,
-            dataToPass
+            dataToPass,
           );
         case "generate_wireframes":
           return await this.toolHandlers.handlePushWireframes(
             codebase,
             userPrompt,
             projectContext,
-            dataToPass
+            dataToPass,
           );
         case "generate_tasks":
           return await this.toolHandlers.handlePushTasks(
             codebase,
             userPrompt,
             projectContext,
-            dataToPass
+            dataToPass,
           );
         case "pull_tasks":
           return await this.toolHandlers.handlePullTasks(
             codebase,
             userPrompt,
             projectContext,
-            dataToPass
+            dataToPass,
           );
         case "update_code":
           return await this.toolHandlers.handleUpdateCode(
             codebase,
             userPrompt,
             projectContext,
-            dataToPass
+            dataToPass,
           );
         case "er_diagram_pull":
           return await this.toolHandlers.handleERDiagramPull(
             codebase,
             userPrompt,
             projectContext,
-            dataToPass
+            dataToPass,
           );
         case "er_diagram_push":
           return await this.toolHandlers.handleERDiagramPush(
             codebase,
             userPrompt,
             projectContext,
-            dataToPass
+            dataToPass,
           );
         case "pull_rules":
           return await this.toolHandlers.handlePullRules(
             codebase,
             userPrompt,
             projectContext,
-            dataToPass
+            dataToPass,
           );
         case "pull_mermaid":
           return await this.toolHandlers.handlePullMermaid(
             codebase,
             userPrompt,
             projectContext,
-            dataToPass
+            dataToPass,
           );
         case "generate_mermaid":
           return await this.toolHandlers.handlePushMermaid(
             codebase,
             userPrompt,
             projectContext,
-            dataToPass
+            dataToPass,
           );
         case "pull_lld":
           return await this.toolHandlers.handlePullLLD(
             codebase,
             userPrompt,
             projectContext,
-            dataToPass
+            dataToPass,
           );
         case "generate_lld":
           return await this.toolHandlers.handlePushLLD(
             codebase,
             userPrompt,
             projectContext,
-            dataToPass
+            dataToPass,
           );
         case "generate_context":
           return await this.toolHandlers.handlePushContext(
             codebase,
             userPrompt,
             projectContext,
-            dataToPass
+            dataToPass,
           );
         case "pull_context":
           return await this.toolHandlers.handlePullContext(
             codebase,
             userPrompt,
             projectContext,
-            dataToPass
+            dataToPass,
           );
         case "generate_code_guideline":
           return await this.toolHandlers.handlePushCodeGuideline(
             codebase,
             userPrompt,
             projectContext,
-            dataToPass
+            dataToPass,
           );
         case "pull_code_guideline":
           return await this.toolHandlers.handlePullCodeGuideline(
             codebase,
             userPrompt,
             projectContext,
-            dataToPass
+            dataToPass,
           );
         case "get_workflow_instruction": {
           const rawProjectId = (args.project_id as string) || "";
           const projectId =
-            rawProjectId && rawProjectId !== "default" ? rawProjectId : projectContext.projectId;
+            rawProjectId && rawProjectId !== "default"
+              ? rawProjectId
+              : projectContext.projectId;
           if (!projectId) {
-            return { content: [{ type: "text", text: "Error: project_id or project_context with projectId required." }], isError: true };
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: "Error: project_id or project_context with projectId required.",
+                },
+              ],
+              isError: true,
+            };
           }
-          const workflowBase = configManager.getWorkflowServiceUrl().replace(/\/$/, "");
+          const workflowBase = configManager
+            .getWorkflowServiceUrl()
+            .replace(/\/$/, "");
           const token = configManager.getAuth()?.token ?? "";
-          const headers: Record<string, string> = { "Content-Type": "application/json" };
+          const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+          };
           if (token) headers["Authorization"] = `Bearer ${token}`;
           try {
             const res = await fetch(`${workflowBase}/api/v1/workflow/next`, {
@@ -814,50 +941,98 @@ export class MCPCursorProtocolServer {
             });
             if (!res.ok) {
               const errText = await res.text();
-              return { content: [{ type: "text", text: `Workflow service error: ${res.status} ${errText}` }], isError: true };
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: `Workflow service error: ${res.status} ${errText}`,
+                  },
+                ],
+                isError: true,
+              };
             }
             const instruction = await res.json();
             return {
-              content: [{ type: "text", text: JSON.stringify(instruction, null, 2) }],
+              content: [
+                { type: "text", text: JSON.stringify(instruction, null, 2) },
+              ],
             };
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            return { content: [{ type: "text", text: `Workflow service call failed: ${msg}` }], isError: true };
+            return {
+              content: [
+                { type: "text", text: `Workflow service call failed: ${msg}` },
+              ],
+              isError: true,
+            };
           }
         }
         case "report_workflow_progress": {
           const rawProjectId = (args.project_id as string) || "";
           const projectId =
-            rawProjectId && rawProjectId !== "default" ? rawProjectId : projectContext.projectId;
+            rawProjectId && rawProjectId !== "default"
+              ? rawProjectId
+              : projectContext.projectId;
           if (!projectId) {
-            return { content: [{ type: "text", text: "Error: project_id or project_context with projectId required." }], isError: true };
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: "Error: project_id or project_context with projectId required.",
+                },
+              ],
+              isError: true,
+            };
           }
-          const workflowBase = configManager.getWorkflowServiceUrl().replace(/\/$/, "");
+          const workflowBase = configManager
+            .getWorkflowServiceUrl()
+            .replace(/\/$/, "");
           const token = configManager.getAuth()?.token ?? "";
-          const headers: Record<string, string> = { "Content-Type": "application/json" };
+          const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+          };
           if (token) headers["Authorization"] = `Bearer ${token}`;
           try {
-            const res = await fetch(`${workflowBase}/api/v1/workflow/progress`, {
-              method: "POST",
-              headers,
-              body: JSON.stringify({
-                projectId,
-                artifactType: args.artifact_type as string,
-                specName: (args.spec_name as string) || "default",
-                artifactName: (args.artifact_name as string) || null,
-                artifactId: (args.artifact_id as string) || null,
-                pendingInstructionId: (args.pending_instruction_id as string) || null,
-              }),
-            });
+            const res = await fetch(
+              `${workflowBase}/api/v1/workflow/progress`,
+              {
+                method: "POST",
+                headers,
+                body: JSON.stringify({
+                  projectId,
+                  artifactType: args.artifact_type as string,
+                  specName: (args.spec_name as string) || "default",
+                  artifactName: (args.artifact_name as string) || null,
+                  artifactId: (args.artifact_id as string) || null,
+                  pendingInstructionId:
+                    (args.pending_instruction_id as string) || null,
+                }),
+              },
+            );
             if (!res.ok) {
               const errText = await res.text();
-              return { content: [{ type: "text", text: `Workflow service error: ${res.status} ${errText}` }], isError: true };
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: `Workflow service error: ${res.status} ${errText}`,
+                  },
+                ],
+                isError: true,
+              };
             }
             const result = await res.json();
-            return { content: [{ type: "text", text: JSON.stringify(result) }] };
+            return {
+              content: [{ type: "text", text: JSON.stringify(result) }],
+            };
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            return { content: [{ type: "text", text: `Workflow service call failed: ${msg}` }], isError: true };
+            return {
+              content: [
+                { type: "text", text: `Workflow service call failed: ${msg}` },
+              ],
+              isError: true,
+            };
           }
         }
         // Workflow engine tools
@@ -872,9 +1047,10 @@ export class MCPCursorProtocolServer {
         case "generate_code_from_requirements":
         case "generate_code_from_design":
           // Lazy import to avoid circular dependency
-          const { WorkflowEngineTools } = await import('./handlers/workflow-tools.js');
+          const { WorkflowEngineTools } =
+            await import("./handlers/workflow-tools.js");
           return await WorkflowEngineTools.handleToolCall(request);
-        
+
         default:
           throw new Error(`Unknown tool: ${name}`);
       }
@@ -928,7 +1104,7 @@ export class MCPCursorProtocolServer {
     process.on("unhandledRejection", (reason, promise) => {
       this.handleCriticalError(
         new Error(`Promise: ${promise}, Reason: ${reason}`),
-        "Unhandled Rejection"
+        "Unhandled Rejection",
       );
     });
 
@@ -947,7 +1123,7 @@ export class MCPCursorProtocolServer {
    */
   private async handleServerError(
     error: Error,
-    operation: string
+    operation: string,
   ): Promise<void> {
     const context: ErrorContext = {
       operation,
@@ -977,7 +1153,7 @@ export class MCPCursorProtocolServer {
    */
   private async handleCriticalError(
     error: Error,
-    operation: string
+    operation: string,
   ): Promise<void> {
     const context: ErrorContext = {
       operation,
