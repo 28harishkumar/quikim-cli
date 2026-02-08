@@ -1185,11 +1185,8 @@ export class MCPCursorProtocolServer {
             }
             const instruction = (await res.json()) as Record<string, unknown>;
 
-            // If server did not include skillContent, load from local cache
-            if (
-              !instruction.skillContent &&
-              (instruction.nextCandidates as string[] | undefined)?.length
-            ) {
+            // Resolve skill content: local first, server response as fallback
+            if ((instruction.nextCandidates as string[] | undefined)?.length) {
               const nextNodeId = (instruction.nextCandidates as string[])[0];
               const { SkillFileManager } =
                 await import("../services/skill-file-manager.js");
@@ -1198,12 +1195,20 @@ export class MCPCursorProtocolServer {
               const skillManager = new SkillFileManager();
               const nodeDef = WORKFLOW_NODES[nextNodeId];
               if (nodeDef) {
+                // 1. Try local .quikim/skills/ first
                 const localSkill = await skillManager.readSkillFile(
                   nextNodeId,
                   nodeDef.specName,
                 );
                 if (localSkill) {
                   instruction.skillContent = localSkill;
+                } else if (instruction.skillContent) {
+                  // 2. Server included it — use it and cache locally
+                  await skillManager.writeSkillFile(
+                    nextNodeId,
+                    nodeDef.specName,
+                    instruction.skillContent as string,
+                  );
                 }
               }
             }
