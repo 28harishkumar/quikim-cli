@@ -25,28 +25,28 @@ export interface WorkflowNodeDef {
 
 /** Ordered list of node ids in agile flow (deterministic next) */
 export const WORKFLOW_NODE_ORDER: string[] = [
-  "1.1",
-  "1.2",
-  "4.2",
-  "2.1",
-  "3.1",
-  "4.1",
-  "5.1",
-  "5.2",
-  "1.3",
-  "3.2",
-  "1.4",
-  "3.3",
-  "1.5",
-  "1.6",
-  "3.4",
-  "3.5",
-  "3.6",
-  "1.7",
-  "2.2",
-  "7.1",
-  "6.1",
-  "6.2",
+  "1.1",  // Project Overview
+  "1.2",  // Business & Functional Requirements
+  "4.2",  // Wireframe - (early design exploration)
+  "2.1",  // HLD - (high level design)
+  "3.1",  // LLD - (low level design)
+  "4.1",  // Wireframe - (detailed wireframes)
+  "1.7",  // Phase & milestone breakdown (moved: before 5.1 for better planning flow)
+  "2.2",  // Milestones/Specs (moved: after 1.7, before 5.1)
+  "5.1",  // Flow Diagram - (user flow)
+  "5.2",  // Flow Diagram - (system architecture)
+  "1.3",  // Epics List
+  "3.2",  // Code Architecture
+  "1.4",  // User stories
+  "3.3",  // LLD - (code plan)
+  "1.5",  // Acceptance criteria
+  "1.6",  // Test scenarios
+  "3.5",  // LLD - (code file listing - header/interface only)
+  "3.6",  // LLD - (code file listing - implementation)
+  "3.4",  // Technical details per code file (moved: after 3.6 for better implementation flow)
+  "7.1",  // Test artifact
+  "6.1",  // Tasks per milestone
+  "6.2",  // Subtasks
 ];
 
 /**
