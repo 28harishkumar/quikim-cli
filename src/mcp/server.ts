@@ -638,6 +638,50 @@ export class MCPCursorProtocolServer {
           },
         } as Tool,
         {
+          name: "poll_queue",
+          description:
+            "Poll for next pending task and claim it for processing. Returns hasTask=false if no pending tasks, or the full task payload with context if found. Combines get + claim in one call for efficiency.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              project_id: {
+                type: "string",
+                description: "Project ID to poll queue for.",
+              },
+              session_id: {
+                type: "string",
+                description: "Optional MCP session ID for tracking.",
+              },
+              project_context: PROJECT_CONTEXT_SCHEMA,
+            },
+            required: [],
+          },
+        } as Tool,
+        {
+          name: "complete_queue_task",
+          description:
+            "Mark a queue task as completed after generating the artifact. Call this after successfully generating content via generate_* tools.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              queue_id: {
+                type: "string",
+                description: "Queue item ID from poll_queue response.",
+              },
+              success: {
+                type: "boolean",
+                description: "Whether generation succeeded.",
+              },
+              error_message: {
+                type: "string",
+                description: "Error message if success=false.",
+              },
+              project_context: PROJECT_CONTEXT_SCHEMA,
+            },
+            required: ["queue_id", "success"],
+          },
+        } as Tool,
+        {
           name: "get_workflow_instruction",
           description:
             "Get the next workflow instruction for the project (action, prompt, context artifacts, skill content, decision trace). Call this before generating an artifact so the LLM knows what to generate and which @mentions to use.",
@@ -1466,6 +1510,143 @@ export class MCPCursorProtocolServer {
             const msg = err instanceof Error ? err.message : String(err);
             return {
               content: [{ type: "text", text: `Queue update failed: ${msg}` }],
+              isError: true,
+            };
+          }
+        }
+        case "poll_queue": {
+          // Poll for next pending task and claim it
+          const rawProjectId = (args.project_id as string) || "";
+          const projectId =
+            rawProjectId && rawProjectId !== "default"
+              ? rawProjectId
+              : projectContext.projectId;
+          if (!projectId) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify({ hasTask: false, error: "project_id required" }),
+                },
+              ],
+              isError: true,
+            };
+          }
+          const workflowBase = configManager
+            .getWorkflowServiceUrl()
+            .replace(/\/$/, "");
+          const token = configManager.getAuth()?.token ?? "";
+          const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+          };
+          if (token) headers["Authorization"] = `Bearer ${token}`;
+          try {
+            const sessionId = (args.session_id as string) || "mcp-session";
+            const res = await fetch(
+              `${workflowBase}/api/v1/workflow/queue/poll?projectId=${projectId}&sessionId=${sessionId}`,
+              { method: "POST", headers },
+            );
+            if (!res.ok) {
+              const errText = await res.text();
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: JSON.stringify({ hasTask: false, error: `Poll failed: ${res.status} ${errText}` }),
+                  },
+                ],
+                isError: true,
+              };
+            }
+            const result = await res.json();
+            if (!result.hasTask) {
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: JSON.stringify({ hasTask: false, message: "No pending tasks in queue" }),
+                  },
+                ],
+              };
+            }
+            // Return task with instructions
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify({
+                    ...result,
+                    instructions:
+                      "1) Use the payload to generate content (systemPrompt + skillContent as system, userPrompt as user). " +
+                      "2) Save via generate_* tool (e.g. generate_requirements based on nodeId). " +
+                      "3) Call complete_queue_task(queueId, success=true) when done. " +
+                      "On error: complete_queue_task(queueId, success=false, error_message).",
+                  }, null, 2),
+                },
+              ],
+            };
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return {
+              content: [{ type: "text", text: JSON.stringify({ hasTask: false, error: msg }) }],
+              isError: true,
+            };
+          }
+        }
+        case "complete_queue_task": {
+          // Mark queue task as completed
+          const queueId = args.queue_id as string;
+          const success = args.success as boolean;
+          if (!queueId) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: "Error: queue_id is required.",
+                },
+              ],
+              isError: true,
+            };
+          }
+          const workflowBase = configManager
+            .getWorkflowServiceUrl()
+            .replace(/\/$/, "");
+          const token = configManager.getAuth()?.token ?? "";
+          const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+          };
+          if (token) headers["Authorization"] = `Bearer ${token}`;
+          try {
+            const params = new URLSearchParams({
+              success: String(success),
+            });
+            if (args.error_message) {
+              params.set("errorMessage", args.error_message as string);
+            }
+            const res = await fetch(
+              `${workflowBase}/api/v1/workflow/queue/${queueId}/complete?${params}`,
+              { method: "POST", headers },
+            );
+            if (!res.ok) {
+              const errText = await res.text();
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: `Complete failed: ${res.status} ${errText}`,
+                  },
+                ],
+                isError: true,
+              };
+            }
+            const result = await res.json();
+            return {
+              content: [{ type: "text", text: JSON.stringify(result) }],
+            };
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return {
+              content: [{ type: "text", text: `Complete failed: ${msg}` }],
               isError: true,
             };
           }
