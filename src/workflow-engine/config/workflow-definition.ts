@@ -9,7 +9,9 @@
 
 /**
  * Canonical workflow nodes and dependencies from interlinking.md.
- * Agile flow order: 1.1 -> 1.2 -> 4.2 -> 2.1 -> ... -> 1.7 -> 2.2 -> 7.1 -> 6.1 -> 6.2
+ * Agile flow order: 1.1 -> 1.2 -> 4.2 -> 2.1 -> ... -> 1.7 -> 1.3 -> 2.2 -> ... -> 6.2
+ *
+ * Optional nodes: 1.2, 4.2, 5.1, 5.2 can be skipped, added later, or completed normally.
  */
 
 export interface WorkflowNodeDef {
@@ -21,21 +23,29 @@ export interface WorkflowNodeDef {
   usedBy: string[];
   label: string;
   category: string;
+  /** If true, this node is optional and can be skipped */
+  isOptional?: boolean;
+  /** If true, match any artifact in this spec (name may be UUID) */
+  anyInSpec?: boolean;
+  /** If true, multiple files per spec (e.g. acceptance criteria) */
+  multiFile?: boolean;
+  /** If true, suggest creating another only when user asks */
+  createOnlyIfUserAsks?: boolean;
 }
 
 /** Ordered list of node ids in agile flow (deterministic next) */
 export const WORKFLOW_NODE_ORDER: string[] = [
   "1.1",  // Project Overview
-  "1.2",  // Business & Functional Requirements
-  "4.2",  // Wireframe - (early design exploration)
+  "1.2",  // Business & Functional Requirements (OPTIONAL)
+  "4.2",  // Business logic flow charts (OPTIONAL)
   "2.1",  // HLD - (high level design)
   "3.1",  // LLD - (low level design)
-  "4.1",  // Wireframe - (detailed wireframes)
-  "1.7",  // Phase & milestone breakdown (moved: before 5.1 for better planning flow)
-  "2.2",  // Milestones/Specs (moved: after 1.7, before 5.1)
-  "5.1",  // Flow Diagram - (user flow)
-  "5.2",  // Flow Diagram - (system architecture)
-  "1.3",  // Epics List
+  "4.1",  // Navigation tree for all screens
+  "1.7",  // Phase & milestone breakdown
+  "1.3",  // Acceptance criteria – Screens (moved: after 1.7, before 2.2)
+  "2.2",  // Milestones/Specs
+  "5.1",  // Wireframes for each screen (OPTIONAL)
+  "5.2",  // Component wireframes (OPTIONAL)
   "3.2",  // Code Architecture
   "1.4",  // User stories
   "3.3",  // LLD - (code plan)
@@ -63,6 +73,7 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     usedBy: ["1.2", "1.6", "2.1", "1.7"],
     label: "Overview",
     category: "requirements",
+    anyInSpec: true,
   },
   "1.2": {
     nodeId: "1.2",
@@ -73,6 +84,9 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     usedBy: ["1.3", "1.4", "1.5", "2.1", "4.2"],
     label: "Business & Functional Requirements",
     category: "requirements",
+    anyInSpec: true,
+    createOnlyIfUserAsks: true,
+    isOptional: true,
   },
   "4.2": {
     nodeId: "4.2",
@@ -83,6 +97,8 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     usedBy: ["3.4", "6.1", "7.1"],
     label: "Business logic flow charts",
     category: "flow_diagram",
+    anyInSpec: true,
+    isOptional: true,
   },
   "2.1": {
     nodeId: "2.1",
@@ -93,16 +109,18 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     usedBy: ["3.3", "3.4", "4.2"],
     label: "Project architecture",
     category: "hld",
+    anyInSpec: true,
   },
   "2.2": {
     nodeId: "2.2",
     artifactType: "hld",
     specName: "milestones-specs",
     artifactName: "milestones-specs",
-    dependencies: ["1.7"],
+    dependencies: ["1.7", "1.3"],
     usedBy: ["6.1"],
     label: "Milestones / Specs",
     category: "hld",
+    anyInSpec: true,
   },
   "3.1": {
     nodeId: "3.1",
@@ -113,6 +131,7 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     usedBy: ["3.5", "4.1", "5.1"],
     label: "List of all screens",
     category: "lld",
+    anyInSpec: true,
   },
   "4.1": {
     nodeId: "4.1",
@@ -123,6 +142,7 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     usedBy: ["5.1", "6.1"],
     label: "Navigation tree for all screens",
     category: "flow_diagram",
+    anyInSpec: true,
   },
   "5.1": {
     nodeId: "5.1",
@@ -133,6 +153,8 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     usedBy: ["6.1", "7.1"],
     label: "Wireframes for each screen",
     category: "wireframe",
+    anyInSpec: true,
+    isOptional: true,
   },
   "5.2": {
     nodeId: "5.2",
@@ -143,16 +165,19 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     usedBy: ["5.1", "6.1"],
     label: "Component wireframes",
     category: "wireframe",
+    anyInSpec: true,
+    isOptional: true,
   },
   "1.3": {
     nodeId: "1.3",
     artifactType: "requirement",
     specName: "acceptance-criteria-screens",
     artifactName: "acceptance-screens",
-    dependencies: ["1.2"],
-    usedBy: ["3.1", "3.5", "4.1", "5.1", "1.6"],
+    dependencies: ["1.7"],
+    usedBy: ["3.1", "3.5", "4.1", "5.1", "1.6", "2.2"],
     label: "Acceptance criteria – Screens",
     category: "requirements",
+    multiFile: true,
   },
   "3.2": {
     nodeId: "3.2",
@@ -163,6 +188,7 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     usedBy: ["3.6", "7.1", "3.5"],
     label: "List of all APIs",
     category: "lld",
+    anyInSpec: true,
   },
   "1.4": {
     nodeId: "1.4",
@@ -173,6 +199,7 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     usedBy: ["3.2", "3.6", "7.1", "1.6"],
     label: "Acceptance criteria – APIs",
     category: "requirements",
+    multiFile: true,
   },
   "3.3": {
     nodeId: "3.3",
@@ -183,6 +210,7 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     usedBy: ["3.4", "3.5", "3.6", "5.2"],
     label: "File tree (all code files)",
     category: "lld",
+    anyInSpec: true,
   },
   "1.5": {
     nodeId: "1.5",
@@ -193,6 +221,7 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     usedBy: ["3.3", "5.2", "1.6"],
     label: "Component requirements",
     category: "requirements",
+    multiFile: true,
   },
   "1.6": {
     nodeId: "1.6",
@@ -203,6 +232,7 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     usedBy: ["3.4"],
     label: "Acceptance criteria – Code files",
     category: "requirements",
+    multiFile: true,
   },
   "3.4": {
     nodeId: "3.4",
@@ -213,6 +243,7 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     usedBy: ["6.1", "7.1"],
     label: "Technical details per code file",
     category: "lld",
+    anyInSpec: true,
   },
   "3.5": {
     nodeId: "3.5",
@@ -223,6 +254,7 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     usedBy: ["5.1", "6.1", "3.4"],
     label: "Technical detail per screen",
     category: "lld",
+    anyInSpec: true,
   },
   "3.6": {
     nodeId: "3.6",
@@ -233,6 +265,7 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     usedBy: ["3.4", "7.1"],
     label: "Technical detail per API",
     category: "lld",
+    anyInSpec: true,
   },
   "1.7": {
     nodeId: "1.7",
@@ -240,9 +273,10 @@ export const WORKFLOW_NODES: Record<string, WorkflowNodeDef> = {
     specName: "phase-milestone-breakdown",
     artifactName: "phase-milestone",
     dependencies: ["1.1"],
-    usedBy: ["2.2", "6.1"],
+    usedBy: ["2.2", "6.1", "1.3"],
     label: "Phase & milestone breakdown",
     category: "requirements",
+    anyInSpec: true,
   },
   "7.1": {
     nodeId: "7.1",
@@ -294,6 +328,14 @@ export function getNodeDef(nodeId: string): WorkflowNodeDef | undefined {
 }
 
 /**
+ * Returns true if the node is optional (can be skipped).
+ */
+export function isNodeOptional(nodeId: string): boolean {
+  const def = WORKFLOW_NODES[nodeId];
+  return Boolean(def?.isOptional);
+}
+
+/**
  * Returns node id that matches artifact type/spec/name, or undefined.
  */
 export function getNodeIdByArtifact(
@@ -305,12 +347,12 @@ export function getNodeIdByArtifact(
   const nameNorm = (s: string) => s.toLowerCase().replace(/\s+/g, "-");
   const target = nameNorm(artifactName);
   for (const [nodeId, def] of Object.entries(WORKFLOW_NODES)) {
-    if (
-      def.artifactType === artifactType &&
-      (def.specName || "default") === spec &&
-      (def.artifactName === artifactName ||
-        nameNorm(def.artifactName) === target)
-    ) {
+    if (def.artifactType !== artifactType) continue;
+    if ((def.specName || "default") !== spec) continue;
+    if (def.multiFile || def.anyInSpec) {
+      return nodeId;
+    }
+    if (def.artifactName === artifactName || nameNorm(def.artifactName) === target) {
       return nodeId;
     }
   }
