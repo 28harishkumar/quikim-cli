@@ -125,10 +125,57 @@ export const WIREFRAME_SPEC_TYPES = [
   { value: "component-wireframes", label: "Component wireframes" },
 ] as const;
 
+/** Task spec types (6.x) aligned with organization dashboard. */
+export const TASK_SPEC_TYPES = [
+  { value: "tasks", label: "Task breakdown" },
+] as const;
+
+/** Test spec types (7.x) aligned with organization dashboard. */
+export const TEST_SPEC_TYPES = [
+  { value: "tests", label: "Test definitions" },
+] as const;
+
 export const HLD_SPEC_NAMES_DESCRIPTION = HLD_SPEC_TYPES.map((t) => `${t.value} (${t.label})`).join(", ");
 export const LLD_SPEC_NAMES_DESCRIPTION = LLD_SPEC_TYPES.map((t) => `${t.value} (${t.label})`).join(", ");
 export const FLOW_SPEC_NAMES_DESCRIPTION = FLOW_SPEC_TYPES.map((t) => `${t.value} (${t.label})`).join(", ");
 export const WIREFRAME_SPEC_NAMES_DESCRIPTION = WIREFRAME_SPEC_TYPES.map((t) => `${t.value} (${t.label})`).join(", ");
+export const TASK_SPEC_NAMES_DESCRIPTION = TASK_SPEC_TYPES.map((t) => `${t.value} (${t.label})`).join(", ");
+export const TEST_SPEC_NAMES_DESCRIPTION = TEST_SPEC_TYPES.map((t) => `${t.value} (${t.label})`).join(", ");
+
+/**
+ * Complete spec type mapping for all 22 workflow nodes.
+ * Maps node IDs to their spec names and descriptions.
+ */
+export const ALL_SPEC_TYPES = {
+  // Requirements (1.x)
+  "1.1": { specName: "overview", tool: "generate_requirements", label: "Overview" },
+  "1.2": { specName: "business-functional", tool: "generate_requirements", label: "Business & Functional Requirements" },
+  "1.3": { specName: "acceptance-criteria-screens", tool: "generate_requirements", label: "Acceptance criteria - Screens" },
+  "1.4": { specName: "acceptance-criteria-apis", tool: "generate_requirements", label: "Acceptance criteria - APIs" },
+  "1.5": { specName: "component-requirements", tool: "generate_requirements", label: "Component requirements" },
+  "1.6": { specName: "acceptance-criteria-code-files", tool: "generate_requirements", label: "Acceptance criteria - Code files" },
+  "1.7": { specName: "phase-milestone-breakdown", tool: "generate_requirements", label: "Phase & milestone breakdown" },
+  // HLD (2.x)
+  "2.1": { specName: "project-architecture", tool: "generate_hld", label: "Project architecture" },
+  "2.2": { specName: "milestones-specs", tool: "generate_hld", label: "Milestones / Specs" },
+  // LLD (3.x)
+  "3.1": { specName: "list-screens", tool: "generate_lld", label: "List of all screens" },
+  "3.2": { specName: "list-apis", tool: "generate_lld", label: "List of all APIs" },
+  "3.3": { specName: "file-tree", tool: "generate_lld", label: "File tree (all code files)" },
+  "3.4": { specName: "technical-details-code", tool: "generate_lld", label: "Technical details per code file" },
+  "3.5": { specName: "technical-detail-screen", tool: "generate_lld", label: "Technical detail per screen" },
+  "3.6": { specName: "technical-detail-api", tool: "generate_lld", label: "Technical detail per API" },
+  // Flow (4.x)
+  "4.1": { specName: "navigation-tree", tool: "generate_mermaid", label: "Navigation tree for all screens" },
+  "4.2": { specName: "business-logic-flow", tool: "generate_mermaid", label: "Business logic flow charts" },
+  // Wireframe (5.x)
+  "5.1": { specName: "wireframes-screens", tool: "generate_wireframes", label: "Wireframes for each screen" },
+  "5.2": { specName: "component-wireframes", tool: "generate_wireframes", label: "Component wireframes" },
+  // Tasks (6.x)
+  "6.1": { specName: "tasks", tool: "generate_tasks", label: "Task breakdown" },
+  // Tests (7.x)
+  "7.1": { specName: "tests", tool: "generate_tests", label: "Test definitions" },
+} as const;
 
 /** Optional name/title for artifacts; LLM can set these separately from content */
 export const ARTIFACT_NAME_TITLE_SCHEMA = {
