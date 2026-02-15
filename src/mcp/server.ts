@@ -1558,7 +1558,7 @@ export class MCPCursorProtocolServer {
                 isError: true,
               };
             }
-            const result = await res.json();
+            const result = (await res.json()) as { hasTask: boolean; queueId?: string; [key: string]: unknown };
             if (!result.hasTask) {
               return {
                 content: [
