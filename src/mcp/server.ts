@@ -131,7 +131,23 @@ export class MCPCursorProtocolServer {
       const existingTools = [
         {
           name: "generate_requirements",
-          description: `Save requirements locally (markdown), then sync to server. Path: .quikim/artifacts/<spec_name>/requirement_<name>.md. Use these spec_name values (same as organization dashboard): ${REQUIREMENT_SPEC_NAMES_DESCRIPTION}. Do not use 'default'. For 1.3, 1.4, 1.5, 1.6 the LLM must create one requirement file per entity (e.g. one file per screen, per API, per component, per code file).`,
+          description: `Save requirements locally (markdown), then sync to server.
+
+REQUIREMENT SPECS (1.x workflow nodes):
+• 1.1 overview: High-level project overview, goals, scope. ONE file per project.
+• 1.2 business-functional: Business rules and functional requirements. Usually ONE file; create additional only when user explicitly requests.
+• 1.3 acceptance-criteria-screens: Screen-by-screen acceptance criteria. ONE FILE PER SCREEN (e.g. requirement_login-screen.md, requirement_dashboard-screen.md).
+• 1.4 acceptance-criteria-apis: API-by-API acceptance criteria. ONE FILE PER API (e.g. requirement_create-order-api.md, requirement_get-user-api.md).
+• 1.5 component-requirements: Component-level requirements. ONE FILE PER COMPONENT (e.g. requirement_button.md, requirement_modal.md).
+• 1.6 acceptance-criteria-code-files: Code file acceptance criteria. ONE FILE PER CODE FILE (e.g. requirement_user-service.md).
+• 1.7 phase-milestone-breakdown: Phase and milestone breakdown. ONE file per project.
+
+Path: .quikim/artifacts/<spec_name>/requirement_<name>.md. Do not use 'default'.
+
+❌ DO NOT include HLD content (architecture, tech stack) → use generate_hld
+❌ DO NOT include LLD content (detailed class/interface specs) → use generate_lld
+❌ DO NOT include flow diagrams → use generate_mermaid
+❌ DO NOT include wireframe details → use generate_wireframes`,
           inputSchema: {
             type: "object",
             properties: {
@@ -227,7 +243,19 @@ export class MCPCursorProtocolServer {
         } as Tool,
         {
           name: "generate_hld",
-          description: `Save HLD locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/hld_<id>.md. Use spec_name: ${HLD_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard). HLD has its own spec names; do not use LLD spec names here. Optional: name/title.`,
+          description: `Save HLD (High-Level Design) locally first, then sync to server.
+
+HLD SPECS (2.x workflow nodes):
+• 2.1 project-architecture: Overall architecture, tech stack, system components, deployment topology. ONE file per project.
+• 2.2 milestones-specs: Milestone breakdown with high-level specs per phase. ONE file per project.
+
+Path: .quikim/artifacts/<spec_name>/hld_<name>.md. Do not use 'default'.
+
+✅ INCLUDE: Architecture diagrams, tech stack choices, service boundaries, deployment strategy, integration points
+❌ DO NOT include detailed API specs → use generate_lld with spec 'technical-detail-api'
+❌ DO NOT include detailed screen specs → use generate_lld with spec 'technical-detail-screen'
+❌ DO NOT include implementation-level class designs → use generate_lld
+❌ DO NOT use LLD spec names (list-screens, list-apis, etc.) → those are for generate_lld only`,
           inputSchema: {
             type: "object",
             properties: {
@@ -276,7 +304,18 @@ export class MCPCursorProtocolServer {
         } as Tool,
         {
           name: "generate_wireframes",
-          description: `Save wireframe locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/wireframe_files_<id>.md. Use spec_name: ${WIREFRAME_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard). Optional: name.`,
+          description: `Save wireframe locally first, then sync to server.
+
+WIREFRAME SPECS (5.x workflow nodes):
+• 5.1 wireframes-screens: Screen-level wireframes showing layout and components. ONE FILE PER SCREEN (e.g. wireframe_files_login.md).
+• 5.2 component-wireframes: Reusable component wireframes. ONE FILE PER COMPONENT (e.g. wireframe_files_button.md).
+
+Path: .quikim/artifacts/<spec_name>/wireframe_files_<name>.md. Do not use 'default'.
+Content: JSON { name, viewport: { width, height }, elements } or empty.
+
+⚠️ DO NOT CONFUSE with 3.1 (list-screens LLD): Node 3.1 = LLD list of screens (use generate_lld spec 'list-screens'). Node 5.1 = actual wireframe layouts (use generate_wireframes spec 'wireframes-screens').
+❌ DO NOT include technical specs → use generate_lld with spec 'technical-detail-screen'
+❌ DO NOT include navigation flows → use generate_mermaid with spec 'navigation-tree'`,
           inputSchema: {
             type: "object",
             properties: {
@@ -413,7 +452,18 @@ export class MCPCursorProtocolServer {
         } as Tool,
         {
           name: "generate_mermaid",
-          description: `Save mermaid diagram locally first, then sync to server in background (non-blocking). Content: raw mermaid only (no code fences). Path: .quikim/artifacts/<spec>/flow_diagram_<id>.md. Use spec_name: ${FLOW_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard).`,
+          description: `Save mermaid/flow diagram locally first, then sync to server.
+
+FLOW SPECS (4.x workflow nodes):
+• 4.1 navigation-tree: Navigation structure showing screen-to-screen flows. ONE file per project.
+• 4.2 business-logic-flow: Business logic flowcharts (e.g. checkout flow, auth flow). ONE FILE PER FLOW (e.g. flow_diagram_checkout.md).
+
+Path: .quikim/artifacts/<spec_name>/flow_diagram_<name>.md. Do not use 'default'.
+Content: RAW mermaid syntax ONLY (no \`\`\`mermaid wrapper, no JSON).
+
+✅ INCLUDE: flowchart, sequenceDiagram, stateDiagram, graph TD/LR
+❌ DO NOT include ER diagrams → use er_diagram_push
+❌ DO NOT include wireframe layouts → use generate_wireframes`,
           inputSchema: {
             type: "object",
             properties: {
@@ -453,7 +503,22 @@ export class MCPCursorProtocolServer {
         } as Tool,
         {
           name: "generate_lld",
-          description: `Save LLD locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/lld_<id>.md. Use spec_name: ${LLD_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard). LLD has its own spec names; do not use HLD spec names here. Optional: name/title; user_prompt can specify component name.`,
+          description: `Save LLD (Low-Level Design) locally first, then sync to server.
+
+LLD SPECS (3.x workflow nodes):
+• 3.1 list-screens: Master list of ALL screens with brief description. ONE file per project.
+• 3.2 list-apis: Master list of ALL APIs with endpoint, method, brief description. ONE file per project.
+• 3.3 file-tree: Complete file tree with all code files. ONE file per project.
+• 3.4 technical-details-code: Detailed spec per code file (classes, functions, interfaces). ONE FILE PER CODE FILE (e.g. lld_user-service.md).
+• 3.5 technical-detail-screen: Detailed screen spec (props, state, handlers, UI structure). ONE FILE PER SCREEN (e.g. lld_login-screen.md).
+• 3.6 technical-detail-api: Detailed API spec (request/response types, validation, error codes). ONE FILE PER API (e.g. lld_create-order.md).
+
+Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
+
+✅ INCLUDE: Interface definitions, data models, method signatures, pseudocode, sequence diagrams
+❌ DO NOT include high-level architecture → use generate_hld with spec 'project-architecture'
+❌ DO NOT include wireframes/UI mockups → use generate_wireframes
+❌ DO NOT use HLD spec names (project-architecture, milestones-specs) → those are for generate_hld only`,
           inputSchema: {
             type: "object",
             properties: {
@@ -679,6 +744,44 @@ export class MCPCursorProtocolServer {
               project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["queue_id", "success"],
+          },
+        } as Tool,
+        {
+          name: "parse_codebase_ast",
+          description:
+            "Parse an existing codebase into AST-like summaries. Returns imports, exports, functions, classes, interfaces, types, React components. Useful for understanding existing code before generating artifacts. Use summaryOnly=true for compact output.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              root_path: {
+                type: "string",
+                description: "Root path of the codebase to parse. Defaults to current project root.",
+              },
+              max_files: {
+                type: "number",
+                description: "Maximum files to parse (default: 500).",
+              },
+              max_depth: {
+                type: "number",
+                description: "Maximum directory depth (default: 10).",
+              },
+              summary_only: {
+                type: "boolean",
+                description: "If true, return only summaries without detailed AST (default: false).",
+              },
+              include_patterns: {
+                type: "array",
+                items: { type: "string" },
+                description: "File extensions to include (default: ['.ts', '.tsx', '.js', '.jsx']).",
+              },
+              exclude_patterns: {
+                type: "array",
+                items: { type: "string" },
+                description: "Paths/patterns to exclude (default: ['node_modules', 'dist', etc.]).",
+              },
+              project_context: PROJECT_CONTEXT_SCHEMA,
+            },
+            required: [],
           },
         } as Tool,
         {
@@ -1071,6 +1174,63 @@ export class MCPCursorProtocolServer {
             projectContext,
             dataToPass,
           );
+        case "parse_codebase_ast": {
+          const { ASTParser } = await import("../services/ast-parser.js");
+          const rootPath = (args.root_path as string) || getQuikimProjectRoot();
+          const parser = new ASTParser({
+            maxFiles: (args.max_files as number) || 500,
+            maxDepth: (args.max_depth as number) || 10,
+            summaryOnly: (args.summary_only as boolean) || false,
+            includePatterns: (args.include_patterns as string[]) || undefined,
+            excludePatterns: (args.exclude_patterns as string[]) || undefined,
+          });
+          try {
+            const projectAST = await parser.parseCodebase(rootPath);
+            const summaryOnly = (args.summary_only as boolean) || false;
+            if (summaryOnly) {
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: projectAST.summary,
+                  },
+                ],
+              };
+            }
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(
+                    {
+                      rootPath: projectAST.rootPath,
+                      structure: projectAST.structure,
+                      fileCount: projectAST.files.length,
+                      summary: projectAST.summary,
+                      files: projectAST.files.map((f) => ({
+                        path: f.path,
+                        summary: f.summary,
+                        exports: f.exports,
+                        functions: f.functions.length,
+                        classes: f.classes.length,
+                        interfaces: f.interfaces.length,
+                        reactComponents: f.reactComponents,
+                      })),
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+            };
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return {
+              content: [{ type: "text", text: `AST parse failed: ${msg}` }],
+              isError: true,
+            };
+          }
+        }
         case "pull_skills": {
           const workflowBase = configManager
             .getWorkflowServiceUrl()

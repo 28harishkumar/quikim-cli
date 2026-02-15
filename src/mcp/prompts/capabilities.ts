@@ -321,6 +321,65 @@ function generateCapabilitiesContent(): string {
 
 The Quikim MCP Server provides tools for managing project artifacts throughout the software development lifecycle.
 
+## 22 Workflow Specs (Node IDs)
+
+The workflow is organized into 22 specs across 7 tools:
+
+### Requirements (1.x) → generate_requirements / pull_requirements
+| Node | spec_name | Description | Files |
+|------|-----------|-------------|-------|
+| 1.1 | overview | Project overview, goals, scope | ONE per project |
+| 1.2 | business-functional | Business & functional requirements | Usually ONE; more if explicit |
+| 1.3 | acceptance-criteria-screens | Screen acceptance criteria | ONE PER SCREEN |
+| 1.4 | acceptance-criteria-apis | API acceptance criteria | ONE PER API |
+| 1.5 | component-requirements | Component requirements | ONE PER COMPONENT |
+| 1.6 | acceptance-criteria-code-files | Code file criteria | ONE PER CODE FILE |
+| 1.7 | phase-milestone-breakdown | Phase & milestone breakdown | ONE per project |
+
+### HLD (2.x) → generate_hld / pull_hld
+| Node | spec_name | Description | Files |
+|------|-----------|-------------|-------|
+| 2.1 | project-architecture | Architecture, tech stack, deployment | ONE per project |
+| 2.2 | milestones-specs | Milestone specs per phase | ONE per project |
+
+### LLD (3.x) → generate_lld / pull_lld
+| Node | spec_name | Description | Files |
+|------|-----------|-------------|-------|
+| 3.1 | list-screens | Master list of ALL screens | ONE per project |
+| 3.2 | list-apis | Master list of ALL APIs | ONE per project |
+| 3.3 | file-tree | Complete code file tree | ONE per project |
+| 3.4 | technical-details-code | Detailed spec per code file | ONE PER CODE FILE |
+| 3.5 | technical-detail-screen | Detailed spec per screen | ONE PER SCREEN |
+| 3.6 | technical-detail-api | Detailed spec per API | ONE PER API |
+
+### Flow Diagrams (4.x) → generate_mermaid / pull_mermaid
+| Node | spec_name | Description | Files |
+|------|-----------|-------------|-------|
+| 4.1 | navigation-tree | Screen navigation structure | ONE per project |
+| 4.2 | business-logic-flow | Business logic flowcharts | ONE PER FLOW |
+
+### Wireframes (5.x) → generate_wireframes / pull_wireframe
+| Node | spec_name | Description | Files |
+|------|-----------|-------------|-------|
+| 5.1 | wireframes-screens | Screen wireframes | ONE PER SCREEN |
+| 5.2 | component-wireframes | Component wireframes | ONE PER COMPONENT |
+
+### Tasks (6.x) → generate_tasks / pull_tasks
+| Node | spec_name | Description | Files |
+|------|-----------|-------------|-------|
+| 6.1 | tasks | Task breakdown | Multiple files |
+
+### Tests (7.x) → generate_tests / pull_tests
+| Node | spec_name | Description | Files |
+|------|-----------|-------------|-------|
+| 7.1 | tests | Test definitions | Multiple files |
+
+## ⚠️ Common Confusions
+
+**3.1 vs 5.1**: Node 3.1 (list-screens) = LLD listing screens. Node 5.1 (wireframes-screens) = actual wireframe layouts. If workflow says "3.1", use generate_lld, NOT generate_wireframes.
+
+**HLD vs LLD spec names**: HLD uses \`project-architecture\`, \`milestones-specs\`. LLD uses \`list-screens\`, \`list-apis\`, \`file-tree\`, \`technical-*\`. Never mix them.
+
 ## Available Tools by Category
 
 `;
