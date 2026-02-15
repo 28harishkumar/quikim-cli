@@ -40,6 +40,15 @@ import {
   LLD_SPEC_NAMES_DESCRIPTION,
   FLOW_SPEC_NAMES_DESCRIPTION,
   WIREFRAME_SPEC_NAMES_DESCRIPTION,
+  TASK_SPEC_NAMES_DESCRIPTION,
+  TEST_SPEC_NAMES_DESCRIPTION,
+  GENERATE_REQUIREMENTS_DESCRIPTION,
+  GENERATE_HLD_DESCRIPTION,
+  GENERATE_LLD_DESCRIPTION,
+  GENERATE_MERMAID_DESCRIPTION,
+  GENERATE_WIREFRAMES_DESCRIPTION,
+  GENERATE_TASKS_DESCRIPTION,
+  GENERATE_TESTS_DESCRIPTION,
 } from "./utils/constants.js";
 import { CodebaseContext } from "./session/types.js";
 import { ToolHandlers } from "./handlers/index.js";
@@ -131,7 +140,7 @@ export class MCPCursorProtocolServer {
       const existingTools = [
         {
           name: "generate_requirements",
-          description: `Save requirements locally (markdown), then sync to server. Path: .quikim/artifacts/<spec_name>/requirement_<name>.md. Use these spec_name values (same as organization dashboard): ${REQUIREMENT_SPEC_NAMES_DESCRIPTION}. Do not use 'default'. For 1.3, 1.4, 1.5, 1.6 the LLM must create one requirement file per entity (e.g. one file per screen, per API, per component, per code file).`,
+          description: GENERATE_REQUIREMENTS_DESCRIPTION,
           inputSchema: {
             type: "object",
             properties: {
@@ -181,8 +190,7 @@ export class MCPCursorProtocolServer {
         } as Tool,
         {
           name: "generate_tests",
-          description:
-            "Save tests locally first (JSON with description, sampleInputOutput, inputDescription, outputDescription), then sync to server. Path: .quikim/artifacts/<spec>/tests_<id>.md. Use spec_name to set the spec.",
+          description: GENERATE_TESTS_DESCRIPTION,
           inputSchema: {
             type: "object",
             properties: {
@@ -227,7 +235,7 @@ export class MCPCursorProtocolServer {
         } as Tool,
         {
           name: "generate_hld",
-          description: `Save HLD locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/hld_<id>.md. Use spec_name: ${HLD_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard). HLD has its own spec names; do not use LLD spec names here. Optional: name/title.`,
+          description: GENERATE_HLD_DESCRIPTION,
           inputSchema: {
             type: "object",
             properties: {
@@ -276,7 +284,7 @@ export class MCPCursorProtocolServer {
         } as Tool,
         {
           name: "generate_wireframes",
-          description: `Save wireframe locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/wireframe_files_<id>.md. Use spec_name: ${WIREFRAME_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard). Optional: name.`,
+          description: GENERATE_WIREFRAMES_DESCRIPTION,
           inputSchema: {
             type: "object",
             properties: {
@@ -298,8 +306,7 @@ export class MCPCursorProtocolServer {
         } as Tool,
         {
           name: "generate_tasks",
-          description:
-            "Save tasks locally first (markdown, Kiro/task format), then sync to server in background (non-blocking). Provide markdown in content; we save and send markdown to server as-is. Path: .quikim/artifacts/<spec>/tasks_<id>.md. File format: YAML frontmatter (--- id, specName, status, ... ---) then # Title, ## Description, ## Subtasks (- [ ] or [x] text), ## Checklist, ## Comments, ## Attachments. Use spec_name to set the spec.",
+          description: GENERATE_TASKS_DESCRIPTION,
           inputSchema: {
             type: "object",
             properties: {
@@ -413,7 +420,7 @@ export class MCPCursorProtocolServer {
         } as Tool,
         {
           name: "generate_mermaid",
-          description: `Save mermaid diagram locally first, then sync to server in background (non-blocking). Content: raw mermaid only (no code fences). Path: .quikim/artifacts/<spec>/flow_diagram_<id>.md. Use spec_name: ${FLOW_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard).`,
+          description: GENERATE_MERMAID_DESCRIPTION,
           inputSchema: {
             type: "object",
             properties: {
@@ -453,7 +460,7 @@ export class MCPCursorProtocolServer {
         } as Tool,
         {
           name: "generate_lld",
-          description: `Save LLD locally first, then sync to server in background (non-blocking). Path: .quikim/artifacts/<spec>/lld_<id>.md. Use spec_name: ${LLD_SPEC_NAMES_DESCRIPTION}, or custom (same as dashboard). LLD has its own spec names; do not use HLD spec names here. Optional: name/title; user_prompt can specify component name.`,
+          description: GENERATE_LLD_DESCRIPTION,
           inputSchema: {
             type: "object",
             properties: {
@@ -738,6 +745,57 @@ export class MCPCursorProtocolServer {
               project_context: PROJECT_CONTEXT_SCHEMA,
             },
             required: ["project_id", "artifact_type", "spec_name"],
+          },
+        } as Tool,
+        {
+          name: "parse_codebase_ast",
+          description: `Parse codebase files into Abstract Syntax Tree (AST) summaries.
+
+📋 PURPOSE: Analyze existing code for technical documentation and task planning.
+
+📂 RETURNS structured analysis including:
+• Imports and their source files (with resolved paths)
+• Class/function definitions with signatures
+• Exports and their types
+• Dependencies between files
+
+✅ USE FOR:
+• Generating technical-details-code (3.4) artifacts
+• Creating accurate task prompts with code context
+• Understanding existing project structure for integration
+• Mapping dependencies between modules
+
+📤 OUTPUT FORMATS:
+• summary: Imports/exports only (token-efficient)
+• detailed: Includes method signatures and properties
+• enhanced: Full AST with placeholders for descriptions
+
+⚠️ Respects .gitignore and excludes node_modules, dist, .git, etc.`,
+          inputSchema: {
+            type: "object",
+            properties: {
+              paths: {
+                type: "array",
+                items: { type: "string" },
+                description: "File paths or glob patterns to parse (e.g., ['src/**/*.ts', 'lib/*.js'])",
+              },
+              output_format: {
+                type: "string",
+                enum: ["summary", "detailed", "enhanced"],
+                description: "summary: imports/exports only. detailed: includes method signatures. enhanced: full AST with placeholders.",
+              },
+              exclude_patterns: {
+                type: "array",
+                items: { type: "string" },
+                description: "Additional patterns to exclude (e.g., ['*.test.ts', '*.spec.ts'])",
+              },
+              as_markdown: {
+                type: "boolean",
+                description: "If true, format output as markdown tables suitable for technical-details-code (3.4) artifacts",
+              },
+              project_context: PROJECT_CONTEXT_SCHEMA,
+            },
+            required: ["paths"],
           },
         } as Tool,
       ];
@@ -1647,6 +1705,58 @@ export class MCPCursorProtocolServer {
             const msg = err instanceof Error ? err.message : String(err);
             return {
               content: [{ type: "text", text: `Complete failed: ${msg}` }],
+              isError: true,
+            };
+          }
+        }
+        // AST Parser tool
+        case "parse_codebase_ast": {
+          const paths = args.paths as string[];
+          const outputFormat = (args.output_format as "summary" | "detailed" | "enhanced") || "summary";
+          const excludePatterns = (args.exclude_patterns as string[]) || [];
+          const asMarkdown = args.as_markdown as boolean;
+          
+          if (!paths || paths.length === 0) {
+            return {
+              content: [{ type: "text", text: "Error: paths array is required" }],
+              isError: true,
+            };
+          }
+          
+          try {
+            const rootPath = getQuikimProjectRoot();
+            const { ASTParser, formatASTSummaries, generateTechnicalDetailsMarkdown } =
+              await import("../services/ast-parser.js");
+            
+            const parser = new ASTParser(rootPath);
+            const summaries = await parser.parseFiles(paths, excludePatterns);
+            
+            if (summaries.length === 0) {
+              return {
+                content: [{ type: "text", text: "No files found matching the specified patterns" }],
+              };
+            }
+            
+            let output: string;
+            if (asMarkdown) {
+              // Generate markdown format suitable for technical-details-code (3.4)
+              output = summaries.map(s => generateTechnicalDetailsMarkdown(s)).join("\n\n---\n\n");
+            } else {
+              output = formatASTSummaries(summaries, outputFormat);
+            }
+            
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Parsed ${summaries.length} file(s):\n\n${output}`,
+                },
+              ],
+            };
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return {
+              content: [{ type: "text", text: `AST parsing failed: ${msg}` }],
               isError: true,
             };
           }
