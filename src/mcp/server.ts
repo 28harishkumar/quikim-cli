@@ -747,26 +747,6 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
           },
         } as Tool,
         {
-          name: "skip_workflow_step",
-          description:
-            "Skip a workflow step (mark as skipped, advance to next). Use for optional nodes or nodes not applicable to the project (e.g., skip wireframes for backend-only projects, skip screen specs for CLI tools).",
-          inputSchema: {
-            type: "object",
-            properties: {
-              node_id: {
-                type: "string",
-                description: "Workflow node ID to skip (e.g., '3.1', '5.1'). Use get_workflow_instruction to see current node.",
-              },
-              reason: {
-                type: "string",
-                description: "Optional reason for skipping (e.g., 'Backend-only project, no screens').",
-              },
-              project_context: PROJECT_CONTEXT_SCHEMA,
-            },
-            required: ["node_id"],
-          },
-        } as Tool,
-        {
           name: "parse_codebase_ast",
           description:
             "Parse an existing codebase into AST-like summaries. Returns imports, exports, functions, classes, interfaces, types, React components. Useful for understanding existing code before generating artifacts. Use summaryOnly=true for compact output.",
@@ -1827,87 +1807,6 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
             const msg = err instanceof Error ? err.message : String(err);
             return {
               content: [{ type: "text", text: `Complete failed: ${msg}` }],
-              isError: true,
-            };
-          }
-        }
-        case "skip_workflow_step": {
-          // Skip a workflow step
-          const nodeId = args.node_id as string;
-          const reason = args.reason as string | undefined;
-          if (!nodeId) {
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify({ success: false, error: "node_id is required" }),
-                },
-              ],
-              isError: true,
-            };
-          }
-          const rawProjectId = (args.project_id as string) || "";
-          const projectId =
-            rawProjectId && rawProjectId !== "default"
-              ? rawProjectId
-              : projectContext.projectId;
-          if (!projectId) {
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify({ success: false, error: "project_id required" }),
-                },
-              ],
-              isError: true,
-            };
-          }
-          const workflowBase = configManager
-            .getWorkflowServiceUrl()
-            .replace(/\/$/, "");
-          const token = configManager.getAuth()?.token ?? "";
-          const headers: Record<string, string> = {
-            "Content-Type": "application/json",
-          };
-          if (token) headers["Authorization"] = `Bearer ${token}`;
-          try {
-            const res = await fetch(
-              `${workflowBase}/api/v1/workflow/skip`,
-              {
-                method: "POST",
-                headers,
-                body: JSON.stringify({
-                  projectId,
-                  nodeId,
-                  reason,
-                }),
-              },
-            );
-            if (!res.ok) {
-              const errText = await res.text();
-              return {
-                content: [
-                  {
-                    type: "text",
-                    text: JSON.stringify({ success: false, error: `Skip failed: ${res.status} ${errText}` }),
-                  },
-                ],
-                isError: true,
-              };
-            }
-            const result = await res.json();
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify(result, null, 2),
-                },
-              ],
-            };
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            return {
-              content: [{ type: "text", text: JSON.stringify({ success: false, error: msg }) }],
               isError: true,
             };
           }
