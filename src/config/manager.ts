@@ -69,7 +69,13 @@ export class ConfigManager {
   getWorkflowServiceUrl(): string {
     const fromEnv = process.env.QUIKIM_WORKFLOW_SERVICE_URL;
     if (fromEnv) return fromEnv.trim();
-    return globalConfig.get("workflowServiceUrl") ?? globalConfig.get("projectServiceUrl") ?? this.getApiUrl();
+    // Check explicit config first
+    const configured = globalConfig.get("workflowServiceUrl");
+    if (configured) return configured;
+    // If in local mode (user/project services are local), use local workflow service too
+    if (this.isLocalMode()) return LOCAL_WORKFLOW_SERVICE_URL;
+    // Fall back to project service URL or API URL
+    return globalConfig.get("projectServiceUrl") ?? this.getApiUrl();
   }
 
   /** Set workflow service URL */
