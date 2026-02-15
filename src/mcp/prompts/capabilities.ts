@@ -4,13 +4,15 @@
  * This module exposes MCP server capabilities through the MCP prompts protocol.
  * LLMs can discover available tools and their usage without needing cursor rules.
  * 
- * Copyright (c) 2026 Quikim Pvt. Ltd.
+ * IMPORTANT: This file defines ALL 22 artifact specs and their boundaries.
+ * Each artifact type has specific content that should/should NOT be included.
  * 
- * This file is part of Quikim, licensed under the AGPL-3.0 License.
- * See LICENSE file in the project root for full license information.
+ * Copyright (c) 2026 Quikim Pvt. Ltd.
+ * Licensed under the AGPL-3.0 License.
  */
 
 import { Prompt } from "@modelcontextprotocol/sdk/types.js";
+import { ALL_ARTIFACT_SPECS } from "../utils/constants.js";
 
 export interface QuikimCapability {
   name: string;
@@ -21,231 +23,308 @@ export interface QuikimCapability {
   examples: string[];
   prerequisites?: string[];
   outputs?: string[];
+  include?: string[];
+  exclude?: string[];
 }
 
 export const QUIKIM_CAPABILITIES: QuikimCapability[] = [
-  // Requirements
-  {
-    name: "Pull Requirements",
-    description: "Fetch project requirements from server or generate new ones",
-    category: "requirements",
-    toolName: "pull_requirements",
-    usage: "Use when starting a new project or syncing requirements from the Quikim platform",
-    examples: [
-      "Create requirements for my project",
-      "Sync requirements from server",
-      "Update project requirements",
-    ],
-    outputs: [".quikim/artifacts/<spec>/requirement_<id>.md"],
-  },
+  // Requirements (1.x)
   {
     name: "Generate Requirements",
-    description: "Sync local requirements to the Quikim platform",
+    description: "Create requirement artifacts (1.1-1.7) for project scope, business rules, and acceptance criteria",
     category: "requirements",
     toolName: "generate_requirements",
-    usage: "Use after creating or updating requirements locally",
-    examples: ["Save requirements to server", "Sync my requirements"],
-    prerequisites: ["requirement_<id>.md must exist under .quikim/artifacts/<spec>/"],
+    usage: "Use to create requirement artifacts. For 1.3-1.6, create ONE FILE PER ENTITY.",
+    examples: [
+      "Create project overview (1.1)",
+      "Generate business requirements (1.2)",
+      "Create acceptance criteria for login screen (1.3)",
+    ],
+    outputs: [".quikim/artifacts/<spec>/requirement_<name>.md"],
+    include: [
+      "Project scope, purpose, stakeholders (1.1)",
+      "Business rules, user stories (1.2)",
+      "Screen acceptance criteria (1.3)",
+      "API acceptance criteria (1.4)",
+      "Component requirements (1.5)",
+      "Code file acceptance criteria (1.6)",
+      "Milestones and phases (1.7)",
+    ],
+    exclude: [
+      "Implementation details → LLD 3.x",
+      "UI layouts → Wireframes 5.x",
+      "Code structure → LLD 3.3, 3.4",
+      "Architecture decisions → HLD 2.x",
+    ],
+  },
+  {
+    name: "Pull Requirements",
+    description: "Read requirements from local files or fetch from server",
+    category: "requirements",
+    toolName: "pull_requirements",
+    usage: "Read from .quikim/artifacts/<spec>/requirement_*.md",
+    examples: ["Sync requirements from server"],
+    outputs: [".quikim/artifacts/<spec>/requirement_<id>.md"],
   },
 
-  // Design - HLD
-  {
-    name: "Pull HLD",
-    description: "Fetch or generate High-Level Design document",
-    category: "design",
-    toolName: "pull_hld",
-    usage: "Use after requirements are complete to define architecture",
-    examples: [
-      "Create high-level design",
-      "Generate HLD for my project",
-      "Sync HLD from server",
-    ],
-    prerequisites: ["requirement_*.md under .quikim/artifacts/<spec>/"],
-    outputs: [".quikim/artifacts/<spec>/hld_<id>.md"],
-  },
+  // HLD (2.x)
   {
     name: "Generate HLD",
-    description: "Sync local HLD to the Quikim platform",
+    description: "Create High-Level Design artifacts (2.1-2.2) for system architecture and delivery planning",
     category: "design",
     toolName: "generate_hld",
-    usage: "Use after creating or updating HLD locally",
-    examples: ["Save HLD to server"],
-    prerequisites: ["hld_<id>.md must exist under .quikim/artifacts/<spec>/"],
+    usage: "Use to define system architecture. DO NOT include API details or code structure.",
+    examples: [
+      "Create project architecture (2.1)",
+      "Generate milestone specs (2.2)",
+    ],
+    prerequisites: ["Requirements (1.x) should exist first"],
+    outputs: [".quikim/artifacts/<spec>/hld_<id>.md"],
+    include: [
+      "System components and boundaries",
+      "Technology stack with justifications",
+      "Module/service decomposition (high-level)",
+      "Deployment topology",
+      "Integration points",
+      "Key architectural decisions",
+    ],
+    exclude: [
+      "API endpoints with request/response → LLD 3.2, 3.6",
+      "Screen layouts → Wireframes 5.x",
+      "File-level code structure → LLD 3.3, 3.4",
+      "Database schemas → ER Diagram",
+      "Implementation code",
+    ],
+  },
+  {
+    name: "Pull HLD",
+    description: "Read HLD from local files or fetch from server",
+    category: "design",
+    toolName: "pull_hld",
+    usage: "Read from .quikim/artifacts/<spec>/hld_*.md",
+    examples: ["Sync HLD from server"],
+    outputs: [".quikim/artifacts/<spec>/hld_<id>.md"],
   },
 
-  // Design - LLD
-  {
-    name: "Pull LLD",
-    description: "Fetch or generate Low-Level Design for a specific component with detailed specifications",
-    category: "design",
-    toolName: "pull_lld",
-    usage: "Use to create detailed design for services, modules, APIs, or UI components",
-    examples: [
-      "Create LLD for auth service",
-      "Generate low-level design for payment module",
-      "Pull LLD for user management API",
-      "Create detailed design for notification service",
-    ],
-    prerequisites: ["requirement_*.md under .quikim/artifacts/<spec>/", "hld_*.md recommended"],
-    outputs: [".quikim/artifacts/<spec>/lld_<id>.md"],
-  },
+  // LLD (3.x)
   {
     name: "Generate LLD",
-    description: "Sync local LLD files to the Quikim platform",
+    description: "Create Low-Level Design artifacts (3.1-3.6) for detailed technical specifications",
     category: "design",
     toolName: "generate_lld",
-    usage: "Use after creating or updating LLD locally",
-    examples: ["Save LLD to server", "Push auth service LLD"],
-    prerequisites: ["lld_<id>.md files must exist under .quikim/artifacts/<spec>/"],
+    usage: "Use for detailed specs. Each LLD spec has DIFFERENT content - see boundaries below.",
+    examples: [
+      "Create list of screens (3.1)",
+      "Generate API inventory (3.2)",
+      "Create file tree (3.3)",
+      "Generate technical details per file (3.4)",
+    ],
+    prerequisites: ["HLD (2.x) should exist first"],
+    outputs: [".quikim/artifacts/<spec>/lld_<id>.md"],
+    include: [
+      "3.1 list-screens: Screen inventory with IDs, entry/exit points",
+      "3.2 list-apis: API inventory with methods, paths, shapes",
+      "3.3 file-tree: Directory structure, file paths",
+      "3.4 technical-details-code: Per-file exports, dependencies, behavior",
+      "3.5 technical-detail-screen: Screen-API-Code traceability",
+      "3.6 technical-detail-api: API-handler-service mapping",
+    ],
+    exclude: [
+      "Full wireframes → 5.x Wireframes",
+      "Full source code → Actual files",
+      "Business requirements → 1.x Requirements",
+      "Architecture decisions → 2.x HLD",
+    ],
+  },
+  {
+    name: "Pull LLD",
+    description: "Read LLD from local files or fetch from server",
+    category: "design",
+    toolName: "pull_lld",
+    usage: "Read from .quikim/artifacts/<spec>/lld_*.md",
+    examples: ["Sync LLD from server"],
+    outputs: [".quikim/artifacts/<spec>/lld_<id>.md"],
   },
 
-  // Design - Wireframes (artifact type is wireframe_files, not wireframe)
+  // Flow Diagrams (4.x)
   {
-    name: "Pull Wireframe",
-    description: "Fetch or generate wireframes for UI components. File type: wireframe_files.",
+    name: "Generate Mermaid/Flow",
+    description: "Create flow diagrams (4.1-4.2) for navigation and business logic",
     category: "design",
-    toolName: "pull_wireframe",
-    usage: "Use to create UI wireframes. Files are wireframe_files_<id>.md",
-    examples: ["Create wireframes", "Generate UI mockups"],
-    prerequisites: ["requirement_*.md under .quikim/artifacts/<spec>/"],
-    outputs: [".quikim/artifacts/<spec>/wireframe_files_<id>.md"],
+    toolName: "generate_mermaid",
+    usage: "Content must be RAW mermaid syntax only (no code fences)",
+    examples: [
+      "Create navigation tree (4.1)",
+      "Generate business logic flow (4.2)",
+    ],
+    prerequisites: ["LLD list-screens (3.1) should exist first"],
+    outputs: [".quikim/artifacts/<spec>/flow_diagram_<id>.md"],
+    include: [
+      "4.1 navigation-tree: Screen-to-screen paths, navigation graph",
+      "4.2 business-logic-flow: Process flowcharts, decision trees",
+    ],
+    exclude: [
+      "Implementation details → LLD 3.x",
+      "API specs → LLD 3.2, 3.6",
+      "Wireframe layouts → 5.x",
+    ],
   },
+  {
+    name: "Pull Mermaid",
+    description: "Read flow diagrams from local files or fetch from server",
+    category: "design",
+    toolName: "pull_mermaid",
+    usage: "Read from .quikim/artifacts/<spec>/flow_diagram_*.md",
+    examples: ["Sync flow diagrams from server"],
+    outputs: [".quikim/artifacts/<spec>/flow_diagram_<id>.md"],
+  },
+
+  // Wireframes (5.x)
   {
     name: "Generate Wireframes",
-    description: "Create wireframe on server. Server expects canvas JSON (name, viewport, elements) or creates empty. Path: wireframe_files_<id>.md.",
+    description: "Create wireframe artifacts (5.1-5.2) for visual layouts",
     category: "design",
     toolName: "generate_wireframes",
-    usage: "Path: .quikim/artifacts/<spec>/wireframe_files_<id>.md. Optional: pass name. Content: JSON { name, viewport, elements } or leave empty.",
-    examples: ["Save wireframes to server"],
-    prerequisites: ["wireframe_files_<id>.md under .quikim/artifacts/<spec>/ (content optional)"],
+    usage: "Content: JSON { name, viewport, elements } or empty",
+    examples: [
+      "Create wireframes for login screen (5.1)",
+      "Generate component wireframes (5.2)",
+    ],
+    prerequisites: ["LLD list-screens (3.1) should exist first"],
+    outputs: [".quikim/artifacts/<spec>/wireframe_files_<id>.md"],
+    include: [
+      "5.1 wireframes-screens: Visual layouts per screen",
+      "5.2 component-wireframes: Reusable UI component designs",
+    ],
+    exclude: [
+      "API details → LLD 3.2, 3.6",
+      "Business logic → 4.x Flows",
+      "Code structure → LLD 3.x",
+    ],
+  },
+  {
+    name: "Pull Wireframe",
+    description: "Read wireframes from local files or fetch from server",
+    category: "design",
+    toolName: "pull_wireframe",
+    usage: "Read from .quikim/artifacts/<spec>/wireframe_files_*.md",
+    examples: ["Sync wireframes from server"],
+    outputs: [".quikim/artifacts/<spec>/wireframe_files_<id>.md"],
   },
 
-  // Design - ER Diagram
+  // Tasks (6.x)
   {
-    name: "Pull ER Diagram",
-    description: "Fetch or generate Entity-Relationship diagram for database design",
+    name: "Generate Tasks",
+    description: "Create task artifacts (6.1-6.2) for work breakdown",
+    category: "tasks",
+    toolName: "generate_tasks",
+    usage: "Content: Markdown with YAML frontmatter, ## sections for Description, Subtasks, etc.",
+    examples: [
+      "Create tasks for milestone 1 (6.1)",
+      "Generate subtasks for auth feature (6.2)",
+    ],
+    prerequisites: ["LLD (3.x) should exist for accurate task scoping"],
+    outputs: [".quikim/artifacts/<spec>/tasks_<id>.md"],
+    include: [
+      "6.1 tasks-milestone: Tasks grouped by milestone with priorities",
+      "6.2 subtasks: Detailed work items with acceptance criteria",
+    ],
+    exclude: [
+      "Detailed implementation → Source files",
+      "Wireframes → 5.x",
+      "Architecture → 2.x HLD",
+    ],
+  },
+  {
+    name: "Pull Tasks",
+    description: "Read tasks from local files or fetch from server",
+    category: "tasks",
+    toolName: "pull_tasks",
+    usage: "Read from .quikim/artifacts/<spec>/tasks_*.md",
+    examples: ["Sync tasks from server"],
+    outputs: [".quikim/artifacts/<spec>/tasks_<id>.md"],
+  },
+
+  // Tests (7.x)
+  {
+    name: "Generate Tests",
+    description: "Create test artifacts (7.1) for API test cases",
+    category: "code",
+    toolName: "generate_tests",
+    usage: "JSON with description, sampleInputOutput, inputDescription, outputDescription",
+    examples: [
+      "Create test cases for auth API (7.1)",
+    ],
+    prerequisites: ["LLD list-apis (3.2) should exist first"],
+    outputs: [".quikim/artifacts/<spec>/tests_<id>.md"],
+    include: [
+      "7.1 test-json-api: Input/output test cases per API endpoint",
+    ],
+    exclude: [
+      "Implementation code → Source files",
+      "Wireframes → 5.x",
+    ],
+  },
+  {
+    name: "Pull Tests",
+    description: "Read tests from local files or fetch from server",
+    category: "code",
+    toolName: "pull_tests",
+    usage: "Read from .quikim/artifacts/<spec>/tests_*.md",
+    examples: ["Sync tests from server"],
+    outputs: [".quikim/artifacts/<spec>/tests_<id>.md"],
+  },
+
+  // ER Diagrams
+  {
+    name: "Push ER Diagram",
+    description: "Create ER diagram for database schema",
     category: "design",
-    toolName: "er_diagram_pull",
-    usage: "Use to create database schema visualization",
-    examples: ["Create ER diagram", "Generate database schema"],
-    prerequisites: ["requirement_*.md under .quikim/artifacts/<spec>/", "hld_*.md recommended"],
+    toolName: "er_diagram_push",
+    usage: "Content: RAW mermaid erDiagram syntax only (no code fences)",
+    examples: ["Create database ER diagram"],
+    prerequisites: ["HLD (2.x) and LLD (3.x) recommended"],
     outputs: [".quikim/artifacts/<spec>/er_diagram_<id>.md"],
   },
   {
-    name: "Push ER Diagram",
-    description: "Push ER diagram to server. Content must be RAW mermaid erDiagram syntax only (no ```mermaid wrapper, no JSON).",
+    name: "Pull ER Diagram",
+    description: "Read ER diagram from local files or fetch from server",
     category: "design",
-    toolName: "er_diagram_push",
-    usage: "Path: .quikim/artifacts/<spec>/er_diagram_<id>.md. Put only raw mermaid diagram code in content.",
-    examples: ["Save ER diagram to server"],
-    prerequisites: ["er_diagram_<id>.md under .quikim/artifacts/<spec>/"],
+    toolName: "er_diagram_pull",
+    usage: "Read from .quikim/artifacts/<spec>/er_diagram_*.md",
+    examples: ["Sync ER diagram from server"],
+    outputs: [".quikim/artifacts/<spec>/er_diagram_<id>.md"],
   },
 
-  // Design - Flow/Mermaid (artifact type is flow_diagram, not mermaid)
-  {
-    name: "Pull Mermaid",
-    description: "Fetch flow/mermaid diagrams (flowchart, sequence, class, state, gantt). File type: flow_diagram.",
-    category: "design",
-    toolName: "pull_mermaid",
-    usage: "Use to sync or create architectural diagrams. Files are flow_diagram_<id>.md",
-    examples: ["Pull mermaid diagrams", "Get flowcharts from server"],
-    outputs: [".quikim/artifacts/<spec>/flow_diagram_<id>.md"],
-  },
-  {
-    name: "Generate Mermaid",
-    description: "Push mermaid/flow diagram to server. Content must be RAW mermaid syntax only (no ```mermaid wrapper, no JSON).",
-    category: "design",
-    toolName: "generate_mermaid",
-    usage: "Path: .quikim/artifacts/<spec>/flow_diagram_<id>.md. Put only raw diagram code (flowchart, sequenceDiagram, etc.) in content.",
-    examples: ["Save diagrams to server"],
-    prerequisites: ["flow_diagram_<id>.md under .quikim/artifacts/<spec>/"],
-  },
-
-  // Tasks
-  {
-    name: "Pull Tasks",
-    description: "Fetch or generate project tasks and milestones",
-    category: "tasks",
-    toolName: "pull_tasks",
-    usage: "Use to create or sync task breakdown",
-    examples: ["Create tasks", "Generate milestones", "Sync tasks from Jira"],
-    prerequisites: ["requirement_*.md and hld_*.md under .quikim/artifacts/<spec>/ recommended"],
-    outputs: [".quikim/artifacts/<spec>/tasks_<id>.md"],
-  },
-  {
-    name: "Generate Tasks",
-    description: "Sync tasks to server. Task file format: YAML frontmatter (--- id, specName, status, ... ---) then # Title, ## Description, ## Subtasks (- [ ] or [x] text), ## Checklist, ## Comments, ## Attachments.",
-    category: "tasks",
-    toolName: "generate_tasks",
-    usage: "Path: .quikim/artifacts/<spec>/tasks_<id>.md. File must have valid YAML frontmatter and ## sections. Put only task content in file.",
-    examples: ["Save tasks to server"],
-    prerequisites: ["tasks_<id>.md under .quikim/artifacts/<spec>/ with correct format"],
-  },
-
-  // Code
+  // Code & Sync
   {
     name: "Update Code",
-    description: "Get code guidelines, snippets, and implementation instructions from RAG pipeline",
+    description: "Get code guidelines and implementation instructions from RAG pipeline",
     category: "code",
     toolName: "update_code",
     usage: "Use when implementing features based on requirements and design",
+    examples: ["Implement authentication feature"],
+    prerequisites: ["Requirements, HLD, LLD, and Tasks should exist"],
+    outputs: ["Source code files"],
+  },
+  {
+    name: "Parse Codebase AST",
+    description: "Parse existing code into AST summaries for technical documentation",
+    category: "code",
+    toolName: "parse_codebase_ast",
+    usage: "Use to analyze existing codebase structure for LLD 3.4 generation",
     examples: [
-      "Implement authentication feature",
-      "Write the payment processing code",
-      "Create user registration API",
+      "Parse src/**/*.ts for technical details",
+      "Generate AST summary for auth service",
     ],
-    prerequisites: ["requirement_*.md, hld_*.md, tasks_*.md under .quikim/artifacts/<spec>/ should exist"],
-    outputs: ["Source code files", "Updated tasks_<id>.md under .quikim/artifacts/<spec>/"],
   },
-
-  // Context
-  {
-    name: "Generate Context",
-    description: "Push project context artifact to server",
-    category: "sync",
-    toolName: "generate_context",
-    usage: "File at .quikim/artifacts/<spec>/context_<id>.md",
-    examples: ["Save context to server"],
-    prerequisites: ["context_<id>.md under .quikim/artifacts/<spec>/"],
-  },
-  {
-    name: "Pull Context",
-    description: "Read context from local files or fetch from API (data.force=true)",
-    category: "sync",
-    toolName: "pull_context",
-    usage: "Read from .quikim/artifacts/<spec>/context_*.md or fetch from API",
-    examples: ["Sync context from server"],
-    outputs: [".quikim/artifacts/<spec>/context_<id>.md"],
-  },
-
-  // Code Guidelines
-  {
-    name: "Generate Code Guideline",
-    description: "Push code guideline to server",
-    category: "sync",
-    toolName: "generate_code_guideline",
-    usage: "File at .quikim/artifacts/<spec>/code_guideline_<id>.md",
-    examples: ["Save code guideline to server"],
-    prerequisites: ["code_guideline_<id>.md under .quikim/artifacts/<spec>/"],
-  },
-  {
-    name: "Pull Code Guideline",
-    description: "Read code guidelines from local files or fetch from API (data.force=true)",
-    category: "sync",
-    toolName: "pull_code_guideline",
-    usage: "Read from .quikim/artifacts/<spec>/code_guideline_*.md or fetch from API",
-    examples: ["Sync code guidelines from server"],
-    outputs: [".quikim/artifacts/<spec>/code_guideline_<id>.md"],
-  },
-
-  // Sync
   {
     name: "Pull Rules",
     description: "Update local Quikim cursor rules files",
     category: "sync",
     toolName: "pull_rules",
-    usage: "Use to get latest Quikim integration rules",
-    examples: ["Update cursor rules", "Sync Quikim rules"],
+    usage: "Sync cursor rules from server",
+    examples: ["Update cursor rules"],
     outputs: [".cursor/rules/quikim.md"],
   },
 ];
@@ -255,16 +334,14 @@ export const QUIKIM_CAPABILITIES: QuikimCapability[] = [
  */
 export function generateMCPPrompts(): Prompt[] {
   const prompts: Prompt[] = [
-    // Main capability discovery prompt
     {
       name: "quikim-capabilities",
       description: "Discover all available Quikim MCP tools and how to use them",
       arguments: [],
     },
-    // Category-specific prompts
     {
-      name: "quikim-design-tools",
-      description: "Learn about Quikim design tools (HLD, LLD, wireframes, ER diagrams)",
+      name: "quikim-all-specs",
+      description: "Get the complete list of all 22 artifact specs with boundaries",
       arguments: [],
     },
     {
@@ -272,19 +349,13 @@ export function generateMCPPrompts(): Prompt[] {
       description: "Understand the recommended Quikim artifact creation workflow",
       arguments: [],
     },
-    // Component-specific prompt for LLD
     {
-      name: "quikim-lld-guide",
-      description: "Guide for creating Low-Level Designs for specific components",
+      name: "quikim-artifact-boundaries",
+      description: "Understand what content belongs in each artifact type",
       arguments: [
         {
-          name: "component_name",
-          description: "Name of the component (e.g., auth-service, payment-module)",
-          required: false,
-        },
-        {
-          name: "component_type",
-          description: "Type of component (service, module, feature, api, ui, database)",
+          name: "artifact_type",
+          description: "Artifact type (requirement, hld, lld, wireframe, task, test, flow)",
           required: false,
         },
       ],
@@ -304,137 +375,124 @@ export function getPromptContent(
   switch (promptName) {
     case "quikim-capabilities":
       return generateCapabilitiesContent();
-    case "quikim-design-tools":
-      return generateDesignToolsContent();
+    case "quikim-all-specs":
+      return generateAllSpecsContent();
     case "quikim-workflow":
       return generateWorkflowContent();
-    case "quikim-lld-guide":
-      return generateLLDGuideContent(args?.component_name, args?.component_type);
+    case "quikim-artifact-boundaries":
+      return generateBoundariesContent(args?.artifact_type);
     default:
       return `Unknown prompt: ${promptName}`;
   }
 }
 
 function generateCapabilitiesContent(): string {
-  const categories = ["requirements", "design", "tasks", "code", "sync"] as const;
-  let content = `# Quikim MCP Server Capabilities
+  let content = `# Quikim MCP Server - All 22 Artifact Specs
 
-The Quikim MCP Server provides tools for managing project artifacts throughout the software development lifecycle.
+## 📋 IMPORTANT: Call get_workflow_instruction BEFORE generating any artifact!
 
-## Available Tools by Category
+This ensures you have the correct skill content and context artifacts.
 
+## Quick Reference - All 22 Specs
+
+| Category | Node | Spec Name | Purpose |
+|----------|------|-----------|---------|
 `;
 
-  for (const category of categories) {
-    const tools = QUIKIM_CAPABILITIES.filter((c) => c.category === category);
-    content += `### ${category.charAt(0).toUpperCase() + category.slice(1)}\n\n`;
-    
-    for (const tool of tools) {
-      content += `**${tool.name}** (\`${tool.toolName}\`)\n`;
-      content += `- ${tool.description}\n`;
-      content += `- Usage: ${tool.usage}\n`;
-      if (tool.prerequisites) {
-        content += `- Prerequisites: ${tool.prerequisites.join(", ")}\n`;
-      }
-      if (tool.outputs) {
-        content += `- Outputs: ${tool.outputs.join(", ")}\n`;
-      }
-      content += `- Examples: "${tool.examples[0]}"\n\n`;
-    }
+  for (const spec of ALL_ARTIFACT_SPECS) {
+    content += `| ${spec.category} | ${spec.nodeId} | \`${spec.value}\` | ${spec.description} |\n`;
   }
 
-  content += `## Quick Start
+  content += `
+## Tool to Spec Mapping
 
-1. Start with \`pull_requirements\` to define project requirements
-2. Use \`pull_hld\` to create high-level architecture
-3. Use \`pull_lld\` for detailed component designs (e.g., "LLD for auth service")
-4. Create wireframes with \`pull_wireframe\`
-5. Generate ER diagrams with \`er_diagram_pull\`
-6. Break down tasks with \`pull_tasks\`
-7. Implement with \`update_code\`
+| Tool | Artifact Types | Spec Names |
+|------|---------------|------------|
+| generate_requirements | requirement | overview, business-functional, acceptance-criteria-screens, acceptance-criteria-apis, component-requirements, acceptance-criteria-code-files, phase-milestone-breakdown |
+| generate_hld | hld | project-architecture, milestones-specs |
+| generate_lld | lld | list-screens, list-apis, file-tree, technical-details-code, technical-detail-screen, technical-detail-api |
+| generate_mermaid | flow_diagram | navigation-tree, business-logic-flow |
+| generate_wireframes | wireframe_files | wireframes-screens, component-wireframes |
+| generate_tasks | tasks | tasks-milestone, subtasks |
+| generate_tests | tests | test-json-api |
 
-## File Structure
+## Workflow Order
 
-All artifacts are stored under \`.quikim/artifacts/<spec name>/<artifact file>\`. Artifact files are named \`<artifact_type>_<artifact_id>.md\` (or \`<artifact_type>_<root_id>.md\` for versioned types: requirement, hld, lld, er_diagram, flow_diagram, wireframe_files).
+\`\`\`
+1.x Requirements → 2.x HLD → 3.x LLD → 4.x Flows → 5.x Wireframes → 6.x Tasks → 7.x Tests
+\`\`\`
 
-Requirement specs (1.x): use \`spec_name\` = \`overview\` (1.1), \`business-functional\` (1.2), \`acceptance-criteria-screens\` (1.3), \`acceptance-criteria-apis\` (1.4), \`component-requirements\` (1.5), \`acceptance-criteria-code-files\` (1.6), \`phase-milestone-breakdown\` (1.7). Do not use \`"default"\`. 1.2 can have many docs; create an additional business-functional doc only when the user explicitly asks for it. For 1.3, 1.4, 1.5, 1.6 there are multiple files—one per entity (one file per screen, per API, per component, per code file). Use a descriptive \`name\` per file (e.g. \`login-screen\`, \`get-orders-api\`).
+## Critical Rules
 
-**HLD (2.x) and LLD (3.x) have different spec names** (per interlinking). Do not mix: use **HLD** spec names only for \`generate_hld\` / \`pull_hld\`; use **LLD** spec names only for \`generate_lld\` / \`pull_lld\`.
-
-- **HLD (2.x):** \`project-architecture\` (2.1), \`milestones-specs\` (2.2).
-- **LLD (3.x):** \`list-screens\` (3.1), \`list-apis\` (3.2), \`file-tree\` (3.3), \`technical-details-code\` (3.4), \`technical-detail-screen\` (3.5), \`technical-detail-api\` (3.6).
-- **Flow (4.x):** \`navigation-tree\` (4.1), \`business-logic-flow\` (4.2).
-- **Wireframe (5.x):** \`wireframes-screens\` (5.1), \`component-wireframes\` (5.2).
-
-Pass \`project_context: { specName: "<spec>" }\` (same values as organization dashboard); custom spec names are also allowed.
-
-**Do not confuse 3.x with 5.x:** Node **3.1** = **LLD** \"List of all screens\" (use \`generate_lld\` / \`pull_lld\`, spec \`list-screens\`). Node **5.1** = **Wireframes** for each screen (use \`generate_wireframes\`, spec \`wireframes-screens\`). If \`get_workflow_instruction\` says next is 3.1, generate LLD list-screens, not wireframes. If an artifact type (e.g. flow_diagram for 4.2) is already complete, the workflow will advance on the next call; you can proceed to the next step.
-
-## Push behavior (all generate_* tools)
-
-- **Local-first, non-blocking**: Content is saved to local files first (e.g. \`.quikim/artifacts/<spec>/<type>_<id>.md\`). Server sync runs in the background; the LLM gets an immediate success and can move on.
-- **Requirements and tasks**: Provide **markdown** in the content field (e.g. Kiro task format for tasks). We save and send markdown to server.
-
-## Content Types (what goes in the content field)
-
-- **Requirements**: Markdown. We save and send markdown to server as-is.
-- **Tasks**: Markdown (Kiro/task file format). We save and send markdown to server as-is.
-- **Mermaid / ER diagrams**: Raw mermaid syntax only (no \`\`\`mermaid wrapper, no JSON).
-- **Context, code_guideline, HLD, LLD**: Plain text or markdown in the content field.
-- **Wireframes**: Canvas JSON (\`name\`, \`viewport\`, \`elements\`) or empty; path \`wireframe_files_<id>.md\`.
-
-You can pass optional \`name\` and \`title\` in tool arguments for display names.
-
-## Task file format (generate_tasks)
-
-Task files \`.quikim/artifacts/<spec>/tasks_<id>.md\` must use:
-1. **YAML frontmatter** between \`---\` lines: \`id\`, \`specName\`, \`milestoneId\` (optional), \`status\`, \`priority\` (optional), \`assignee\`, \`dueDate\`, \`tags\`, \`createdAt\`, \`updatedAt\`
-2. **Body**: \`# Title\`, then \`## Description\`, \`## Subtasks\` (lines \`  - [ ] or [x] description\`), \`## Checklist\`, \`## Comments\`, \`## Attachments\`
-Put only the task content in the file; do not wrap in JSON.
+1. **Always call get_workflow_instruction first** to get skill content
+2. **Never mix content between artifact types** - each has explicit boundaries
+3. **For 1.3-1.6, create ONE FILE PER ENTITY** (per screen, per API, etc.)
+4. **HLD ≠ LLD**: HLD is high-level architecture, LLD is detailed specs
+5. **3.1 ≠ 5.1**: 3.1 is screen LIST (LLD), 5.1 is screen WIREFRAMES
 `;
 
   return content;
 }
 
-function generateDesignToolsContent(): string {
-  // Design tools are defined inline for better readability
-  const content = `# Quikim Design Tools
+function generateAllSpecsContent(): string {
+  let content = `# All 22 Quikim Artifact Specs
 
-## High-Level Design (HLD)
-- Defines overall architecture, technology stack, and system structure
-- Tool: \`pull_hld\` / \`generate_hld\`
-- File: \`.quikim/artifacts/<spec>/hld_<id>.md\`
+## Requirements (1.x) - WHAT to build
 
-## Low-Level Design (LLD)
-- Detailed specifications for individual components
-- Includes: interfaces, data models, method specifications, sequence diagrams
-- Tool: \`pull_lld\` / \`generate_lld\`
-- Files: \`.quikim/artifacts/<spec>/lld_<id>.md\`
-- Component Types: service, module, feature, api, ui, database
+| Node | Spec | Description |
+|------|------|-------------|
+| 1.1 | overview | Project scope, purpose, stakeholders, success criteria |
+| 1.2 | business-functional | Business rules, user stories, functional requirements |
+| 1.3 | acceptance-criteria-screens | One file PER SCREEN with acceptance criteria |
+| 1.4 | acceptance-criteria-apis | One file PER API with acceptance criteria |
+| 1.5 | component-requirements | One file PER COMPONENT with requirements |
+| 1.6 | acceptance-criteria-code-files | One file PER CODE MODULE |
+| 1.7 | phase-milestone-breakdown | Delivery phases, milestones, timeline |
 
-### LLD Usage Examples
-- "Create LLD for authentication service"
-- "Generate low-level design for payment module"
-- "Pull LLD for user management API"
+## HLD (2.x) - HOW it's structured (high-level)
 
-## Wireframes
-- UI mockups and component layouts
-- Tool: \`pull_wireframe\` / \`generate_wireframes\`
-- Integrates with Penpot for visual editing
+| Node | Spec | Description |
+|------|------|-------------|
+| 2.1 | project-architecture | System components, tech stack, deployment topology |
+| 2.2 | milestones-specs | Delivery schedule, spec boundaries per milestone |
 
-## ER Diagrams
-- Database entity relationships
-- Tool: \`er_diagram_pull\` / \`er_diagram_push\`
-- Supports Mermaid ER diagram syntax
+## LLD (3.x) - HOW it's built (detailed)
 
-## Mermaid Diagrams
-- Various diagram types: flowchart, sequence, class, state, gantt
-- Tool: \`pull_mermaid\` / \`generate_mermaid\`
-- **Content**: Put only raw mermaid syntax in the content field (no \`\`\`mermaid wrapper, no JSON). Server rejects invalid syntax.
+| Node | Spec | Description |
+|------|------|-------------|
+| 3.1 | list-screens | Screen inventory with IDs, entry/exit points |
+| 3.2 | list-apis | API inventory with methods, paths, request/response |
+| 3.3 | file-tree | Directory structure, file paths, naming |
+| 3.4 | technical-details-code | Per-file exports, dependencies, behavior |
+| 3.5 | technical-detail-screen | Screen-API-Code traceability matrix |
+| 3.6 | technical-detail-api | API-handler-service mapping |
 
-## ER Diagrams
-- **Content**: Put only raw mermaid \`erDiagram\` syntax in the content field (no code fences, no JSON).
+## Flows (4.x) - HOW users navigate
 
+| Node | Spec | Description |
+|------|------|-------------|
+| 4.1 | navigation-tree | Screen-to-screen paths, navigation graph |
+| 4.2 | business-logic-flow | Mermaid flowcharts for business processes |
+
+## Wireframes (5.x) - WHAT it looks like
+
+| Node | Spec | Description |
+|------|------|-------------|
+| 5.1 | wireframes-screens | Visual layouts per screen |
+| 5.2 | component-wireframes | Reusable UI component designs |
+
+## Tasks (6.x) - WHO does WHAT
+
+| Node | Spec | Description |
+|------|------|-------------|
+| 6.1 | tasks-milestone | Tasks grouped by milestone |
+| 6.2 | subtasks | Detailed work items per task |
+
+## Tests (7.x) - HOW to verify
+
+| Node | Spec | Description |
+|------|------|-------------|
+| 7.1 | test-json-api | Input/output test cases per API |
 `;
 
   return content;
@@ -443,141 +501,180 @@ function generateDesignToolsContent(): string {
 function generateWorkflowContent(): string {
   return `# Quikim Artifact Workflow
 
-## Recommended Order
+## Recommended Generation Order
 
 \`\`\`
-Requirements → HLD → LLD (optional) → Wireframes → ER Diagram → Tasks → Code
+┌─────────────────────────────────────────────────────────────┐
+│ 1. Requirements (1.x) - Start here!                        │
+│    1.1 Overview → 1.2 Business → 1.3-1.6 Acceptance → 1.7  │
+├─────────────────────────────────────────────────────────────┤
+│ 2. HLD (2.x) - High-level architecture                     │
+│    2.1 Project Architecture → 2.2 Milestones               │
+├─────────────────────────────────────────────────────────────┤
+│ 3. LLD (3.x) - Detailed technical specs                    │
+│    3.1 Screens → 3.2 APIs → 3.3 Files → 3.4-3.6 Details    │
+├─────────────────────────────────────────────────────────────┤
+│ 4. Flows (4.x) - Navigation and logic                      │
+│    4.1 Navigation → 4.2 Business Logic                     │
+├─────────────────────────────────────────────────────────────┤
+│ 5. Wireframes (5.x) - Visual layouts                       │
+│    5.1 Screen Wireframes → 5.2 Component Wireframes        │
+├─────────────────────────────────────────────────────────────┤
+│ 6. Tasks (6.x) - Work breakdown                            │
+│    6.1 Milestone Tasks → 6.2 Subtasks                      │
+├─────────────────────────────────────────────────────────────┤
+│ 7. Tests (7.x) - Verification                              │
+│    7.1 API Tests                                            │
+└─────────────────────────────────────────────────────────────┘
 \`\`\`
 
-## Detailed Flow
+## For Each Artifact:
 
-### 1. Requirements (First)
-- Use \`pull_requirements\` to create/fetch requirements
-- Define functional and non-functional requirements
-- Specify Quikim features to use (auth, payments, multi-tenant, etc.)
+1. Call \`get_workflow_instruction\` to get:
+   - Skill content with instructions
+   - Context artifacts to reference
+   - What to include/exclude
 
-### 2. High-Level Design
-- Use \`pull_hld\` after requirements exist
-- Define technology stack, architecture pattern, project structure
-- Include integration points and deployment configuration
+2. Generate the artifact following skill instructions
 
-### 3. Low-Level Design (Optional but Recommended)
-- Use \`pull_lld\` with component name for complex components
-- Create detailed specifications before implementation
-- Include sequence diagrams and interface definitions
+3. Call \`report_workflow_progress\` to advance workflow
 
-### 4. Wireframes
-- Use \`pull_wireframe\` for UI components
-- Define page layouts and component structure
-- Sync to Penpot for visual editing
+## Dependencies
 
-### 5. ER Diagram
-- Use \`er_diagram_pull\` for database design
-- Define entities, relationships, and fields
-- Generates Prisma schema foundation
-
-### 6. Tasks
-- Use \`pull_tasks\` to create task breakdown
-- Organize into milestones and sprints
-- Estimate effort and assign priorities
-
-### 7. Code Implementation
-- Use \`update_code\` for implementation guidance
-- Receives: code guidelines, sample snippets, relevant context
-- Updates task status as work progresses
-
-## Directory Structure
-- All artifacts stored in \`.quikim/artifacts/<spec name>/<artifact_type>_<id>.md\`
-- Versioned artifact types use root id in filename: requirement, hld, lld, er_diagram, flow_diagram, wireframe_files
-- Push tools sync to Quikim platform for team collaboration
+- HLD needs Requirements (1.x)
+- LLD needs HLD (2.x)
+- Flows need LLD list-screens (3.1)
+- Wireframes need LLD list-screens (3.1)
+- Tasks need LLD (3.x) for accurate scoping
+- Tests need LLD list-apis (3.2)
 `;
 }
 
-function generateLLDGuideContent(componentName?: string, componentType?: string): string {
-  const name = componentName || "{component-name}";
-  const type = componentType || "service";
+function generateBoundariesContent(artifactType?: string): string {
+  const boundaries: Record<string, { include: string[]; exclude: string[] }> = {
+    requirement: {
+      include: [
+        "Project scope, purpose, stakeholders (1.1)",
+        "Business rules, user stories (1.2)",
+        "Screen acceptance criteria (1.3)",
+        "API acceptance criteria (1.4)",
+        "Component requirements (1.5)",
+        "Code file criteria (1.6)",
+        "Milestones and phases (1.7)",
+      ],
+      exclude: [
+        "Implementation details → LLD 3.x",
+        "UI layouts → Wireframes 5.x",
+        "Code structure → LLD 3.3, 3.4",
+        "Architecture decisions → HLD 2.x",
+      ],
+    },
+    hld: {
+      include: [
+        "System components and boundaries",
+        "Technology stack with justifications",
+        "Module/service decomposition (high-level)",
+        "Deployment topology",
+        "Integration points",
+        "Key architectural decisions",
+      ],
+      exclude: [
+        "API endpoints with request/response → LLD 3.2, 3.6",
+        "Screen layouts → Wireframes 5.x",
+        "File-level code structure → LLD 3.3, 3.4",
+        "Database schemas → ER Diagram",
+        "Implementation code",
+      ],
+    },
+    lld: {
+      include: [
+        "3.1: Screen inventory with IDs, entry/exit points",
+        "3.2: API inventory with methods, paths, shapes",
+        "3.3: Directory tree with file purposes",
+        "3.4: Per-file exports, dependencies, behavior",
+        "3.5: Screen-API-Code traceability",
+        "3.6: API-handler-service mapping",
+      ],
+      exclude: [
+        "Full wireframes → 5.x Wireframes",
+        "Full source code → Actual files",
+        "Business requirements → 1.x Requirements",
+        "Architecture decisions → 2.x HLD",
+      ],
+    },
+    flow: {
+      include: [
+        "4.1: Screen-to-screen navigation paths",
+        "4.2: Business process flowcharts",
+      ],
+      exclude: [
+        "Implementation details → LLD 3.x",
+        "API specs → LLD 3.2, 3.6",
+        "Wireframe layouts → 5.x",
+      ],
+    },
+    wireframe: {
+      include: [
+        "5.1: Visual layouts per screen",
+        "5.2: Reusable UI component designs",
+      ],
+      exclude: [
+        "API details → LLD 3.2, 3.6",
+        "Business logic → 4.x Flows",
+        "Code structure → LLD 3.x",
+      ],
+    },
+    task: {
+      include: [
+        "6.1: Tasks grouped by milestone",
+        "6.2: Detailed subtasks with acceptance criteria",
+      ],
+      exclude: [
+        "Detailed implementation → Source files",
+        "Wireframes → 5.x",
+        "Architecture → 2.x HLD",
+      ],
+    },
+    test: {
+      include: [
+        "7.1: Input/output test cases per API",
+      ],
+      exclude: [
+        "Implementation code → Source files",
+        "Wireframes → 5.x",
+      ],
+    },
+  };
 
-  return `# Low-Level Design Guide${componentName ? ` for ${componentName}` : ""}
+  if (artifactType && boundaries[artifactType]) {
+    const b = boundaries[artifactType];
+    return `# Artifact Boundaries: ${artifactType.toUpperCase()}
 
-## What is LLD?
+## ✅ INCLUDE in ${artifactType}:
+${b.include.map(i => `- ${i}`).join('\n')}
 
-Low-Level Design (LLD) provides detailed technical specifications for individual components, going beyond the high-level architecture to define:
-- Interface definitions with TypeScript types
-- Data models and schemas
-- Method specifications with pseudocode
-- Sequence diagrams for key flows
-- Error handling strategies
-
-## Creating LLD for ${name}
-
-### Step 1: Call pull_lld
-\`\`\`
-"Create LLD for ${name}"
-or
-"Generate low-level design for ${name} ${type}"
-\`\`\`
-
-### Step 2: LLD Sections to Complete
-
-1. **Component Overview**
-   - Purpose and scope
-   - Dependencies
-   - HLD reference
-
-2. **Interface Definitions**
-\`\`\`typescript
-interface I${toPascalCase(name)} {
-  // Define public methods
-}
-\`\`\`
-
-3. **Data Models**
-\`\`\`typescript
-interface ${toPascalCase(name)}Model {
-  // Define data structure
-}
-\`\`\`
-
-4. **Method Specifications**
-   - Signature, description, inputs, outputs
-   - Pseudocode for complex logic
-   - Error handling
-
-5. **Sequence Diagrams**
-\`\`\`mermaid
-sequenceDiagram
-    participant Client
-    participant ${toPascalCase(name)}
-    Client->>+${toPascalCase(name)}: request()
-\`\`\`
-
-### Step 3: Push to Server
-Use \`generate_lld\` to sync to Quikim platform.
-
-## Component Types
-
-- **service**: Backend services with lifecycle management
-- **module**: Reusable code modules
-- **feature**: User-facing features
-- **api**: REST/GraphQL endpoints
-- **ui**: React/UI components
-- **database**: Data layer and repositories
-
-## File Location
-\`.quikim/artifacts/<spec>/lld_<id>.md\` (e.g. \`lld_${toKebabCase(name)}.md\`)
+## ❌ DO NOT INCLUDE (belongs elsewhere):
+${b.exclude.map(e => `- ${e}`).join('\n')}
 `;
-}
+  }
 
-function toPascalCase(str: string): string {
-  return str
-    .split(/[-_\s]+/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join("");
-}
+  // Return all boundaries
+  let content = `# Artifact Boundaries - What Goes Where
 
-function toKebabCase(str: string): string {
-  return str
-    .replace(/([a-z])([A-Z])/g, "$1-$2")
-    .replace(/[\s_]+/g, "-")
-    .toLowerCase();
+`;
+  for (const [type, b] of Object.entries(boundaries)) {
+    content += `## ${type.toUpperCase()}
+
+✅ INCLUDE:
+${b.include.map(i => `- ${i}`).join('\n')}
+
+❌ DO NOT INCLUDE:
+${b.exclude.map(e => `- ${e}`).join('\n')}
+
+---
+
+`;
+  }
+
+  return content;
 }
