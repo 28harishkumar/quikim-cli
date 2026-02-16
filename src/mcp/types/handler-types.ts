@@ -7,6 +7,10 @@
  * See LICENSE file in the project root for full license information.
  */
 
+/**
+ * MCP/tool artifact type names (used for backward compatibility with tools).
+ * Maps to CLI artifact types via mcpToCLIArtifactType in artifact-operations.ts
+ */
 export type ArtifactType =
   | "requirements"
   | "hld"
