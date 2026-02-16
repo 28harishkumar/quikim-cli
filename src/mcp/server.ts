@@ -154,7 +154,11 @@ Path: .quikim/artifacts/<spec_name>/requirement_<name>.md. Do not use 'default'.
               codebase: {
                 type: "object",
                 description:
-                  "Object with 'files' array. Path: .quikim/artifacts/<spec_name>/requirement_<name>.md. For 1.3/1.4/1.5/1.6 use one file per entity (e.g. one requirement_screen-login.md per screen). content = markdown.",
+                  "REQUIRED: Object with 'files' array containing the artifact content. " +
+                  "You MUST generate the full markdown content and include it here. " +
+                  "Format: { files: [{ path: '.quikim/artifacts/<spec_name>/requirement_<name>.md', content: '# Your generated markdown content' }] }. " +
+                  "For 1.3/1.4/1.5/1.6 use one file per entity (e.g. one requirement_screen-login.md per screen). " +
+                  "DO NOT send empty files array - the content field must contain the actual generated artifact.",
               },
               user_prompt: {
                 type: "string",
@@ -262,7 +266,10 @@ Path: .quikim/artifacts/<spec_name>/hld_<name>.md. Do not use 'default'.
               codebase: {
                 type: "object",
                 description:
-                  "Files array. Path: .quikim/artifacts/<spec>/hld_<id>.md.",
+                  "REQUIRED: Object with 'files' array containing the artifact content. " +
+                  "You MUST generate the full markdown content and include it here. " +
+                  "Format: { files: [{ path: '.quikim/artifacts/<spec>/hld_<id>.md', content: '# Your generated markdown content' }] }. " +
+                  "DO NOT send empty files array - the content field must contain the actual generated artifact.",
               },
               user_prompt: { type: "string" },
               spec_name: {
@@ -345,7 +352,10 @@ Content: JSON { name, viewport: { width, height }, elements } or empty.
               codebase: {
                 type: "object",
                 description:
-                  "Files array. Path: .quikim/artifacts/<spec>/tasks_<id>.md. content = markdown (Kiro/task format; saved and sent to server as markdown).",
+                  "REQUIRED: Object with 'files' array containing the artifact content. " +
+                  "You MUST generate the full markdown content and include it here. " +
+                  "Format: { files: [{ path: '.quikim/artifacts/<spec>/tasks_<id>.md', content: '# Your generated markdown content' }] }. " +
+                  "DO NOT send empty files array - the content field must contain the actual generated artifact (Kiro/task format).",
               },
               user_prompt: { type: "string" },
               spec_name: {
@@ -470,7 +480,10 @@ Content: RAW mermaid syntax ONLY (no \`\`\`mermaid wrapper, no JSON).
               codebase: {
                 type: "object",
                 description:
-                  "Files array. Path: .quikim/artifacts/<spec>/flow_diagram_<id>.md. content = raw mermaid only (no code fences).",
+                  "REQUIRED: Object with 'files' array containing the artifact content. " +
+                  "You MUST generate the full mermaid content and include it here. " +
+                  "Format: { files: [{ path: '.quikim/artifacts/<spec>/flow_diagram_<id>.md', content: 'flowchart TD\\n  A --> B' }] }. " +
+                  "DO NOT send empty files array - the content field must contain raw mermaid syntax (no code fences).",
               },
               user_prompt: { type: "string" },
               spec_name: {
@@ -525,7 +538,10 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
               codebase: {
                 type: "object",
                 description:
-                  "Files array. Path: .quikim/artifacts/<spec>/lld_<id>.md.",
+                  "REQUIRED: Object with 'files' array containing the artifact content. " +
+                  "You MUST generate the full markdown content and include it here. " +
+                  "Format: { files: [{ path: '.quikim/artifacts/<spec>/lld_<id>.md', content: '# Your generated markdown content' }] }. " +
+                  "DO NOT send empty files array - the content field must contain the actual generated artifact.",
               },
               user_prompt: {
                 type: "string",
@@ -553,7 +569,10 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
               codebase: {
                 type: "object",
                 description:
-                  "Files array. Path: .quikim/artifacts/<spec>/context_<id>.md. content = plain text only.",
+                  "REQUIRED: Object with 'files' array containing the artifact content. " +
+                  "You MUST generate the full content and include it here. " +
+                  "Format: { files: [{ path: '.quikim/artifacts/<spec>/context_<id>.md', content: 'Your generated content' }] }. " +
+                  "DO NOT send empty files array - the content field must contain the actual generated artifact.",
               },
               user_prompt: { type: "string" },
               name: ARTIFACT_NAME_TITLE_SCHEMA.name,

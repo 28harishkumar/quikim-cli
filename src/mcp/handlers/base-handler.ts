@@ -167,7 +167,9 @@ export abstract class BaseHandler {
         if (!fromLocal) {
           const pathHint = ContentExtractor.getExpectedPathHint(artifactType);
           throw new Error(
-            `No content. Add a file matching ${pathHint} to codebase or create it locally.`
+            `No content provided. You MUST include the artifact content in codebase.files array. ` +
+            `Example: { "codebase": { "files": [{ "path": "${pathHint}", "content": "# Your markdown content here" }] } }. ` +
+            `Generate the full artifact content and include it in the 'content' field.`
           );
         }
         content = fromLocal.content;
