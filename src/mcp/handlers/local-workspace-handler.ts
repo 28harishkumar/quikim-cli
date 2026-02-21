@@ -6,15 +6,15 @@
 import fs from "fs";
 import path from "path";
 import { execSync } from "child_process";
-import { getProjectContext } from "../../utils/project-context.js";
+import { getQuikimProjectRoot } from "../../config/project-root.js";
 
 export class LocalWorkspaceHandler {
   private getProjectRoot(): string {
-    const context = getProjectContext();
-    if (!context?.rootPath) {
-      throw new Error("No project connected. Run `quikim connect` first.");
+    try {
+      return getQuikimProjectRoot();
+    } catch (error) {
+      throw new Error("No project found. Run from within a Quikim project directory.");
     }
-    return context.rootPath;
   }
 
   private resolvePath(relativePath: string): string {

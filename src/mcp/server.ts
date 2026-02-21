@@ -59,6 +59,9 @@ import { workspaceHandler } from "./handlers/workspace-handler.js";
 // Local workspace (direct filesystem access)
 import { localWorkspaceTools } from "./tools/local-workspace-tools.js";
 import { localWorkspaceHandler } from "./handlers/local-workspace-handler.js";
+// Context tools (pwd, ls)
+import { contextTools } from "./tools/context-tools.js";
+import { workingDirectoryHandler } from "./handlers/working-directory-handler.js";
 
 export class MCPCursorProtocolServer {
   private server: Server;
@@ -897,13 +900,14 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
         await import("./handlers/workflow-tools.js");
       const workflowTools = await WorkflowEngineTools.listTools();
 
-      // Combine all tools (cloud + local + workflow + existing)
+      // Combine all tools (cloud + local + context + workflow + existing)
       return {
         tools: [
           ...existingTools,
           ...workflowTools,
           ...workspaceTools, // Cloud workspace tools (cloud_*)
           ...localWorkspaceTools, // Local workspace tools (local_*)
+          ...contextTools, // Context tools (pwd, ls)
         ],
       };
     });
@@ -2064,6 +2068,30 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
                 type: "text",
                 text: JSON.stringify(
                   await localWorkspaceHandler.getFileStats(args as any)
+                ),
+              },
+            ],
+          };
+
+        // Context tools (pwd, ls)
+        case "get_working_directory":
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  await workingDirectoryHandler.getWorkingDirectory()
+                ),
+              },
+            ],
+          };
+        case "list_working_directory":
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  await workingDirectoryHandler.listWorkingDirectory(args as any)
                 ),
               },
             ],
