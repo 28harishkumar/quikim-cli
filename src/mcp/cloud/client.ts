@@ -1,6 +1,8 @@
 /**
  * Cloud API client for MCP.
  * CLI is ONLY a proxy - all execution happens on cloud.
+ * 
+ * Updated for vibe-coding-service v2.0 (SQLAlchemy)
  */
 
 import { configManager } from "../../config/manager.js";
@@ -10,24 +12,45 @@ export interface CloudClientConfig {
   authToken: string;
 }
 
+interface Workspace {
+  id: string;
+  projectId: string;
+  status: string;
+  branch: string;
+}
+
 export class CloudClient {
   private baseUrl: string;
   private token: string;
+  private workspaceCache = new Map<string, Workspace>();
 
   constructor(config: CloudClientConfig) {
     this.baseUrl = config.vibeServiceUrl;
     this.token = config.authToken;
   }
 
-  async request<T>(endpoint: string, data: Record<string, unknown>): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      method: "POST",
+  async request<T>(
+    method: string,
+    endpoint: string,
+    data?: Record<string, unknown>
+  ): Promise<T> {
+    const options: RequestInit = {
+      method,
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${this.token}`,
       },
-      body: JSON.stringify(data),
-    });
+    };
+
+    if (data && method !== "GET") {
+      options.body = JSON.stringify(data);
+    }
+
+    const url = method === "GET" && data
+      ? `${this.baseUrl}${endpoint}?${new URLSearchParams(data as Record<string, string>).toString()}`
+      : `${this.baseUrl}${endpoint}`;
+
+    const response = await fetch(url, options);
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
@@ -37,11 +60,46 @@ export class CloudClient {
       );
     }
 
-    const result = (await response.json()) as { data: T };
-    return result.data;
+    return await response.json() as T;
   }
 
-  // Phase 1 Methods (Read-Only)
+  /**
+   * Get or provision workspace for project.
+   * Caches workspace ID to avoid repeated provision calls.
+   */
+  async getWorkspace(projectId: string, repositoryId: string): Promise<Workspace> {
+    // Check cache first
+    const cacheKey = `${projectId}:${repositoryId}`;
+    if (this.workspaceCache.has(cacheKey)) {
+      return this.workspaceCache.get(cacheKey)!;
+    }
+
+    // List existing workspaces
+    const workspaces = await this.request<Workspace[]>(
+      "GET",
+      `/api/v1/workspace/project/${projectId}`
+    );
+
+    // Find workspace for this repository
+    let workspace = workspaces.find(
+      (ws) => ws.status === "READY" && ws.branch === "main"
+    );
+
+    // If no workspace exists, would need to provision
+    // But CLI doesn't have git URL - this should be done via web UI first
+    if (!workspace) {
+      throw new CloudError(
+        "No workspace found for this project. Please provision a workspace via the web UI first.",
+        404
+      );
+    }
+
+    // Cache it
+    this.workspaceCache.set(cacheKey, workspace);
+    return workspace;
+  }
+
+  // Workspace Operations (Updated for v2.0 API)
 
   async listDirectory(
     projectId: string,
@@ -52,13 +110,18 @@ export class CloudClient {
       fileExtensions?: string[];
     } = {}
   ): Promise<unknown> {
-    return this.request("/api/v1/workspace/list", {
-      project_id: projectId,
-      path,
-      depth: options.depth ?? 2,
-      include_hidden: options.includeHidden ?? false,
-      file_extensions: options.fileExtensions,
-    });
+    const workspace = await this.getWorkspace(projectId, "default");
+    
+    return this.request(
+      "POST",
+      `/api/v1/workspace/${workspace.id}/list`,
+      {
+        path: path || "",
+        depth: options.depth ?? 2,
+        include_hidden: options.includeHidden ?? false,
+        file_extensions: options.fileExtensions,
+      }
+    );
   }
 
   async readFile(
@@ -66,11 +129,16 @@ export class CloudClient {
     path: string,
     encoding = "utf-8"
   ): Promise<unknown> {
-    return this.request("/api/v1/workspace/read", {
-      project_id: projectId,
-      path,
-      encoding,
-    });
+    const workspace = await this.getWorkspace(projectId, "default");
+    
+    return this.request(
+      "POST",
+      `/api/v1/workspace/${workspace.id}/read`,
+      {
+        path,
+        encoding,
+      }
+    );
   }
 
   async readFileLines(
@@ -79,12 +147,18 @@ export class CloudClient {
     startLine: number,
     endLine: number
   ): Promise<unknown> {
-    return this.request("/api/v1/workspace/read-lines", {
-      project_id: projectId,
-      path,
-      start_line: startLine,
-      end_line: endLine,
-    });
+    const workspace = await this.getWorkspace(projectId, "default");
+    
+    // Note: New API uses read with line range
+    return this.request(
+      "POST",
+      `/api/v1/workspace/${workspace.id}/read`,
+      {
+        path,
+        start_line: startLine,
+        end_line: endLine,
+      }
+    );
   }
 
   async search(
@@ -97,14 +171,18 @@ export class CloudClient {
       useRegex?: boolean;
     } = {}
   ): Promise<unknown> {
-    return this.request("/api/v1/workspace/search", {
-      project_id: projectId,
-      query,
-      search_type: options.searchType ?? "content",
-      file_extensions: options.fileExtensions,
-      max_results: options.maxResults ?? 50,
-      use_regex: options.useRegex ?? false,
-    });
+    const workspace = await this.getWorkspace(projectId, "default");
+    
+    return this.request(
+      "POST",
+      `/api/v1/workspace/${workspace.id}/search`,
+      {
+        query,
+        case_sensitive: false,
+        file_patterns: options.fileExtensions,
+        max_results: options.maxResults ?? 50,
+      }
+    );
   }
 
   async getAST(
@@ -112,18 +190,31 @@ export class CloudClient {
     path: string,
     detailLevel = "symbols"
   ): Promise<unknown> {
-    return this.request("/api/v1/workspace/ast", {
-      project_id: projectId,
-      path,
-      detail_level: detailLevel,
-    });
+    const workspace = await this.getWorkspace(projectId, "default");
+    
+    return this.request(
+      "POST",
+      `/api/v1/workspace/${workspace.id}/ast`,
+      {
+        path,
+        include_bodies: detailLevel === "full",
+      }
+    );
   }
 
   async getFileStats(projectId: string, path: string): Promise<unknown> {
-    return this.request("/api/v1/workspace/stats", {
-      project_id: projectId,
-      path,
-    });
+    const workspace = await this.getWorkspace(projectId, "default");
+    
+    // New API doesn't have separate stats endpoint
+    // Use read with metadata_only flag
+    return this.request(
+      "POST",
+      `/api/v1/workspace/${workspace.id}/read`,
+      {
+        path,
+        metadata_only: true,
+      }
+    );
   }
 }
 
