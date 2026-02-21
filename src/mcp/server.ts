@@ -62,6 +62,9 @@ import { localWorkspaceHandler } from "./handlers/local-workspace-handler.js";
 // Context tools (pwd, ls)
 import { contextTools } from "./tools/context-tools.js";
 import { workingDirectoryHandler } from "./handlers/working-directory-handler.js";
+// Plan tools (save planning documents)
+import { planTools } from "./tools/plan-tools.js";
+import { planHandler } from "./handlers/plan-handler.js";
 
 export class MCPCursorProtocolServer {
   private server: Server;
@@ -900,7 +903,7 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
         await import("./handlers/workflow-tools.js");
       const workflowTools = await WorkflowEngineTools.listTools();
 
-      // Combine all tools (cloud + local + context + workflow + existing)
+      // Combine all tools (cloud + local + context + plan + workflow + existing)
       return {
         tools: [
           ...existingTools,
@@ -908,6 +911,7 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
           ...workspaceTools, // Cloud workspace tools (cloud_*)
           ...localWorkspaceTools, // Local workspace tools (local_*)
           ...contextTools, // Context tools (pwd, ls)
+          ...planTools, // Plan tools (save planning docs)
         ],
       };
     });
@@ -2092,6 +2096,52 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
                 type: "text",
                 text: JSON.stringify(
                   await workingDirectoryHandler.listWorkingDirectory(args as any)
+                ),
+              },
+            ],
+          };
+
+        // Plan tools (save planning documents to .quikim/plan/)
+        case "save_plan_file":
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  await planHandler.savePlanFile(args as any)
+                ),
+              },
+            ],
+          };
+        case "read_plan_file":
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  await planHandler.readPlanFile(args as any)
+                ),
+              },
+            ],
+          };
+        case "list_plan_files":
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  await planHandler.listPlanFiles()
+                ),
+              },
+            ],
+          };
+        case "delete_plan_file":
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  await planHandler.deletePlanFile(args as any)
                 ),
               },
             ],
