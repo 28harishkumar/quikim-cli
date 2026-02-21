@@ -65,6 +65,9 @@ import { workingDirectoryHandler } from "./handlers/working-directory-handler.js
 // Plan tools (save planning documents)
 import { planTools } from "./tools/plan-tools.js";
 import { planHandler } from "./handlers/plan-handler.js";
+// Git tools (search git history)
+import { gitTools } from "./tools/git-tools.js";
+import { gitHandler } from "./handlers/git-handler.js";
 
 export class MCPCursorProtocolServer {
   private server: Server;
@@ -903,7 +906,7 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
         await import("./handlers/workflow-tools.js");
       const workflowTools = await WorkflowEngineTools.listTools();
 
-      // Combine all tools (cloud + local + context + plan + workflow + existing)
+      // Combine all tools (cloud + local + context + plan + git + workflow + existing)
       return {
         tools: [
           ...existingTools,
@@ -912,6 +915,7 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
           ...localWorkspaceTools, // Local workspace tools (local_*)
           ...contextTools, // Context tools (pwd, ls)
           ...planTools, // Plan tools (save planning docs)
+          ...gitTools, // Git tools (search git history)
         ],
       };
     });
@@ -2142,6 +2146,52 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
                 type: "text",
                 text: JSON.stringify(
                   await planHandler.deletePlanFile(args as any)
+                ),
+              },
+            ],
+          };
+
+        // Git tools (search git history)
+        case "git_log":
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  await gitHandler.gitLog(args as any)
+                ),
+              },
+            ],
+          };
+        case "git_show":
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  await gitHandler.gitShow(args as any)
+                ),
+              },
+            ],
+          };
+        case "git_blame":
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  await gitHandler.gitBlame(args as any)
+                ),
+              },
+            ],
+          };
+        case "git_diff":
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  await gitHandler.gitDiff(args as any)
                 ),
               },
             ],
