@@ -7,17 +7,19 @@ export const planTools = [
   {
     name: "save_plan_file",
     description:
-      "Save a planning document to .quikim/plan/ directory. Use for saving meeting notes, project plans, brainstorming sessions, or any planning documentation.\n\n" +
-      "Example request:\n" +
-      '{"filename": "architecture-plan.md", "content": "# Architecture Plan\\n\\n## Overview\\n..."}\n\n' +
+      "Save a planning document to .quikim/plan/ directory with optional subdirectory support. Subdirectories are automatically created.\n\n" +
+      "Example requests:\n" +
+      '{"filename": "architecture-plan.md", "content": "# Plan..."}\n' +
+      '{"filename": "architecture/system-design.md", "content": "# Design..."}\n' +
+      '{"filename": "meetings/2026-02-22.md", "content": "# Meeting..."}\n\n' +
       "Example response:\n" +
-      '{"success": true, "path": ".quikim/plan/architecture-plan.md", "size": 1234}',
+      '{"success": true, "path": ".quikim/plan/architecture/system-design.md", "size": 1234}',
     inputSchema: {
       type: "object",
       properties: {
         filename: {
           type: "string",
-          description: "Filename (e.g., 'architecture-plan.md'). Will be saved to .quikim/plan/",
+          description: "Filename with optional subdirectory (e.g., 'plan.md' or 'architecture/design.md')",
         },
         content: {
           type: "string",
@@ -30,17 +32,18 @@ export const planTools = [
   {
     name: "read_plan_file",
     description:
-      "Read a planning document from .quikim/plan/ directory.\n\n" +
-      "Example request:\n" +
-      '{"filename": "architecture-plan.md"}\n\n' +
+      "Read a planning document from .quikim/plan/ directory. Supports subdirectories.\n\n" +
+      "Example requests:\n" +
+      '{"filename": "architecture-plan.md"}\n' +
+      '{"filename": "architecture/system-design.md"}\n\n' +
       "Example response:\n" +
-      '{"content": "# Architecture Plan\\n...", "size": 1234, "modified": "2026-02-21T23:10:00Z"}',
+      '{"content": "# Architecture Plan\\n...", "path": "architecture/system-design.md", "size": 1234}',
     inputSchema: {
       type: "object",
       properties: {
         filename: {
           type: "string",
-          description: "Filename to read from .quikim/plan/",
+          description: "Filename with optional subdirectory (e.g., 'plan.md' or 'architecture/design.md')",
         },
       },
       required: ["filename"],
@@ -49,11 +52,11 @@ export const planTools = [
   {
     name: "list_plan_files",
     description:
-      "List all planning documents in .quikim/plan/ directory.\n\n" +
+      "List all planning documents in .quikim/plan/ directory recursively. Shows files with their paths and all subdirectories.\n\n" +
       "Example request:\n" +
       "{}\n\n" +
       "Example response:\n" +
-      '{"files": [{"name": "architecture-plan.md", "size": 1234, "modified": "2026-02-21T23:10:00Z"}], "total": 5}',
+      '{"files": [{"path": "architecture/design.md", "name": "design.md", "size": 1234}], "directories": ["architecture", "meetings"], "total": 5}',
     inputSchema: {
       type: "object",
       properties: {},
@@ -62,17 +65,18 @@ export const planTools = [
   {
     name: "delete_plan_file",
     description:
-      "Delete a planning document from .quikim/plan/ directory.\n\n" +
-      "Example request:\n" +
-      '{"filename": "old-plan.md"}\n\n' +
+      "Delete a planning document from .quikim/plan/ directory. Supports subdirectories.\n\n" +
+      "Example requests:\n" +
+      '{"filename": "old-plan.md"}\n' +
+      '{"filename": "architecture/old-design.md"}\n\n' +
       "Example response:\n" +
-      '{"success": true, "deleted": ".quikim/plan/old-plan.md"}',
+      '{"success": true, "deleted": ".quikim/plan/architecture/old-design.md"}',
     inputSchema: {
       type: "object",
       properties: {
         filename: {
           type: "string",
-          description: "Filename to delete from .quikim/plan/",
+          description: "Filename with optional subdirectory (e.g., 'plan.md' or 'architecture/design.md')",
         },
       },
       required: ["filename"],

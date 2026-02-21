@@ -21,15 +21,25 @@ export class PlanHandler {
   }
 
   private sanitizeFilename(filename: string): string {
-    // Remove path traversal attempts
-    const basename = path.basename(filename);
+    // Normalize path and remove any ../ or ./ attempts
+    const normalized = path.normalize(filename).replace(/^(\.\.(\/|\\|$))+/, '');
+    
+    // Remove leading slash/backslash
+    const cleaned = normalized.replace(/^[\/\\]+/, '');
     
     // Ensure .md extension
-    if (!basename.endsWith(".md")) {
-      return basename + ".md";
+    if (!cleaned.endsWith(".md")) {
+      return cleaned + ".md";
     }
     
-    return basename;
+    return cleaned;
+  }
+
+  private ensureDirectoryExists(filePath: string): void {
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
   }
 
   async savePlanFile(args: {
@@ -42,6 +52,9 @@ export class PlanHandler {
       const filename = this.sanitizeFilename(args.filename);
       const planDir = this.getPlanDirectory();
       const filePath = path.join(planDir, filename);
+      
+      // Ensure parent directories exist (for subdirectories)
+      this.ensureDirectoryExists(filePath);
       
       // Write file
       fs.writeFileSync(filePath, args.content, "utf-8");
@@ -93,34 +106,82 @@ export class PlanHandler {
       if (!fs.existsSync(planDir)) {
         return {
           files: [],
+          directories: [],
           total: 0,
           directory: path.relative(getQuikimProjectRoot(), planDir),
         };
       }
       
-      const entries = fs.readdirSync(planDir, { withFileTypes: true });
-      const files = entries
-        .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
-        .map((entry) => {
-          const filePath = path.join(planDir, entry.name);
-          const stats = fs.statSync(filePath);
-          return {
-            name: entry.name,
-            size: stats.size,
-            modified: stats.mtime.toISOString(),
-            created: stats.birthtime.toISOString(),
-          };
-        })
-        .sort((a, b) => b.modified.localeCompare(a.modified)); // Most recent first
+      // Recursively collect all .md files
+      const files = this.collectMarkdownFiles(planDir, "");
+      
+      // Sort by most recent first
+      files.sort((a, b) => b.modified.localeCompare(a.modified));
+      
+      // Collect unique directories
+      const directories = new Set<string>();
+      files.forEach(file => {
+        const dir = path.dirname(file.path);
+        if (dir !== ".") {
+          // Add all parent directories
+          const parts = dir.split(path.sep);
+          for (let i = 1; i <= parts.length; i++) {
+            directories.add(parts.slice(0, i).join(path.sep));
+          }
+        }
+      });
       
       return {
         files,
+        directories: Array.from(directories).sort(),
         total: files.length,
         directory: path.relative(getQuikimProjectRoot(), planDir),
       };
     } catch (error) {
       return this.handleError(error, "list_plan_files");
     }
+  }
+
+  private collectMarkdownFiles(
+    dir: string,
+    relativePath: string
+  ): Array<{
+    path: string;
+    name: string;
+    size: number;
+    modified: string;
+    created: string;
+  }> {
+    const results: Array<{
+      path: string;
+      name: string;
+      size: number;
+      modified: string;
+      created: string;
+    }> = [];
+    
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      const relPath = relativePath ? path.join(relativePath, entry.name) : entry.name;
+      
+      if (entry.isDirectory()) {
+        // Recurse into subdirectories
+        results.push(...this.collectMarkdownFiles(fullPath, relPath));
+      } else if (entry.isFile() && entry.name.endsWith(".md")) {
+        const stats = fs.statSync(fullPath);
+        results.push({
+          path: relPath,
+          name: entry.name,
+          size: stats.size,
+          modified: stats.mtime.toISOString(),
+          created: stats.birthtime.toISOString(),
+        });
+      }
+    }
+    
+    return results;
   }
 
   async deletePlanFile(args: { filename: string }): Promise<unknown> {
