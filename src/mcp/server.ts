@@ -52,9 +52,13 @@ import {
 // Import CLI config manager for shared authentication
 import { configManager } from "../config/manager.js";
 
-// Import workspace tools and handler (Phase 1: Cloud workspace read-only)
+// Import workspace tools and handlers
+// Cloud workspace (proxy to vibe-coding-service API)
 import { workspaceTools } from "./tools/workspace-tools.js";
 import { workspaceHandler } from "./handlers/workspace-handler.js";
+// Local workspace (direct filesystem access)
+import { localWorkspaceTools } from "./tools/local-workspace-tools.js";
+import { localWorkspaceHandler } from "./handlers/local-workspace-handler.js";
 
 export class MCPCursorProtocolServer {
   private server: Server;
@@ -893,9 +897,14 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
         await import("./handlers/workflow-tools.js");
       const workflowTools = await WorkflowEngineTools.listTools();
 
-      // Combine all tools
+      // Combine all tools (cloud + local + workflow + existing)
       return {
-        tools: [...existingTools, ...workflowTools, ...workspaceTools],
+        tools: [
+          ...existingTools,
+          ...workflowTools,
+          ...workspaceTools, // Cloud workspace tools (cloud_*)
+          ...localWorkspaceTools, // Local workspace tools (local_*)
+        ],
       };
     });
 
@@ -1935,8 +1944,8 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
             };
           }
         }
-        // Workspace tools (Phase 1: Cloud workspace read-only)
-        case "list_directory":
+        // Cloud workspace tools (proxy to vibe-coding-service API)
+        case "cloud_list_directory":
           return {
             content: [
               {
@@ -1947,7 +1956,7 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
               },
             ],
           };
-        case "read_file":
+        case "cloud_read_file":
           return {
             content: [
               {
@@ -1958,7 +1967,7 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
               },
             ],
           };
-        case "read_file_lines":
+        case "cloud_read_file_lines":
           return {
             content: [
               {
@@ -1969,7 +1978,7 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
               },
             ],
           };
-        case "search_codebase":
+        case "cloud_search_codebase":
           return {
             content: [
               {
@@ -1980,7 +1989,7 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
               },
             ],
           };
-        case "get_ast":
+        case "cloud_get_ast":
           return {
             content: [
               {
@@ -1991,13 +2000,70 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
               },
             ],
           };
-        case "get_file_stats":
+        case "cloud_get_file_stats":
           return {
             content: [
               {
                 type: "text",
                 text: JSON.stringify(
                   await workspaceHandler.getFileStats(args as any)
+                ),
+              },
+            ],
+          };
+
+        // Local workspace tools (direct filesystem access)
+        case "local_list_directory":
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  await localWorkspaceHandler.listDirectory(args as any)
+                ),
+              },
+            ],
+          };
+        case "local_read_file":
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  await localWorkspaceHandler.readFile(args as any)
+                ),
+              },
+            ],
+          };
+        case "local_read_file_lines":
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  await localWorkspaceHandler.readFileLines(args as any)
+                ),
+              },
+            ],
+          };
+        case "local_search_codebase":
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  await localWorkspaceHandler.searchCodebase(args as any)
+                ),
+              },
+            ],
+          };
+        case "local_get_file_stats":
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  await localWorkspaceHandler.getFileStats(args as any)
                 ),
               },
             ],

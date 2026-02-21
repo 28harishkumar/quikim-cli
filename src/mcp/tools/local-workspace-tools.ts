@@ -1,17 +1,17 @@
 /**
- * MCP tool definitions for CLOUD workspace operations.
- * These are proxy tools - all execution happens on cloud workspace.
+ * MCP tool definitions for LOCAL workspace operations.
+ * These read/write directly from your local filesystem.
  */
 
-export const workspaceTools = [
+export const localWorkspaceTools = [
   {
-    name: "cloud_list_directory",
+    name: "local_list_directory",
     description:
-      "List files and directories in the CLOUD project workspace. Use to explore cloud workspace structure.\n\n" +
+      "List files and directories in your LOCAL project workspace. Reads directly from filesystem.\n\n" +
       "Example request:\n" +
       '{"path": "src/components", "depth": 2, "include_hidden": false}\n\n' +
       "Example response:\n" +
-      '{"path": "src/components", "files": ["Button.tsx", "Input.tsx"], "directories": ["forms"], "total": 3}',
+      '{"files": ["Button.tsx", "Input.tsx"], "directories": ["forms", "layout"], "total": 4}',
     inputSchema: {
       type: "object",
       properties: {
@@ -36,13 +36,13 @@ export const workspaceTools = [
     },
   },
   {
-    name: "cloud_read_file",
+    name: "local_read_file",
     description:
-      "Read the full content of a file from CLOUD workspace. For large files (>100KB), use cloud_read_file_lines instead.\n\n" +
+      "Read the full content of a file from your LOCAL filesystem.\n\n" +
       "Example request:\n" +
       '{"path": "src/App.tsx", "encoding": "utf-8"}\n\n' +
       "Example response:\n" +
-      '{"path": "src/App.tsx", "content": "import React from \'react\';\\n...", "size": 1234, "lines": 45}',
+      '{"content": "import React from \'react\';\\n...", "size": 1234, "lines": 45}',
     inputSchema: {
       type: "object",
       properties: {
@@ -60,13 +60,13 @@ export const workspaceTools = [
     },
   },
   {
-    name: "cloud_read_file_lines",
+    name: "local_read_file_lines",
     description:
-      "Read specific lines from a file in CLOUD workspace. Use for large files.\n\n" +
+      "Read specific lines from a LOCAL file. Use for large files.\n\n" +
       "Example request:\n" +
       '{"path": "src/App.tsx", "start_line": 10, "end_line": 20}\n\n' +
       "Example response:\n" +
-      '{"path": "src/App.tsx", "content": "  const [state, setState] = ...\\n...", "start_line": 10, "end_line": 20, "total_lines": 45}',
+      '{"content": "  const [state, setState] = ...\\n...", "start_line": 10, "end_line": 20, "total_lines": 45}',
     inputSchema: {
       type: "object",
       properties: {
@@ -87,13 +87,13 @@ export const workspaceTools = [
     },
   },
   {
-    name: "cloud_search_codebase",
+    name: "local_search_codebase",
     description:
-      "Search for text or patterns in the CLOUD workspace codebase.\n\n" +
+      "Search for text or patterns in your LOCAL codebase using ripgrep.\n\n" +
       "Example request:\n" +
-      '{"query": "useState", "file_extensions": [".tsx"], "max_results": 50}\n\n' +
+      '{"query": "useState", "search_type": "content", "file_extensions": [".tsx"], "max_results": 50}\n\n' +
       "Example response:\n" +
-      '{"query": "useState", "results": [{"file": "src/App.tsx", "line": 5, "match": "const [state, setState] = useState(0)"}], "total": 12}',
+      '{"results": [{"file": "src/App.tsx", "line": 5, "match": "const [state, setState] = useState(0)"}], "total": 12}',
     inputSchema: {
       type: "object",
       properties: {
@@ -119,43 +119,22 @@ export const workspaceTools = [
           type: "boolean",
           description: "Treat query as regex (default: false)",
         },
+        case_sensitive: {
+          type: "boolean",
+          description: "Case sensitive search (default: false)",
+        },
       },
       required: ["query"],
     },
   },
   {
-    name: "cloud_get_ast",
+    name: "local_get_file_stats",
     description:
-      "Get AST (Abstract Syntax Tree) analysis from a source file in CLOUD workspace. Extracts symbols, functions, classes, imports without reading full content. Processed by cloud AST parser.\n\n" +
-      "Example request:\n" +
-      '{"path": "src/App.tsx", "detail_level": "symbols"}\n\n' +
-      "Example response:\n" +
-      '{"path": "src/App.tsx", "symbols": {"functions": ["App", "handleClick"], "classes": [], "imports": ["React", "useState"]}, "language": "typescript"}',
-    inputSchema: {
-      type: "object",
-      properties: {
-        path: {
-          type: "string",
-          description: "Relative path to source file",
-        },
-        detail_level: {
-          type: "string",
-          enum: ["symbols", "full"],
-          description:
-            "symbols = names only (recommended), full = complete AST with positions",
-        },
-      },
-      required: ["path"],
-    },
-  },
-  {
-    name: "cloud_get_file_stats",
-    description:
-      "Get file metadata from CLOUD workspace (size, lines, type) without reading content.\n\n" +
+      "Get file metadata from your LOCAL filesystem without reading content.\n\n" +
       "Example request:\n" +
       '{"path": "src/App.tsx"}\n\n' +
       "Example response:\n" +
-      '{"path": "src/App.tsx", "size": 1234, "lines": 45, "extension": ".tsx", "modified": "2024-02-21T10:30:00Z"}',
+      '{"size": 1234, "lines": 45, "extension": ".tsx", "modified": "2024-02-21T10:30:00Z", "created": "2024-01-15T08:00:00Z"}',
     inputSchema: {
       type: "object",
       properties: {
