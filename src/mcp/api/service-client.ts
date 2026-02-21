@@ -567,6 +567,58 @@ export class ServiceAwareAPIClient {
   }
 
   /**
+   * Get a single wireframe by id (org-scoped). Contract: GET /organizations/:orgId/projects/:projectId/wireframes/:id
+   */
+  async getWireframe(
+    organizationId: string,
+    projectId: string,
+    wireframeId: string,
+  ): Promise<unknown> {
+    const res = await this.request(
+      "project",
+      `/organizations/${organizationId}/projects/${projectId}/wireframes/${wireframeId}`,
+      { method: "GET" },
+    );
+    return res.data;
+  }
+
+  /**
+   * Update wireframe (name, content, etc.). Contract: PATCH /organizations/:orgId/projects/:projectId/wireframes/:id
+   */
+  async updateWireframe(
+    organizationId: string,
+    projectId: string,
+    wireframeId: string,
+    body: { name?: string; content?: unknown; viewport?: unknown; elements?: unknown[] },
+  ): Promise<unknown> {
+    const res = await this.request(
+      "project",
+      `/organizations/${organizationId}/projects/${projectId}/wireframes/${wireframeId}`,
+      { method: "PATCH", body: JSON.stringify(body) },
+    );
+    return res.data;
+  }
+
+  /**
+   * Modify wireframe via LLM (prompt). Contract: POST /projects/:projectId/wireframes/modify
+   */
+  async modifyWireframe(
+    projectId: string,
+    payload: {
+      wireframeId: string;
+      modificationRequest: string;
+      wireframe?: { id?: string; elements?: unknown[]; [key: string]: unknown };
+    },
+  ): Promise<unknown> {
+    const res = await this.request(
+      "project",
+      `/projects/${projectId}/wireframes/modify`,
+      { method: "POST", body: JSON.stringify(payload) },
+    );
+    return res.data;
+  }
+
+  /**
    * Create wireframe. Server expects WireframeUpdateSchema: name (1-100), viewport (width 320-7680, height 240-4320), elements (array).
    * For org projects we always send this shape; content is ignored (wireframes are canvas JSON, not markdown).
    */
@@ -776,7 +828,7 @@ export class ServiceAwareAPIClient {
           status: string;
           context: Record<string, unknown>;
         }>
-      >("project", `/projects/${projectId}/queue/pending`, {
+      >("project", `/wireframes/queue/${projectId}`, {
         method: "GET",
       });
       return response.data || [];
@@ -797,7 +849,7 @@ export class ServiceAwareAPIClient {
     result?: Record<string, unknown>,
   ): Promise<void> {
     try {
-      await this.request("project", `/projects/queue/${requestId}`, {
+      await this.request("project", `/wireframes/queue/${requestId}`, {
         method: "PATCH",
         body: JSON.stringify({ status, result }),
       });

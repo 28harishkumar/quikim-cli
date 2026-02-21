@@ -25,6 +25,8 @@ import { createConfigCommands } from "./commands/config.js";
 import { createMCPCommands } from "./commands/mcp.js";
 import { createIDERulesCommands } from "./commands/ide-rules.js";
 import { createArtifactCommands } from "./commands/artifacts.js";
+import { createWireframeCommands } from "./commands/wireframe.js";
+import { createTestCommands } from "./commands/test.js";
 import * as output from "./utils/output.js";
 
 /** Main CLI program */
@@ -51,6 +53,8 @@ program.addCommand(createIDERulesCommands());
 
 // Add artifact commands at root level
 createArtifactCommands(program);
+program.addCommand(createWireframeCommands());
+program.addCommand(createTestCommands());
 
 // Add status command at root level
 program
