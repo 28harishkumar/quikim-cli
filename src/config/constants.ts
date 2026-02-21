@@ -14,6 +14,7 @@ export const DEFAULT_API_URL = "https://api.quikim.com";
 export const LOCAL_USER_SERVICE_URL = "http://localhost:8001";
 export const LOCAL_PROJECT_SERVICE_URL = "http://localhost:8002";
 export const LOCAL_WORKFLOW_SERVICE_URL = "http://localhost:8004";
+export const LOCAL_VIBE_SERVICE_URL = "http://localhost:8003";
 
 /** Project service API prefix (all project-service routes are under this) */
 export const PROJECT_SERVICE_API_PREFIX = "/api/v1/project";

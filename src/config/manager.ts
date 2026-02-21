@@ -16,6 +16,7 @@ import {
   LOCAL_USER_SERVICE_URL,
   LOCAL_PROJECT_SERVICE_URL,
   LOCAL_WORKFLOW_SERVICE_URL,
+  LOCAL_VIBE_SERVICE_URL,
   CONFIG_FILE_NAME,
   QUIKIM_DIR,
   PROJECT_CONFIG_FILE,
@@ -83,11 +84,30 @@ export class ConfigManager {
     globalConfig.set("workflowServiceUrl", url);
   }
 
+  /** Get vibe service URL. Env QUIKIM_VIBE_SERVICE_URL overrides when set (e.g. Claude Desktop). */
+  getVibeServiceUrl(): string {
+    const fromEnv = process.env.QUIKIM_VIBE_SERVICE_URL;
+    if (fromEnv) return fromEnv.trim();
+    // Check explicit config first
+    const configured = globalConfig.get("vibeServiceUrl");
+    if (configured) return configured;
+    // If in local mode, use local vibe service
+    if (this.isLocalMode()) return LOCAL_VIBE_SERVICE_URL;
+    // Fall back to project service URL or API URL
+    return globalConfig.get("projectServiceUrl") ?? this.getApiUrl();
+  }
+
+  /** Set vibe service URL */
+  setVibeServiceUrl(url: string): void {
+    globalConfig.set("vibeServiceUrl", url);
+  }
+
   /** Set local development mode (separate services) */
   setLocalMode(): void {
     globalConfig.set("userServiceUrl", LOCAL_USER_SERVICE_URL);
     globalConfig.set("projectServiceUrl", LOCAL_PROJECT_SERVICE_URL);
     globalConfig.set("workflowServiceUrl", LOCAL_WORKFLOW_SERVICE_URL);
+    globalConfig.set("vibeServiceUrl", LOCAL_VIBE_SERVICE_URL);
   }
 
   /** Set production mode (single gateway) */
@@ -95,6 +115,7 @@ export class ConfigManager {
     globalConfig.delete("userServiceUrl");
     globalConfig.delete("projectServiceUrl");
     globalConfig.delete("workflowServiceUrl");
+    globalConfig.delete("vibeServiceUrl");
     globalConfig.set("apiUrl", DEFAULT_API_URL);
   }
 

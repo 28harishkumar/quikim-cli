@@ -52,6 +52,10 @@ import {
 // Import CLI config manager for shared authentication
 import { configManager } from "../config/manager.js";
 
+// Import workspace tools and handler (Phase 1: Cloud workspace read-only)
+import { workspaceTools } from "./tools/workspace-tools.js";
+import { workspaceHandler } from "./handlers/workspace-handler.js";
+
 export class MCPCursorProtocolServer {
   private server: Server;
   private sessionManager: SessionManager;
@@ -891,7 +895,7 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
 
       // Combine all tools
       return {
-        tools: [...existingTools, ...workflowTools],
+        tools: [...existingTools, ...workflowTools, ...workspaceTools],
       };
     });
 
@@ -1931,6 +1935,74 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
             };
           }
         }
+        // Workspace tools (Phase 1: Cloud workspace read-only)
+        case "list_directory":
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  await workspaceHandler.listDirectory(args as any)
+                ),
+              },
+            ],
+          };
+        case "read_file":
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  await workspaceHandler.readFile(args as any)
+                ),
+              },
+            ],
+          };
+        case "read_file_lines":
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  await workspaceHandler.readFileLines(args as any)
+                ),
+              },
+            ],
+          };
+        case "search_codebase":
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  await workspaceHandler.searchCodebase(args as any)
+                ),
+              },
+            ],
+          };
+        case "get_ast":
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  await workspaceHandler.getAST(args as any)
+                ),
+              },
+            ],
+          };
+        case "get_file_stats":
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  await workspaceHandler.getFileStats(args as any)
+                ),
+              },
+            ],
+          };
+
         // Workflow engine tools
         case "detect_change":
         case "analyze_impact":

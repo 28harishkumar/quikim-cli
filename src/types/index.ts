@@ -13,6 +13,7 @@ export interface CLIConfig {
   userServiceUrl?: string;
   projectServiceUrl?: string;
   workflowServiceUrl?: string;
+  vibeServiceUrl?: string;
   auth?: AuthConfig;
   currentProject?: ProjectConfig;
 }
