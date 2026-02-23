@@ -16,7 +16,8 @@
     "sourceMap": true,
     "noImplicitAny": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true
+    "noUnusedParameters": true,
+    "allowUnreachableCode": false
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

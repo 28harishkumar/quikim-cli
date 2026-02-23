@@ -119,6 +119,8 @@ export class MCPCursorProtocolServer {
     this.toolHandlers = new ToolHandlers(this.apiClient);
 
     this.setupToolHandlers();
+    this.setupPromptHandlers();
+    this.setupErrorHandlers();
   }
 
   /**
@@ -127,8 +129,6 @@ export class MCPCursorProtocolServer {
    */
   private isLocalOnly(): boolean {
     return process.env.QUIKIM_LOCAL_ONLY === "1";
-    this.setupPromptHandlers();
-    this.setupErrorHandlers();
   }
 
   /**
