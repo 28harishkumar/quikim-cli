@@ -119,6 +119,14 @@ export class MCPCursorProtocolServer {
     this.toolHandlers = new ToolHandlers(this.apiClient);
 
     this.setupToolHandlers();
+  }
+
+  /**
+   * Check if running in local-only mode (no cloud sync).
+   * Set by install-claude-local command via QUIKIM_LOCAL_ONLY=1.
+   */
+  private isLocalOnly(): boolean {
+    return process.env.QUIKIM_LOCAL_ONLY === "1";
     this.setupPromptHandlers();
     this.setupErrorHandlers();
   }
@@ -1300,6 +1308,15 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
           }
         }
         case "pull_skills": {
+          if (this.isLocalOnly()) {
+            return {
+              content: [{
+                type: "text",
+                text: "ℹ️  Local-only mode: workflow service is not available. " +
+                      "Skills cannot be pulled from server. Use generate_* tools directly."
+              }]
+            };
+          }
           const workflowBase = configManager
             .getWorkflowServiceUrl()
             .replace(/\/$/, "");
@@ -1363,8 +1380,8 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
           const specName = nodeDef?.specName || "default";
           // Try local cache first
           let skillContent = await skillManager.readSkillFile(nodeId, specName);
-          if (!skillContent) {
-            // Fallback: fetch from server and cache locally
+          if (!skillContent && !this.isLocalOnly()) {
+            // Fallback: fetch from server and cache locally (skip in local-only mode)
             const workflowBase = configManager
               .getWorkflowServiceUrl()
               .replace(/\/$/, "");
@@ -1409,6 +1426,15 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
           };
         }
         case "get_workflow_instruction": {
+          if (this.isLocalOnly()) {
+            return {
+              content: [{
+                type: "text",
+                text: "ℹ️  Local-only mode: workflow service is not available. " +
+                      "Use generate_* tools directly to create artifacts in .quikim/."
+              }]
+            };
+          }
           const rawProjectId = (args.project_id as string) || "";
           const projectId =
             rawProjectId && rawProjectId !== "default"
@@ -1501,6 +1527,15 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
           }
         }
         case "report_workflow_progress": {
+          if (this.isLocalOnly()) {
+            return {
+              content: [{
+                type: "text",
+                text: "ℹ️  Local-only mode: workflow service is not available. " +
+                      "Artifacts are saved locally but workflow progress cannot be reported to server."
+              }]
+            };
+          }
           const rawProjectId = (args.project_id as string) || "";
           const projectId =
             rawProjectId && rawProjectId !== "default"
@@ -1569,6 +1604,15 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
           }
         }
         case "get_llm_queue": {
+          if (this.isLocalOnly()) {
+            return {
+              content: [{
+                type: "text",
+                text: "ℹ️  Local-only mode: workflow service is not available. " +
+                      "LLM queue is a server feature. Use generate_* tools directly."
+              }]
+            };
+          }
           const rawProjectId = (args.project_id as string) || "";
           const projectId =
             rawProjectId && rawProjectId !== "default"
@@ -1684,6 +1728,15 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
           }
         }
         case "update_queue_item": {
+          if (this.isLocalOnly()) {
+            return {
+              content: [{
+                type: "text",
+                text: "ℹ️  Local-only mode: workflow service is not available. " +
+                      "Queue updates are a server feature."
+              }]
+            };
+          }
           const queueId = args.queue_id as string;
           const newStatus = args.status as string;
           if (!queueId || !newStatus) {
@@ -1743,6 +1796,14 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
           }
         }
         case "poll_queue": {
+          if (this.isLocalOnly()) {
+            return {
+              content: [{
+                type: "text",
+                text: JSON.stringify({ hasTask: false, message: "Local-only mode: queue polling is not available." })
+              }]
+            };
+          }
           // Poll for next pending task and claim it
           const rawProjectId = (args.project_id as string) || "";
           const projectId =
@@ -1822,6 +1883,15 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
           }
         }
         case "complete_queue_task": {
+          if (this.isLocalOnly()) {
+            return {
+              content: [{
+                type: "text",
+                text: "ℹ️  Local-only mode: workflow service is not available. " +
+                      "Queue completion is a server feature."
+              }]
+            };
+          }
           // Mark queue task as completed
           const queueId = args.queue_id as string;
           const success = args.success as boolean;
@@ -1880,6 +1950,15 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
           }
         }
         case "skip_workflow_step": {
+          if (this.isLocalOnly()) {
+            return {
+              content: [{
+                type: "text",
+                text: "ℹ️  Local-only mode: workflow service is not available. " +
+                      "Workflow step skipping is a server feature."
+              }]
+            };
+          }
           // Skip a workflow step
           const nodeId = args.node_id as string;
           const reason = args.reason as string | undefined;

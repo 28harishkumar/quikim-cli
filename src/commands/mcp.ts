@@ -524,6 +524,118 @@ function removeQuikimFromConfig(config: unknown, editor: EditorType): unknown {
   return config;
 }
 
+/**
+ * Install Quikim MCP Server for Claude Desktop in LOCAL-ONLY mode.
+ * No Quikim account, login, or internet required.
+ */
+async function installClaudeLocalHandler(options: {
+  force?: boolean;
+  projectDir?: string;
+  projectName?: string;
+}): Promise<void> {
+  const projectDirRaw = options.projectDir ? resolve(options.projectDir) : cwd();
+  const projectName = options.projectName || "Local Dev Project";
+
+  output.header("Installing Quikim MCP Server for Claude Desktop (Local Mode)");
+  output.separator();
+  output.info("🔒 Local mode: no Quikim account or internet connection required.");
+  output.info("   Artifacts are saved to .quikim/ in your project directory only.");
+  output.separator();
+
+  // 1. Write fake auth so isAuthenticated() passes
+  const fakeAuth = {
+    token: "local-dev-skip",
+    userId: "local-dev-user",
+    email: "local@dev.local",
+    organizationId: "local-dev-org",
+    organizationName: "Local Dev",
+    expiresAt: "2099-12-31T00:00:00.000Z",
+  };
+  configManager.setAuth(fakeAuth);
+
+  // 2. Write .quikim/project.json with fake projectId / orgId
+  const { ProjectConfigManager } = await import("../config/manager.js");
+  const projectConfigMgr = new ProjectConfigManager(projectDirRaw);
+  const existingProjectConfig = await projectConfigMgr.read();
+
+  let projectId: string;
+  if (existingProjectConfig && !options.force) {
+    output.info(`Found existing .quikim/project.json (projectId: ${existingProjectConfig.projectId}).`);
+    output.info("Using existing config. Use --force to overwrite.");
+    projectId = existingProjectConfig.projectId;
+  } else {
+    projectId = `local-${Date.now().toString(36)}`;
+    await projectConfigMgr.write({
+      projectId,
+      organizationId: "local-dev-org",
+      userId: "local-dev-user",
+      name: projectName,
+      slug: projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+      connectedAt: new Date().toISOString(),
+    });
+    output.success(`Created .quikim/project.json (projectId: ${projectId})`);
+  }
+
+  // 3. Build Claude Desktop config with QUIKIM_LOCAL_ONLY=1 and dead API URLs
+  const editorConfig = getEditorConfig("claude-desktop");
+  const configPath = editorConfig.getConfigPath();
+  const configDir = editorConfig.getConfigDir();
+
+  try { await mkdir(configDir, { recursive: true }); } catch { /* exists */ }
+
+  const config = await editorConfig.readConfig(configPath);
+
+  if (isQuikimConfigured(config, "claude-desktop") && !options.force) {
+    output.info("Quikim MCP server already configured in Claude Desktop.");
+    output.info("Use --force to overwrite.");
+    return;
+  }
+
+  const cliPath = getClaudeDesktopCliPath();
+  const command = cliPath ? process.execPath : "quikim";
+  const args = cliPath ? [cliPath, "mcp", "serve"] : ["mcp", "serve"];
+
+  const localServerConfig: MCPServerConfig = {
+    command,
+    args,
+    env: {
+      QUIKIM_MCP_SILENT: "1",
+      QUIKIM_LOCAL_ONLY: "1",
+      QUIKIM_PROJECT_DIR: projectDirRaw,
+      QUIKIM_API_KEY: "local-dev-skip",
+      QUIKIM_API_BASE_URL: "http://localhost:0",
+      QUIKIM_WORKFLOW_SERVICE_URL: "http://localhost:0",
+    },
+  };
+
+  const c = config as ClaudeDesktopConfig;
+  if (!c.mcpServers) c.mcpServers = {};
+  c.mcpServers[CLAUDE_DESKTOP_QUIKIM_SERVER_KEY] = localServerConfig;
+
+  try {
+    await editorConfig.writeConfig(configPath, c);
+    output.success("Claude Desktop configured for local-only Quikim MCP!");
+    output.separator();
+    output.tableRow("Config file", configPath);
+    output.tableRow("Project dir", projectDirRaw);
+    output.tableRow("Mode", "Local only (no cloud sync)");
+    output.separator();
+    output.info("Restart Claude Desktop to activate.");
+    output.info("Artifacts will be saved to .quikim/ in your project directory.");
+    output.info("");
+    output.info("What works in local mode:");
+    output.info("  ✅  generate_requirements, generate_hld, generate_lld, generate_tasks");
+    output.info("  ✅  generate_mermaid, generate_wireframes, generate_context");
+    output.info("  ✅  pull_* (reads from local .quikim/ files)");
+    output.info("  ✅  local_* filesystem tools, git tools, plan tools");
+    output.info("  ⚠️   pull_* with force:true  — requires server, fails gracefully");
+    output.info("  ⚠️   Workflow/queue tools    — require server, return friendly error");
+  } catch (err) {
+    output.error(`Failed to write config: ${err instanceof Error ? err.message : "Unknown error"}`);
+    process.exit(1);
+  }
+}
+
 /** Start MCP server handler (called by any editor) */
 async function serveHandler(): Promise<void> {
   // Import and start the MCP server
@@ -866,6 +978,18 @@ export function createMCPCommands(): Command {
       "Project root path (default: current directory). Use if not running from project root."
     )
     .action(installClaudeDesktopHandler);
+
+  mcp
+    .command("install-claude-local")
+    .description(
+      "Configure Quikim MCP for Claude Desktop in LOCAL-ONLY mode. " +
+      "No Quikim account, login, or internet required. " +
+      "Run from your project root (or pass --project-dir)."
+    )
+    .option("-f, --force", "Overwrite existing configuration")
+    .option("--project-dir <path>", "Project root path (default: current directory)")
+    .option("--project-name <name>", "Display name for this local project (default: 'Local Dev Project')")
+    .action(installClaudeLocalHandler);
 
   // Uninstall commands for each editor
   mcp
