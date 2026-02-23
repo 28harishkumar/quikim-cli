@@ -68,6 +68,9 @@ import { planHandler } from "./handlers/plan-handler.js";
 // Git tools (search git history)
 import { gitTools } from "./tools/git-tools.js";
 import { gitHandler } from "./handlers/git-handler.js";
+// Git worktree tools (create worktrees, commit, merge)
+import { gitWorktreeTools } from "./tools/git-worktree-tools.js";
+import { gitWorktreeHandler } from "./handlers/git-worktree-handler.js";
 
 export class MCPCursorProtocolServer {
   private server: Server;
@@ -916,6 +919,7 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
           ...contextTools, // Context tools (pwd, ls)
           ...planTools, // Plan tools (save planning docs)
           ...gitTools, // Git tools (search git history)
+          ...gitWorktreeTools, // Git worktree tools (create worktrees, commit, merge)
         ],
       };
     });
@@ -2196,6 +2200,38 @@ Path: .quikim/artifacts/<spec_name>/lld_<name>.md. Do not use 'default'.
               },
             ],
           };
+
+        // ── Git worktree tools ───────────────────────────────────────────────
+        case "git_worktree_list":
+          return { content: [{ type: "text", text: JSON.stringify(await gitWorktreeHandler.list()) }] };
+        case "git_worktree_add":
+          return { content: [{ type: "text", text: JSON.stringify(await gitWorktreeHandler.add(args as any)) }] };
+        case "git_worktree_remove":
+          return { content: [{ type: "text", text: JSON.stringify(await gitWorktreeHandler.remove(args as any)) }] };
+        case "git_worktree_status":
+          return { content: [{ type: "text", text: JSON.stringify(await gitWorktreeHandler.status(args as any)) }] };
+        case "git_worktree_commit":
+          return { content: [{ type: "text", text: JSON.stringify(await gitWorktreeHandler.commit(args as any)) }] };
+        case "git_worktree_diff":
+          return { content: [{ type: "text", text: JSON.stringify(await gitWorktreeHandler.diff(args as any)) }] };
+        case "git_worktree_set_active":
+          return { content: [{ type: "text", text: JSON.stringify(await gitWorktreeHandler.setActive(args as any)) }] };
+        case "git_worktree_get_active":
+          return { content: [{ type: "text", text: JSON.stringify(await gitWorktreeHandler.getActive()) }] };
+        case "git_merge_to_dev":
+          return { content: [{ type: "text", text: JSON.stringify(await gitWorktreeHandler.mergeToDev(args as any)) }] };
+        case "git_merge_dev_to_main":
+          return { content: [{ type: "text", text: JSON.stringify(await gitWorktreeHandler.mergeDevToMain(args as any)) }] };
+
+        // ── Local write tools ────────────────────────────────────────────────
+        case "local_write_file":
+          return { content: [{ type: "text", text: JSON.stringify(await localWorkspaceHandler.writeFile(args as any)) }] };
+        case "local_str_replace":
+          return { content: [{ type: "text", text: JSON.stringify(await localWorkspaceHandler.strReplace(args as any)) }] };
+        case "local_delete_file":
+          return { content: [{ type: "text", text: JSON.stringify(await localWorkspaceHandler.deleteFile(args as any)) }] };
+        case "bash_exec":
+          return { content: [{ type: "text", text: JSON.stringify(await localWorkspaceHandler.bashExec(args as any)) }] };
 
         // Workflow engine tools
         case "detect_change":
