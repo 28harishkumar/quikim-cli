@@ -273,21 +273,36 @@ function getEditorConfig(editor: EditorType): EditorConfig {
   return configs[editor];
 }
 
+/**
+ * On Windows, .cmd files cannot be spawned directly by MCP hosts (which use
+ * Node.js child_process.spawn internally). They must be invoked via
+ * `cmd.exe /c <file>`. This helper wraps a Windows .cmd path accordingly.
+ */
+function wrapWindowsCmd(filePath: string, mcpArgs: string[]): { command: string; args: string[] } {
+  return { command: "cmd", args: ["/c", filePath, ...mcpArgs] };
+}
+
 /** Find the quikim binary path */
 function findQuikimBinary(): { command: string; args: string[] } {
+  const isWin = platform() === "win32";
+  const mcpArgs = ["mcp", "serve"];
+
   try {
     // Try to find quikim in PATH
-    if (platform() === "win32") {
+    if (isWin) {
       const result = execSync("where quikim", { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] });
-      const path = result.trim().split("\n")[0];
-      if (path && existsSync(path)) {
-        return { command: path, args: ["mcp", "serve"] };
+      // `where` may return multiple lines (quikim.cmd, quikim.ps1, …); prefer .cmd
+      const lines = result.trim().split(/\r?\n/).map((l: string) => l.trim()).filter(Boolean);
+      const cmdPath = lines.find((l: string) => l.toLowerCase().endsWith(".cmd")) || lines[0];
+      if (cmdPath && existsSync(cmdPath)) {
+        // .cmd files must be run via cmd /c — MCP hosts call spawn() directly
+        return wrapWindowsCmd(cmdPath, mcpArgs);
       }
     } else {
       const result = execSync("which quikim", { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] });
       const path = result.trim();
       if (path && existsSync(path)) {
-        return { command: path, args: ["mcp", "serve"] };
+        return { command: path, args: mcpArgs };
       }
     }
   } catch {
@@ -298,34 +313,42 @@ function findQuikimBinary(): { command: string; args: string[] } {
   try {
     const npmPrefix = execSync("npm config get prefix", { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] }).trim();
     if (npmPrefix) {
-      const globalBin = platform() === "win32" 
-        ? join(npmPrefix, "quikim.cmd")
-        : join(npmPrefix, "bin", "quikim");
-      if (existsSync(globalBin)) {
-        return { command: globalBin, args: ["mcp", "serve"] };
+      if (isWin) {
+        const globalBin = join(npmPrefix, "quikim.cmd");
+        if (existsSync(globalBin)) {
+          return wrapWindowsCmd(globalBin, mcpArgs);
+        }
+      } else {
+        const globalBin = join(npmPrefix, "bin", "quikim");
+        if (existsSync(globalBin)) {
+          return { command: globalBin, args: mcpArgs };
+        }
       }
     }
   } catch {
     // npm config failed
   }
 
-  // Fallback: try to use node with the current script
-  // This works when quikim is installed via npm link or in development
+  // Fallback: try to use node with the current script.
+  // This works when quikim is installed via npm link or in development,
+  // and is safe cross-platform since we're invoking node directly.
   try {
     const currentFile = fileURLToPath(import.meta.url);
     const cliDir = dirname(dirname(dirname(currentFile)));
     const distIndex = join(cliDir, "dist", "index.js");
-    // Check if the file exists synchronously
     if (existsSync(distIndex)) {
-      return { command: process.execPath, args: [distIndex, "mcp", "serve"] };
+      return { command: process.execPath, args: [distIndex, ...mcpArgs] };
     }
   } catch {
     // Fallback failed
   }
 
-  // Last resort: return "quikim" and hope it's in PATH
-  // The user will need to ensure quikim is in their PATH
-  return { command: "quikim", args: ["mcp", "serve"] };
+  // Last resort: on Windows MCP hosts need cmd /c to invoke a named script;
+  // on Unix/Mac the bare name is fine since the shell resolves PATH.
+  if (isWin) {
+    return { command: "cmd", args: ["/c", "quikim", ...mcpArgs] };
+  }
+  return { command: "quikim", args: mcpArgs };
 }
 
 /**
@@ -354,14 +377,13 @@ function getClaudeDesktopCliPath(): string {
  */
 function getClaudeDesktopMCPServerConfig(projectDir: string, apiKey: string): MCPServerConfig {
   const cliPath = getClaudeDesktopCliPath();
-  const command = cliPath ? process.execPath : "node";
-  const args = cliPath ? [cliPath, "mcp", "serve"] : ["mcp", "serve"];
-  if (!cliPath) {
-    // If no dist path, use quikim from PATH
-    const { command: cmd, args: a } = findQuikimBinary();
-    return getClaudeDesktopMCPServerConfigFromCommand(projectDir, apiKey, cmd, a);
+  if (cliPath) {
+    // node + absolute path works cross-platform without .cmd wrapping
+    return getClaudeDesktopMCPServerConfigFromCommand(projectDir, apiKey, process.execPath, [cliPath, "mcp", "serve"]);
   }
-  return getClaudeDesktopMCPServerConfigFromCommand(projectDir, apiKey, command, args);
+  // findQuikimBinary handles Windows .cmd → cmd /c wrapping
+  const { command: cmd, args: a } = findQuikimBinary();
+  return getClaudeDesktopMCPServerConfigFromCommand(projectDir, apiKey, cmd, a);
 }
 
 /**
@@ -591,9 +613,18 @@ async function installClaudeLocalHandler(options: {
     return;
   }
 
+  // Resolve the command/args correctly for the current platform.
+  // Prefer node + absolute dist path (works everywhere without .cmd issues).
+  // Fall back to findQuikimBinary() which handles Windows .cmd wrapping.
+  let command: string;
+  let args: string[];
   const cliPath = getClaudeDesktopCliPath();
-  const command = cliPath ? process.execPath : "quikim";
-  const args = cliPath ? [cliPath, "mcp", "serve"] : ["mcp", "serve"];
+  if (cliPath) {
+    command = process.execPath;
+    args = [cliPath, "mcp", "serve"];
+  } else {
+    ({ command, args } = findQuikimBinary());
+  }
 
   const localServerConfig: MCPServerConfig = {
     command,
